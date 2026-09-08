@@ -1,11 +1,15 @@
-import { FileText, ClipboardCheck } from 'lucide-react';
+import { User, MessageCircle, MapPin, ListPlus, Compass } from 'lucide-react';
 
-export const WIZARD_STEP_COUNT = 2;
-
-export const WIZARD_STEPS = [
-  { id: 1, key: 'form', title: 'Lead Form', subtitle: 'Fill all lead details.', icon: FileText },
-  { id: 2, key: 'review', title: 'Review', subtitle: 'Confirm & save.', icon: ClipboardCheck },
+/** The Add/Edit Lead form's 5 visual sections — a single scrollable page, not a click-through wizard. */
+export const LEAD_FORM_STEPS = [
+  { id: 1, key: 'identity', anchorId: 'step-identity', title: 'Customer Identity', subtitle: 'Name & phone number', icon: User },
+  { id: 2, key: 'communication', anchorId: 'step-communication', title: 'Communication', subtitle: 'WhatsApp & email', icon: MessageCircle },
+  { id: 3, key: 'location', anchorId: 'step-location', title: 'Location', subtitle: 'City & state', icon: MapPin },
+  { id: 4, key: 'details', anchorId: 'step-details', title: 'Additional Details', subtitle: 'Optional extras', icon: ListPlus },
+  { id: 5, key: 'source', anchorId: 'step-source', title: 'Lead Source', subtitle: 'Where it came from', icon: Compass },
 ];
+
+export const LEAD_FORM_STEP_IDS = LEAD_FORM_STEPS.map((s) => s.anchorId);
 
 export const LEAD_SOURCES = [
   { value: 'dpw', label: 'DPW' },
@@ -33,6 +37,17 @@ export function defaultLeadSourceForRole(role) {
   if (role === 'sales_executive') return 'call_lead';
   return 'dpw';
 }
+
+/** Keep in sync with backend/src/models/Lead.js REFERRAL_RELATIONSHIPS */
+export const REFERRAL_RELATIONSHIPS = [
+  { value: 'friend', label: 'Friend' },
+  { value: 'family', label: 'Family' },
+  { value: 'colleague', label: 'Colleague' },
+  { value: 'previous_customer', label: 'Previous Customer' },
+  { value: 'business_partner', label: 'Business Partner' },
+  { value: 'hotel_travel_partner', label: 'Hotel / Travel Partner' },
+  { value: 'other', label: 'Other' },
+];
 
 export const PRIORITIES = [
   { value: 'low', label: 'Low', color: 'text-slate-600 bg-slate-500/10 border-slate-500/30' },
@@ -227,4 +242,15 @@ export const defaultWizardValues = {
   companyName: '',
   alternatePhone: '',
   alternateEmail: '',
+  // Referral Details — only persisted when leadSource === 'referral' (see leadWizardUtils.js)
+  referrerLeadId: '',
+  referrerName: '',
+  referrerPhone: '',
+  referrerCity: '',
+  referrerState: '',
+  referrerRelationship: '',
+  previousTripWithUs: false,
+  previousDestination: '',
+  previousTravelDate: '',
+  referralNotes: '',
 };

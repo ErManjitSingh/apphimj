@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Phone, MapPin, Repeat } from 'lucide-react';
 import API from '../../api/axios';
+import { useLogModuleOpened } from '../../hooks/useLogModuleOpened';
 import ExecutivePageShell from './ExecutivePageShell';
 import Avatar from '../ui/Avatar';
 import { formatCurrency } from './executiveUtils';
 import { executiveCard, executiveIconAccent, executiveSpinner } from './executivePageStyles';
 
 export default function ExecutiveCustomersPage() {
+  useLogModuleOpened('customers');
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
 

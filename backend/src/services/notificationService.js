@@ -5,6 +5,7 @@ const { getIO } = require('../config/socket');
 const { formatNotification } = require('../utils/queryHelpers');
 const { NOTIFICATION_TYPES: T } = require('../constants/notificationTypes');
 const { LEAD_ACCEPT_MINUTES } = require('../constants/salesSop');
+const { sendPushToUser } = require('./webPushService');
 
 async function emitUnreadCount(userId) {
   const io = getIO();
@@ -32,6 +33,18 @@ async function notifyUser(userId, payload) {
     io.to(`user:${id}`).emit('notification:new', formatted);
     await emitUnreadCount(id);
   }
+
+  // Same event, second channel — every device this user has registered for push, not just
+  // whichever tab happens to be open. Never blocks/fails the CRM notification above it.
+  sendPushToUser(id, {
+    title: payload.title,
+    body: payload.message,
+    href: payload.meta?.href,
+    // The notification's own id, not its type — so two distinct lead-assignment alerts (say)
+    // never collapse into one another, only a genuine retry of the exact same event would.
+    tag: String(doc._id),
+  }).catch((err) => console.error('[WebPush] notifyUser dispatch failed', err.message));
+
   return formatted;
 }
 

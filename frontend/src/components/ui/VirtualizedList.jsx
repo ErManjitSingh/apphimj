@@ -40,7 +40,11 @@ export default function VirtualizedList({
       {virtualItems.map((virtualRow) => {
         const item = items[virtualRow.index];
         return (
-          <div key={getItemKey(item, virtualRow.index)} data-index={virtualRow.index}>
+          <div
+            key={getItemKey(item, virtualRow.index)}
+            data-index={virtualRow.index}
+            ref={virtualizer.measureElement}
+          >
             {renderItem(item, virtualRow.index)}
           </div>
         );

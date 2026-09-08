@@ -25,7 +25,7 @@ export function ColdCallAlertsPanel({ items = [], onMarkDone }) {
           <p className="text-[11px] text-red-600/80">Red alerts stay until you mark call done</p>
         </div>
       </div>
-      <div className="space-y-2">
+      <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
         {items.map((item) => (
           <div
             key={item._id}

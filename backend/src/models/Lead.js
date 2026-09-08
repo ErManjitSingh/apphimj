@@ -36,6 +36,17 @@ const REACTIVATION_STAGES = [
   'converted',
 ];
 
+/** Source = 'referral' → who sent us this lead. See leadSchema.referral below. */
+const REFERRAL_RELATIONSHIPS = [
+  'friend',
+  'family',
+  'colleague',
+  'previous_customer',
+  'business_partner',
+  'hotel_travel_partner',
+  'other',
+];
+
 const leadSchema = new mongoose.Schema(
   {
     leadId: { type: String, unique: true, sparse: true },
@@ -66,6 +77,11 @@ const leadSchema = new mongoose.Schema(
     leadScore: { type: String, enum: LEAD_SCORES, default: 'low', index: true },
     smartScore: { type: Number, default: 0, min: 0, max: 100, index: true },
     temperature: { type: String, enum: ['hot', 'warm', 'cold', 'vip'], default: 'cold', index: true },
+    /** Add/Edit Lead form's "Lead Score" (Step 6) — booking potential from customer+travel details
+     *  entered on the form, distinct from smartScore's post-creation engagement signals. See
+     *  services/leadScoringService.js computeBookingPotential(). */
+    bookingPotentialScore: { type: Number, default: 0, min: 0, max: 100, index: true },
+    bookingPotentialCategory: { type: String, enum: ['cold', 'warm', 'hot'], default: 'cold', index: true },
     coldReason: { type: String, trim: true, default: '' },
     coldCallPending: { type: Boolean, default: false, index: true },
     coldCallReminderAt: { type: Date },
@@ -204,6 +220,21 @@ const leadSchema = new mongoose.Schema(
         },
       ],
     },
+    /** Populated only when source = 'referral' (see Step 5 · Lead Source). Cleared when the
+     *  source is changed away from Referral — see normalizeLeadInput.normalizeLeadUpdateInput. */
+    referral: {
+      /** Set when the referrer was matched to an existing lead/customer via search. */
+      referrerLeadId: { type: mongoose.Schema.Types.ObjectId, ref: 'Lead', default: null },
+      referrerName: { type: String, trim: true, default: '' },
+      referrerPhone: { type: String, trim: true, default: '' },
+      referrerCity: { type: String, trim: true, default: '' },
+      referrerState: { type: String, trim: true, default: '' },
+      relationship: { type: String, enum: [...REFERRAL_RELATIONSHIPS, ''], default: '' },
+      previousTripWithUs: { type: Boolean, default: false },
+      previousDestination: { type: String, trim: true, default: '' },
+      previousTravelDate: { type: Date },
+      notes: { type: String, trim: true, default: '' },
+    },
   },
   { timestamps: true }
 );
@@ -264,3 +295,4 @@ module.exports.REACTIVATION_STAGES = REACTIVATION_STAGES;
 module.exports.BUDGET_RANGES = BUDGET_RANGES;
 module.exports.LEAD_SCORES = LEAD_SCORES;
 module.exports.LEAD_TYPES = LEAD_TYPES;
+module.exports.REFERRAL_RELATIONSHIPS = REFERRAL_RELATIONSHIPS;

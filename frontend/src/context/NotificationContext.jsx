@@ -20,6 +20,7 @@ import {
   markNotificationRead,
   markAllNotificationsRead,
 } from '../api/notificationApi';
+import { subscribeToPush, unsubscribeFromPush } from '../lib/pushNotifications';
 const NotificationDrawer = lazy(() => import('../components/notifications/NotificationDrawer'));
 const NotificationDetailModal = lazy(() => import('../components/notifications/NotificationDetailModal'));
 
@@ -122,10 +123,20 @@ export function NotificationProvider({ children }) {
         socketRef.current = null;
       }
       setConnected(false);
+      // This device should stop receiving the signed-out user's push notifications.
+      unsubscribeFromPush();
       return undefined;
     }
 
     loadUnreadOnly();
+
+    // Silently restore this device's push subscription when permission was already granted in a
+    // previous session — never prompts (Notification.requestPermission() is only ever called from
+    // requestBrowserPermission(), triggered by the user opening the notification drawer). If
+    // permission is 'default' or 'denied', this intentionally does nothing.
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      subscribeToPush();
+    }
 
     const token = authStorage.getToken();
     if (!token) return undefined;
@@ -176,9 +187,15 @@ export function NotificationProvider({ children }) {
 
   const requestBrowserPermission = useCallback(async () => {
     if (!('Notification' in window)) return 'unsupported';
-    if (Notification.permission === 'granted') return 'granted';
+    if (Notification.permission === 'granted') {
+      // Already granted on a prior visit — (re)register this device in case its subscription
+      // lapsed (browser data cleared, etc.) or it was never registered before this feature shipped.
+      subscribeToPush();
+      return 'granted';
+    }
     if (Notification.permission === 'denied') return 'denied';
     const result = await Notification.requestPermission();
+    if (result === 'granted') subscribeToPush();
     return result;
   }, []);
 

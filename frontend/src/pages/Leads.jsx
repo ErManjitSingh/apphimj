@@ -67,17 +67,21 @@ export default function Leads() {
   const canEditLead = can('leads', 'edit');
   const canDeleteLead = can('leads', 'delete');
   const canImportExport = !isLeadProvider && (isManagerRole || isAdmin);
-  const leadMenuActions = isLimitedRole
-    ? { view: true, edit: false, assign: false, transferBranch: false, delete: false }
-    : isLeadProvider
-      ? { view: true, edit: canEditLead, assign: userCanAssignLeads, transferBranch: false, delete: false }
-      : {
-          view: true,
-          edit: isManagerRole,
-          assign: isManagerRole,
-          transferBranch: isManagerRole,
-          delete: isManagerRole && canDeleteLead,
-        };
+  const leadMenuActions = useMemo(
+    () =>
+      isLimitedRole
+        ? { view: true, edit: false, assign: false, transferBranch: false, delete: false }
+        : isLeadProvider
+          ? { view: true, edit: canEditLead, assign: userCanAssignLeads, transferBranch: false, delete: false }
+          : {
+              view: true,
+              edit: isManagerRole,
+              assign: isManagerRole,
+              transferBranch: isManagerRole,
+              delete: isManagerRole && canDeleteLead,
+            },
+    [isLimitedRole, isLeadProvider, canEditLead, userCanAssignLeads, isManagerRole, canDeleteLead]
+  );
   const config = pageConfig[location.pathname] || pageConfig['/leads'];
   const isAllLeadsPage = location.pathname === '/leads';
   const isConvertedPage = location.pathname === '/leads/converted' || config.status === 'converted';
@@ -281,7 +285,7 @@ export default function Leads() {
     syncPeriodToUrl(next);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = useCallback(async (id) => {
     const ok = await confirm({
       title: 'Delete lead?',
       message: 'This lead will be deleted permanently.',
@@ -293,9 +297,9 @@ export default function Leads() {
     await API.delete(`/leads/${id}`);
     setPreviewLead(null);
     invalidateLeads();
-  };
+  }, [confirm, invalidateLeads]);
 
-  const handleTransferBranch = async ({ leadId, branchId }) => {
+  const handleTransferBranch = useCallback(async ({ leadId, branchId }) => {
     const branch = availableBranches.find((b) => b._id === branchId);
     const ok = await confirm({
       title: 'Transfer lead to another branch?',
@@ -314,7 +318,7 @@ export default function Leads() {
     } finally {
       setTransferSubmitting(false);
     }
-  };
+  }, [availableBranches, confirm, invalidateLeads]);
 
   const handleBulkStatus = async (payload) => {
     const ids = Object.keys(rowSelection).filter((k) => rowSelection[k]);

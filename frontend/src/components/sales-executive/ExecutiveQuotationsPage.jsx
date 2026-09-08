@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import API from '../../api/axios';
 import { unwrapList } from '../../utils/apiHelpers';
+import { useLogModuleOpened } from '../../hooks/useLogModuleOpened';
 import ExecutivePageShell from './ExecutivePageShell';
 import ExecutiveQuotationKpiStrip from './ExecutiveQuotationKpiStrip';
 import MobileExecutiveQuotations from './MobileExecutiveQuotations';
@@ -74,6 +75,7 @@ function startOfMonth() {
 }
 
 export default function ExecutiveQuotationsPage() {
+  useLogModuleOpened('quotations');
   const location = useLocation();
   const navigate = useNavigate();
   const { dateFrom, dateTo, setPeriod } = useUrlPeriodFilter();

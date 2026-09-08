@@ -47,6 +47,7 @@ export const QuotationApprovalPage = lazy(() => import('../components/sales-mana
 export const ManagerQuotationBuilder = lazy(() => import('../components/sales-manager/ManagerQuotationBuilder'));
 export const TeamPerformancePage = lazy(() => import('../components/sales-manager/TeamPerformancePage'));
 export const ManagerReportsPage = lazy(() => import('../components/sales-manager/ManagerReportsPage'));
+export const CallReportPage = lazy(() => import('../components/sales-manager/call-report/CallReportPage'));
 export const ManagerCalendarPage = lazy(() => import('../components/sales-manager/ManagerCalendarPage'));
 export const ManagerNotificationsPage = lazy(() => import('../components/sales-manager/ManagerNotificationsPage'));
 export const ManagerProfilePage = lazy(() => import('../components/sales-manager/ManagerProfilePage'));

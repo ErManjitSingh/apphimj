@@ -23,6 +23,7 @@ import {
   Target,
   Percent,
   Thermometer,
+  PhoneCall,
 } from "lucide-react";
 import { operationsAdminMenuChildren } from "../operations-manager/operations-nav-config";
 import { leadManagementSections } from "./lead-management-config";
@@ -47,6 +48,13 @@ export const reportsAnalyticsItems = [
     icon: Timer,
     roles: ["admin", "sales_manager", "team_leader"],
     permission: { module: "leads", action: "view" },
+  },
+  {
+    path: "/call-report",
+    label: "Call Report",
+    icon: PhoneCall,
+    roles: ["admin"],
+    permission: { module: "reports", action: "view" },
   },
 ];
 

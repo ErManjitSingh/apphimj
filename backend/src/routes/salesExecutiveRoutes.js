@@ -32,6 +32,7 @@ const {
   sendQuotationWhatsApp,
 } = require('../controllers/whatsappContactController');
 const { sendLeadEmail, listLeadEmailHistory } = require('../controllers/emailController');
+const { logModuleOpened } = require('../controllers/executiveActivityController');
 const { protect } = require('../middleware/auth');
 const { authorize } = require('../middleware/rbac');
 const { requirePermission } = require('../middleware/requirePermission');
@@ -43,6 +44,7 @@ router.get('/customers', listCustomers);
 router.get('/notifications', listNotifications);
 router.get('/profile', getProfile);
 router.get('/calendar', getCalendar);
+router.post('/activity/module-opened', logModuleOpened);
 
 router.get('/followups/summary', getFollowUpSummary);
 router.get('/followups', listFollowUps);

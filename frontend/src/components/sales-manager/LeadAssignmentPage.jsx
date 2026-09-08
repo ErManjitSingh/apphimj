@@ -225,6 +225,8 @@ export default function LeadAssignmentPage() {
                     return (
                       <tr
                         key={lead._id}
+                        data-index={i}
+                        ref={rowVirtualizer.measureElement}
                         className={cn(
                           'group border-b border-slate-100 last:border-0',
                           selected.includes(lead._id)

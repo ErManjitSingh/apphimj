@@ -4,6 +4,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { formatUserResponse, generateToken, getRestrictedSessionMeta } = require('../middleware/auth');
 const { resolveUserPermissions } = require('../services/permissionsService');
 const { logActivity, getClientIp } = require('../services/activityService');
+const { logExecutiveActivity } = require('../services/executiveActivityService');
 
 const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
@@ -27,6 +28,15 @@ const login = asyncHandler(async (req, res) => {
     ip: getClientIp(req),
     branchId: user.branchId || req.branchId || null,
   });
+  // ActivityLog auto-deletes after 24h — keep a persistent copy for executives so
+  // logins still show up in 7/30-day Executive Activity views.
+  if (user.role === 'sales_executive') {
+    logExecutiveActivity({
+      userId: user._id,
+      branchId: user.branchId || req.branchId || null,
+      type: 'login',
+    }).catch(() => {});
+  }
 
   const permissions = await resolveUserPermissions(user);
   const payload = formatUserResponse(user, permissions);
@@ -46,6 +56,13 @@ const logout = asyncHandler(async (req, res) => {
     ip: getClientIp(req),
     branchId: req.user.branchId || req.branchId || null,
   });
+  if (req.user.role === 'sales_executive') {
+    logExecutiveActivity({
+      userId: req.user._id,
+      branchId: req.user.branchId || req.branchId || null,
+      type: 'logout',
+    }).catch(() => {});
+  }
   res.json({ message: 'Logged out' });
 });
 

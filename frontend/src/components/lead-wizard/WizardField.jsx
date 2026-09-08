@@ -1,17 +1,17 @@
 import { cn } from '../../lib/utils';
 
-export default function WizardField({ label, required, error, hint, children, className }) {
+export default function WizardField({ label, required, error, hint, children, className, labelClassName }) {
   return (
-    <div className={cn('space-y-1.5', className)}>
+    <div className={cn('space-y-1', className)}>
       {label && (
-        <label className="block text-[12px] font-semibold text-slate-700">
+        <label className={cn('block text-[12px] font-semibold text-slate-700', labelClassName)}>
           {label}
           {required && <span className="text-rose-500 ml-0.5">*</span>}
         </label>
       )}
       {children}
-      {hint && !error && <p className="text-[11px] text-slate-400 leading-tight">{hint}</p>}
-      {error && <p className="text-[11px] text-rose-500 font-medium">{error}</p>}
+      {hint && !error && <p className="text-[10px] text-slate-400 leading-tight">{hint}</p>}
+      {error && <p className="text-[10px] text-rose-500 font-medium">{error}</p>}
     </div>
   );
 }
@@ -20,7 +20,7 @@ export function WizardInput({ className, error, readOnly, disabled, ...props }) 
   return (
     <input
       className={cn(
-        'w-full h-11 rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-800 placeholder:text-slate-400',
+        'w-full h-10 rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-800 placeholder:text-slate-400',
         'focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]/25 focus:border-[#5D5FEF]/50 transition-shadow',
         error && 'border-rose-300 focus:ring-rose-200 focus:border-rose-400',
         (readOnly || disabled) && 'bg-slate-100 text-slate-500 cursor-not-allowed',
@@ -37,7 +37,7 @@ export function WizardSelect({ className, error, children, ...props }) {
   return (
     <select
       className={cn(
-        'w-full h-11 rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-800',
+        'w-full h-10 rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-800',
         'focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]/25 focus:border-[#5D5FEF]/50 transition-shadow',
         error && 'border-rose-300 focus:ring-rose-200 focus:border-rose-400',
         className
@@ -53,7 +53,7 @@ export function WizardTextarea({ className, error, ...props }) {
   return (
     <textarea
       className={cn(
-        'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 resize-none min-h-[88px]',
+        'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-800 resize-none min-h-[68px]',
         'focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]/25 focus:border-[#5D5FEF]/50 transition-shadow',
         error && 'border-rose-300 focus:ring-rose-200 focus:border-rose-400',
         className
@@ -67,6 +67,8 @@ export function WizardTextarea({ className, error, ...props }) {
 export function IconInput({
   icon: Icon,
   className,
+  containerClassName,
+  iconClassName,
   error,
   readOnly,
   disabled,
@@ -77,15 +79,16 @@ export function IconInput({
   return (
     <div
       className={cn(
-        'flex items-center h-11 rounded-xl border border-slate-200 bg-white overflow-hidden',
+        'flex items-center h-10 rounded-xl border border-slate-200 bg-white overflow-hidden',
         'focus-within:ring-2 focus-within:ring-[#5D5FEF]/25 focus-within:border-[#5D5FEF]/50 transition-shadow',
         error && 'border-rose-300 focus-within:ring-rose-200',
-        (readOnly || disabled) && 'bg-slate-100'
+        (readOnly || disabled) && 'bg-slate-100',
+        containerClassName
       )}
     >
       {prefix || (
         Icon ? (
-          <span className="pl-3 pr-1.5 text-slate-400 shrink-0">
+          <span className={cn('pl-3 pr-1.5 text-slate-400 shrink-0', iconClassName)}>
             <Icon className="w-4 h-4" />
           </span>
         ) : null
@@ -110,7 +113,7 @@ export function IconSelect({ icon: Icon, className, error, children, ...props })
   return (
     <div
       className={cn(
-        'flex items-center h-11 rounded-xl border border-slate-200 bg-white overflow-hidden',
+        'flex items-center h-10 rounded-xl border border-slate-200 bg-white overflow-hidden',
         'focus-within:ring-2 focus-within:ring-[#5D5FEF]/25 focus-within:border-[#5D5FEF]/50 transition-shadow',
         error && 'border-rose-300 focus-within:ring-rose-200'
       )}
@@ -123,6 +126,7 @@ export function IconSelect({ icon: Icon, className, error, children, ...props })
       <select
         className={cn(
           'flex-1 min-w-0 h-full bg-transparent pr-3 text-sm text-slate-800 focus:outline-none appearance-none',
+          !Icon && 'pl-3.5',
           className
         )}
         {...props}

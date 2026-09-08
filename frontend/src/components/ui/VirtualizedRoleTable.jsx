@@ -102,6 +102,8 @@ export default function VirtualizedRoleTable({
                   return (
                     <tr
                       key={row.id}
+                      data-index={virtualRow.index}
+                      ref={rowVirtualizer.measureElement}
                       className={cn(
                         rowClassName,
                         stallOrExtra || leadListRowBg(virtualRow.index)

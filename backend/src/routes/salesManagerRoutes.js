@@ -17,6 +17,21 @@ const {
   getCalendar,
 } = require('../controllers/salesManagerController');
 const {
+  getTimeline,
+  getSummary,
+  getTeamOverviewHandler,
+  getAnalyticsHandler,
+  getHourDetail,
+} = require('../controllers/callReportController');
+const {
+  getTimeline: getActivityTimeline,
+  getSummary: getActivitySummary,
+  getModuleUsageHandler,
+  getTeamOverviewHandler: getActivityTeamOverviewHandler,
+  getAnalyticsHandler: getActivityAnalyticsHandler,
+  getLoginSessionsHandler,
+} = require('../controllers/executiveActivityController');
+const {
   listTeams,
   getTeam,
   createTeam,
@@ -51,6 +66,19 @@ router.put('/quotations/:id', managerOnly, updateQuotation);
 router.get('/notifications', managerOnly, listNotifications);
 router.get('/reports', managerOnly, getReports);
 router.get('/calendar', managerOnly, getCalendar);
+
+router.get('/call-report/timeline', managerOnly, getTimeline);
+router.get('/call-report/summary', managerOnly, getSummary);
+router.get('/call-report/team-overview', managerOnly, getTeamOverviewHandler);
+router.get('/call-report/analytics', managerOnly, getAnalyticsHandler);
+router.get('/call-report/hour-detail', managerOnly, getHourDetail);
+
+router.get('/call-report/activity/timeline', managerOnly, getActivityTimeline);
+router.get('/call-report/activity/summary', managerOnly, getActivitySummary);
+router.get('/call-report/activity/module-usage', managerOnly, getModuleUsageHandler);
+router.get('/call-report/activity/team-overview', managerOnly, getActivityTeamOverviewHandler);
+router.get('/call-report/activity/analytics', managerOnly, getActivityAnalyticsHandler);
+router.get('/call-report/activity/login-sessions', managerOnly, getLoginSessionsHandler);
 
 router.get('/teams/leaders', teamAccess, listTeamLeaders);
 router.get('/teams/available-executives', teamAccess, listAvailableExecutives);

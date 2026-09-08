@@ -913,6 +913,14 @@ async function createBooking(payload, actor) {
     notifyBookingConfirmed(booking.toObject()).catch(() => {});
   }
 
+  require('./executiveActivityService').logExecutiveActivity({
+    userId: actor?._id,
+    branchId: booking.branchId,
+    type: 'booking_created',
+    refId: booking._id,
+    meta: { bookingNumber: booking.bookingNumber },
+  }).catch(() => {});
+
   await cacheService.invalidate('ops:');
   return booking;
 }
@@ -945,6 +953,14 @@ async function updateBooking(id, payload, actor) {
     await createOperationsTasksForBooking(booking, actor);
     notifyBookingConfirmed(booking.toObject()).catch(() => {});
   }
+
+  require('./executiveActivityService').logExecutiveActivity({
+    userId: actor?._id,
+    branchId: booking.branchId,
+    type: 'booking_updated',
+    refId: booking._id,
+    meta: { bookingNumber: booking.bookingNumber },
+  }).catch(() => {});
 
   await cacheService.invalidate('ops:');
   return booking;

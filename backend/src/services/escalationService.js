@@ -43,16 +43,42 @@ async function processFollowUpEscalations() {
       if (overdueMin < level.minutes) continue;
       if (existingKeys.has(`${fu._id}:${level.key}`)) continue;
 
-      await LeadEscalation.create({
-        leadId: fu.lead?._id || fu.lead,
-        followUpId: fu._id,
-        branchId: fu.branchId || fu.lead?.branchId,
-        level: level.key,
-        minutesOverdue: overdueMin,
-        notifiedRoles: level.roles,
-        meta: { leadName: fu.lead?.name, executiveName: fu.assignedTo?.name },
-      });
+      // Atomic upsert on the same {followUpId, level} the unique index enforces — this is what
+      // makes concurrent scheduler ticks (setInterval doesn't wait for a slow previous tick to
+      // finish, so overlap is expected under load) safe: MongoDB guarantees only one concurrent
+      // upsert against the same key actually inserts, every other one just matches the existing
+      // doc. The try/catch is defense in depth for the rare case a duplicate-key error still
+      // surfaces from the race window inside the upsert itself — either way, "already exists" is
+      // treated as already scheduled, never as an application error, and never aborts the rest of
+      // this batch.
+      let inserted = false;
+      try {
+        const result = await LeadEscalation.findOneAndUpdate(
+          { followUpId: fu._id, level: level.key },
+          {
+            $setOnInsert: {
+              leadId: fu.lead?._id || fu.lead,
+              followUpId: fu._id,
+              branchId: fu.branchId || fu.lead?.branchId,
+              level: level.key,
+              minutesOverdue: overdueMin,
+              notifiedRoles: level.roles,
+              meta: { leadName: fu.lead?.name, executiveName: fu.assignedTo?.name },
+            },
+          },
+          { upsert: true, includeResultMetadata: true }
+        );
+        inserted = Boolean(result?.lastErrorObject?.upserted);
+      } catch (err) {
+        if (err.code === 11000) {
+          inserted = false; // lost the race to a concurrent tick — already scheduled, not an error
+        } else {
+          throw err;
+        }
+      }
+
       existingKeys.add(`${fu._id}:${level.key}`);
+      if (!inserted) continue; // already existed (this run or a concurrent one) — nothing new to notify
 
       await logLeadActivity({
         leadId: fu.lead?._id || fu.lead,

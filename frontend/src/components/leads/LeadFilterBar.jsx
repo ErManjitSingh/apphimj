@@ -227,6 +227,18 @@ export default function LeadFilterBar({
               {chip.label}
             </ChipButton>
           ))}
+          <ChipButton
+            active={filters.connected === 'true'}
+            activeClass="bg-blue-600 text-white shadow-sm shadow-blue-500/30 ring-blue-700/20"
+            idleClass="bg-blue-50 text-blue-700 ring-blue-200 hover:bg-blue-100"
+            onClick={() =>
+              applyQuick(
+                filters.connected === 'true' ? { connected: '' } : { connected: 'true' }
+              )
+            }
+          >
+            Connected
+          </ChipButton>
         </div>
       </div>
 

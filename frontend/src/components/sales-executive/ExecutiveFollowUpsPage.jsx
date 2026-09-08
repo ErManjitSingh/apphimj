@@ -12,6 +12,7 @@ import {
 import API from '../../api/axios';
 import { unwrapList } from '../../utils/apiHelpers';
 import { useDataRefresh } from '../../hooks/useDataRefresh';
+import { useLogModuleOpened } from '../../hooks/useLogModuleOpened';
 import ExecutivePageShell from './ExecutivePageShell';
 import ExecutiveFollowUpKpiStrip from './ExecutiveFollowUpKpiStrip';
 import ExecutiveFollowUpRow from './ExecutiveFollowUpRow';
@@ -59,6 +60,7 @@ function startOfMonth() {
 }
 
 export default function ExecutiveFollowUpsPage() {
+  useLogModuleOpened('follow_ups');
   const [tab, setTab] = useState('today');
   const [category, setCategory] = useState('');
   const [typeFilter, setTypeFilter] = useState('');

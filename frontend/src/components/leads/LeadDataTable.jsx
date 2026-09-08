@@ -319,6 +319,8 @@ export default function LeadDataTable({
               return (
                 <tr
                   key={row.id}
+                  data-index={virtualRow.index}
+                  ref={rowVirtualizer.measureElement}
                   onClick={() => onRowClick(row.original)}
                   className={cn('group cursor-pointer', rowBg, LEAD_LIST_ROW_HOVER)}
                 >

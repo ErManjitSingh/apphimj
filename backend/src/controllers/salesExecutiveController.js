@@ -17,6 +17,7 @@ const {
   formatStatusChangeDescription,
 } = require('../services/leadAuditService');
 const { onLeadConverted, isLeadStatusLocked } = require('../services/leadConversionService');
+const { applyBookingPotential } = require('../services/leadScoringService');
 const {
   getLeadPaymentSummary,
   getLeadPaymentReceipt,
@@ -46,6 +47,7 @@ const {
 } = require('../utils/queryHelpers');
 const { createFollowUpForLead, updateFollowUpRecord } = require('../services/followUpService');
 const { markLeadViewedByExecutive } = require('../services/leadExecutiveStallService');
+const { logExecutiveActivity } = require('../services/executiveActivityService');
 const {
   getExecutiveLeadIds,
   buildExecutiveFollowUpFilter,
@@ -159,6 +161,16 @@ const listLeads = asyncHandler(async (req, res) => {
     },
     { branchId: req.branchId }
   );
+  // Only log a fresh/first-page open, not every pagination click or filter tweak.
+  const isFreshListOpen = (!req.query.page || req.query.page === '1') && !req.query.search;
+  if (isFreshListOpen) {
+    logExecutiveActivity({
+      userId: req.user._id,
+      branchId: req.branchId,
+      type: 'leads_list_opened',
+      module: 'leads',
+    }).catch(() => {});
+  }
   res.json(result);
 });
 
@@ -170,6 +182,13 @@ const getLeadDetail = asyncHandler(async (req, res) => {
   if (!lead) throw new ApiError(404, 'Lead not found');
 
   markLeadViewedByExecutive(lead._id, req.user._id).catch(() => {});
+  logExecutiveActivity({
+    userId: req.user._id,
+    branchId: req.branchId,
+    type: 'lead_viewed',
+    refId: lead._id,
+    meta: { leadName: lead.name },
+  }).catch(() => {});
 
   const paymentSummary = await getLeadPaymentSummary(lead._id);
 
@@ -553,6 +572,7 @@ const updateLead = asyncHandler(async (req, res) => {
   Object.keys(data).forEach((key) => {
     if (data[key] !== undefined) lead[key] = data[key];
   });
+  applyBookingPotential(lead);
 
   const coldCallDone = req.body.coldCallDone === true || req.body.coldCallDone === 'true';
   const markedCold =

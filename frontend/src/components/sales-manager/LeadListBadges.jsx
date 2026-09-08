@@ -7,6 +7,7 @@ import Avatar from '../ui/Avatar';
 import { formatBudget } from './managerUtils';
 import RepeatedLeadBadge from '../leads/RepeatedLeadBadge';
 import LeadCallStats from '../leads/LeadCallStats';
+import { formatCallDuration } from '../../lib/callSession';
 import { getLeadListStatusDisplay, listStatusTextClass } from '../../lib/executiveStatusDisplay';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from '../../context/ToastContext';
@@ -90,7 +91,14 @@ export function LeadTimingLines({ lead, className }) {
     (creatorRole === 'sales_executive' ||
       (sameOwner && lead?.assigneeRole === 'sales_executive'));
 
-  if (!created && !assigned && !selfCreatedByExec) return null;
+  // Only render this line when the list endpoint actually computed it (key present) — an
+  // absent key means "not fetched here", not "no calls", so it must never fall back to
+  // "Not called yet" and risk hiding real call history.
+  const hasFirstCallData = Boolean(lead) && Object.prototype.hasOwnProperty.call(lead, 'firstCall');
+  const firstCall = hasFirstCallData ? lead.firstCall : undefined;
+  const firstCallAt = firstCall ? formatLeadArrivedAt(firstCall.at) : null;
+
+  if (!created && !assigned && !selfCreatedByExec && !hasFirstCallData) return null;
 
   return (
     <div className={cn('mt-0.5 space-y-0.5 text-[11px] leading-tight text-slate-500', className)}>
@@ -123,6 +131,32 @@ export function LeadTimingLines({ lead, className }) {
             {assigned}
           </span>
         </p>
+      ) : null}
+      {hasFirstCallData ? (
+        firstCall && firstCallAt ? (
+          <p
+            className="flex items-center gap-1 min-w-0"
+            title={`First call ${firstCallAt} · ${formatCallDuration(firstCall.durationSeconds)}`}
+          >
+            <Phone className="w-3 h-3 shrink-0 text-slate-400" />
+            <span className="truncate">
+              <span className="font-semibold text-slate-600">First Call</span>
+              {' · '}
+              {firstCallAt}
+              {' · '}
+              {formatCallDuration(firstCall.durationSeconds)}
+            </span>
+          </p>
+        ) : (
+          <p className="flex items-center gap-1 min-w-0 text-rose-600" title="No calls logged yet">
+            <Phone className="w-3 h-3 shrink-0 text-rose-500" />
+            <span className="truncate">
+              <span className="font-semibold text-rose-600">First Call</span>
+              {' · '}
+              Not called yet
+            </span>
+          </p>
+        )
       ) : null}
     </div>
   );

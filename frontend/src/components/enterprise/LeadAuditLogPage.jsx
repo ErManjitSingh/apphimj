@@ -18,14 +18,14 @@ const ACTION_LABELS = {
   'lead.call_note_added': 'Call Note',
 };
 
-function AuditRow({ row }) {
+function AuditRow({ row, index, measureRef }) {
   const changes = (row.changes || []).slice(0, 2);
   const changeText = changes.length
     ? changes.map((c) => `${c.field}: ${c.oldValue ?? '—'} → ${c.newValue ?? '—'}`).join('; ')
     : row.meta?.outcome || '—';
 
   return (
-    <tr className="hover:bg-brand-500/[0.03]">
+    <tr data-index={index} ref={measureRef} className="hover:bg-brand-500/[0.03]">
       <td className={`${compactTd} whitespace-nowrap text-content-secondary`}>
         {row.createdAt ? new Date(row.createdAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : '—'}
       </td>
@@ -127,7 +127,12 @@ export default function LeadAuditLogPage() {
                   </tr>
                 )}
                 {virtualRows.map((virtualRow) => (
-                  <AuditRow key={rows[virtualRow.index]._id} row={rows[virtualRow.index]} />
+                  <AuditRow
+                    key={rows[virtualRow.index]._id}
+                    row={rows[virtualRow.index]}
+                    index={virtualRow.index}
+                    measureRef={rowVirtualizer.measureElement}
+                  />
                 ))}
                 {paddingBottom > 0 && (
                   <tr aria-hidden>

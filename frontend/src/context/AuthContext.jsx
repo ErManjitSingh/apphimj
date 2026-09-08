@@ -7,6 +7,7 @@ import { setCredentials, clearCredentials } from '../store/slices/authSlice';
 import { clearBranchState, setSelectedBranch } from '../store/slices/branchSlice';
 import { useRestrictedSessionTimeout } from '../hooks/useRestrictedSessionTimeout';
 import { useSalesExecutiveEodLogout } from '../hooks/useSalesExecutiveEodLogout';
+import { unsubscribeFromPush } from '../lib/pushNotifications';
 
 const AuthContext = createContext(null);
 
@@ -15,6 +16,9 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   const logout = useCallback(async () => {
+    // Must run BEFORE authService.logout() clears the stored token — the unsubscribe request
+    // needs a valid Authorization header to identify (and delete) this device's subscription.
+    await unsubscribeFromPush();
     await authService.logout();
     setUser(null);
     store.dispatch(clearCredentials());

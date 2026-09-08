@@ -4,6 +4,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import API from '../../api/axios';
+import { useLogModuleOpened } from '../../hooks/useLogModuleOpened';
 import ExecutivePageShell from './ExecutivePageShell';
 import { executiveCard } from './executivePageStyles';
 
@@ -14,6 +15,7 @@ const TYPE_COLORS = {
 };
 
 export default function ExecutiveCalendarPage() {
+  useLogModuleOpened('calendar');
   const [events, setEvents] = useState([]);
 
   useEffect(() => {

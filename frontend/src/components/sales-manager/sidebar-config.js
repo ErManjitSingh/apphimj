@@ -14,6 +14,7 @@ import {
   Award,
   Mail,
   Percent,
+  PhoneCall,
 } from 'lucide-react';
 
 /** Sales Manager sidebar — matches Command Center mockup sections */
@@ -83,6 +84,12 @@ export const salesManagerNavItems = [
     path: '/sales-manager/reports',
     label: 'Reports',
     icon: BarChart3,
+    section: 'Sales Operations',
+  },
+  {
+    path: '/sales-manager/call-report',
+    label: 'Call Report',
+    icon: PhoneCall,
     section: 'Sales Operations',
   },
   {

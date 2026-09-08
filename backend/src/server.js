@@ -20,8 +20,11 @@ const { validateEnvOnBoot: validateFacebookEnv } = require('./services/facebookL
 
 const app = express();
 
-// Behind Nginx — trust first proxy hop for correct per-client rate limits
-app.set('trust proxy', true);
+// Behind Nginx — trust exactly the first proxy hop for correct per-client rate limits.
+// `true` trusts an unbounded proxy chain, which express-rate-limit rejects as unsafe
+// (a client could spoof X-Forwarded-For to bypass IP-based limits) — `1` matches the
+// actual single-nginx-hop topology this app runs behind.
+app.set('trust proxy', 1);
 
 applySecurityMiddleware(app);
 

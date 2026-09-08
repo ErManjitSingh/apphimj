@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Bell, UserPlus, CalendarClock, FileCheck, Trophy } from 'lucide-react';
 import API from '../../api/axios';
+import { useLogModuleOpened } from '../../hooks/useLogModuleOpened';
 import ExecutivePageShell from './ExecutivePageShell';
 import { executiveCard, executiveSpinner } from './executivePageStyles';
 import { cn } from '../../lib/utils';
@@ -14,6 +15,7 @@ const TYPE_META = {
 };
 
 export default function ExecutiveNotificationsPage() {
+  useLogModuleOpened('notifications');
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 

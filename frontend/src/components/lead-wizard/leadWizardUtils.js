@@ -48,7 +48,10 @@ export function leadToWizardValues(lead) {
     destination: lead.destination || '',
     travelDate,
     returnDate,
-    tourDays: lead.tourDays || calcTourDays(travelDate, returnDate) || '',
+    // Dates are authoritative whenever both are present — a stored tourDays can be stale if the
+    // lead's dates were edited since it was last saved. Only fall back to the stored value (or
+    // blank) when dates are missing.
+    tourDays: calcTourDays(travelDate, returnDate) || lead.tourDays || '',
     pickupPoint: lead.pickupPoint || '',
     dropPoint: lead.dropPoint || '',
     numberOfRooms: lead.numberOfRooms || 1,
@@ -59,6 +62,20 @@ export function leadToWizardValues(lead) {
     children,
     infants,
     leadSource: lead.leadSource || lead.source || 'dpw',
+    referrerLeadId: lead.referral?.referrerLeadId
+      ? String(lead.referral.referrerLeadId._id || lead.referral.referrerLeadId)
+      : '',
+    referrerName: lead.referral?.referrerName || '',
+    referrerPhone: lead.referral?.referrerPhone || '',
+    referrerCity: lead.referral?.referrerCity || '',
+    referrerState: lead.referral?.referrerState || '',
+    referrerRelationship: lead.referral?.relationship || '',
+    previousTripWithUs: Boolean(lead.referral?.previousTripWithUs),
+    previousDestination: lead.referral?.previousDestination || '',
+    previousTravelDate: lead.referral?.previousTravelDate
+      ? String(lead.referral.previousTravelDate).split('T')[0]
+      : '',
+    referralNotes: lead.referral?.notes || '',
     priority: lead.priority || 'medium',
     branchId: lead.branchId || '',
     leadType: lead.leadType || 'fit',
@@ -74,8 +91,10 @@ export function wizardValuesToPayload(values) {
   const travelers =
     Number(values.adults || 0) + Number(values.children || 0) + Number(values.infants || 0);
 
+  // Dates are authoritative whenever both are present, so the field the executive sees can
+  // never diverge from what actually gets saved (see leadToWizardValues for the load-side fix).
   const tourDays =
-    Number(values.tourDays) || calcTourDays(values.travelDate, values.returnDate) || 0;
+    calcTourDays(values.travelDate, values.returnDate) || Number(values.tourDays) || 0;
 
   const mealPlan = normalizeMealPlanKey(values.mealPlan) || 'map';
 
@@ -110,6 +129,24 @@ export function wizardValuesToPayload(values) {
     leadSource: values.leadSource,
     source: values.leadSource,
     sourceLabel: sourceLabel(values.leadSource),
+    // Explicit `null` when source isn't Referral so a value typed earlier (then the source
+    // switched away) can never be saved as stale referral data — see normalizeLeadInput.js.
+    referral: values.leadSource === 'referral'
+      ? {
+          referrerLeadId: values.referrerLeadId || undefined,
+          referrerName: String(values.referrerName || '').trim(),
+          referrerPhone: String(values.referrerPhone || '').trim(),
+          referrerCity: String(values.referrerCity || '').trim(),
+          referrerState: String(values.referrerState || '').trim(),
+          relationship: values.referrerRelationship || '',
+          previousTripWithUs: Boolean(values.previousTripWithUs),
+          previousDestination: values.previousTripWithUs ? String(values.previousDestination || '').trim() : '',
+          previousTravelDate: values.previousTripWithUs && values.previousTravelDate
+            ? new Date(values.previousTravelDate).toISOString()
+            : undefined,
+          notes: String(values.referralNotes || '').trim(),
+        }
+      : null,
     priority: values.priority,
     budget: Number(values.budget) > 0 ? Number(values.budget) : 0,
     budgetRange: 'custom',

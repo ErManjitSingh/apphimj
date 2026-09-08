@@ -15,6 +15,8 @@ const {
   wantsPackageSharedLeads,
 } = require('../utils/packageSharedLeads');
 const { applyListStatusBucket } = require('../utils/listStatusBucketFilter');
+const { findConnectedLeadIds, wantsConnectedFilter } = require('../utils/connectedLeadIds');
+const { attachFirstCall } = require('../utils/firstCallInfo');
 
 function parseLocalDayStart(dateStr) {
   const parts = String(dateStr || '').split('-').map(Number);
@@ -36,7 +38,7 @@ function escapeRegex(value) {
   return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function buildLeadListFilter(query = {}) {
+async function buildLeadListFilter(query = {}, { branchId } = {}) {
   const {
     status,
     search,
@@ -138,6 +140,15 @@ function buildLeadListFilter(query = {}) {
 
   applyListStatusBucket(mongoFilter, listStatus);
 
+  // Connected = at least one CallNote whose outcome is in the canonical "connected"
+  // bucket (see CallNote.OUTCOME_BUCKETS). Uses $and rather than mongoFilter._id so it
+  // composes safely with the duplicates/package-shared id filters applied by the caller.
+  if (wantsConnectedFilter(query)) {
+    const connectedIds = await findConnectedLeadIds({ branchId });
+    if (!mongoFilter.$and) mongoFilter.$and = [];
+    mongoFilter.$and.push({ _id: { $in: connectedIds } });
+  }
+
   return mongoFilter;
 }
 
@@ -149,7 +160,7 @@ async function findLeadsPaginated(query = {}, { branchId } = {}) {
   );
   const sortField = Object.keys(sort)[0] || 'createdAt';
   const sortDir = sort[sortField] ?? -1;
-  const filter = withBranch(buildLeadListFilter(query), branchId);
+  const filter = withBranch(await buildLeadListFilter(query, { branchId }), branchId);
 
   if (query.filter === 'duplicates') {
     const { findDuplicateLeadIds } = require('../services/leadListKpiService');
@@ -197,6 +208,7 @@ async function findLeadsPaginated(query = {}, { branchId } = {}) {
     const { attachPaymentSummariesToLeads } = require('../services/paymentReceiptService');
     enriched = await attachPaymentSummariesToLeads(enriched);
   }
+  await attachFirstCall(enriched);
 
   return paginatedResponse(enriched, {
     page,
@@ -208,7 +220,7 @@ async function findLeadsPaginated(query = {}, { branchId } = {}) {
 }
 
 async function countLeads(query = {}, { branchId } = {}) {
-  return Lead.countDocuments(withBranch(buildLeadListFilter(query), branchId));
+  return Lead.countDocuments(withBranch(await buildLeadListFilter(query, { branchId }), branchId));
 }
 
 module.exports = {

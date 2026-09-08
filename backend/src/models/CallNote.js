@@ -40,5 +40,37 @@ const callNoteSchema = new mongoose.Schema(
 
 callNoteSchema.index({ leadId: 1, createdAt: -1 });
 
+/**
+ * Call Report bucketing: "connected" = guest answered (regardless of sales outcome),
+ * "no_answer" = rang without pickup, "failed" = technical/unclassified.
+ */
+const OUTCOME_BUCKETS = {
+  discussed_package: 'connected',
+  requested_callback: 'connected',
+  price_negotiation: 'connected',
+  ready_to_book: 'connected',
+  language_barrier: 'connected',
+  not_interested: 'connected',
+  budget_issues: 'connected',
+  booked_elsewhere: 'connected',
+  cnp_same_day: 'no_answer',
+  busy: 'no_answer',
+  no_answer: 'no_answer',
+  invalid_number: 'failed',
+  other: 'failed',
+  // legacy
+  interested: 'connected',
+  need_better_hotel: 'connected',
+  budget_issue: 'connected',
+  call_back_later: 'connected',
+  call_back_tomorrow: 'connected',
+};
+
+function bucketOutcome(outcome) {
+  return OUTCOME_BUCKETS[outcome] || 'failed';
+}
+
 module.exports = mongoose.model('CallNote', callNoteSchema);
 module.exports.CALL_OUTCOMES = CALL_OUTCOMES;
+module.exports.OUTCOME_BUCKETS = OUTCOME_BUCKETS;
+module.exports.bucketOutcome = bucketOutcome;

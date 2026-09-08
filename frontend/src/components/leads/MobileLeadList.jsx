@@ -197,6 +197,15 @@ export default function MobileLeadList({
                 {chip.label}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => updateAndApply(filters.connected === 'true' ? { connected: '' } : { connected: 'true' })}
+              className={`h-9 shrink-0 rounded-xl px-3 text-[9px] font-semibold ${
+                filters.connected === 'true' ? 'bg-violet-600 text-white' : 'border border-slate-200 bg-white text-slate-600'
+              }`}
+            >
+              Connected
+            </button>
           </div>
           <PeriodPresetChips
             className="mt-2"

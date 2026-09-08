@@ -126,6 +126,7 @@ export const emptyFilters = {
   status: '',
   filter: '',
   listStatus: '',
+  connected: '',
   travelMonth: '',
   budgetMin: '',
   budgetMax: '',

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { CalendarDays, Moon, Sparkles, Sun } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useDataRefresh } from '../../hooks/useDataRefresh';
+import { useLogModuleOpened } from '../../hooks/useLogModuleOpened';
 import { useDashboardQuery } from '../../features/dashboard/hooks/useDashboardQuery';
 import { invalidateDashboard } from '../../lib/queryInvalidation';
 import { fetchAnnouncementFeed } from '../../services/announcementApi';
@@ -106,6 +107,7 @@ function TimeScene({ scene }) {
 }
 
 export default function ExecutiveDashboard() {
+  useLogModuleOpened('dashboard');
   const [now, setNow] = useState(() => new Date());
   const [filters, setFilters] = useState(getDefaultExecDashboardFilters);
   const { user } = useAuth();

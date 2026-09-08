@@ -3,11 +3,12 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { WizardFormContext } from './WizardFormContext';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import API from '../../api/axios';
-import WizardStepProgress from './WizardStepProgress';
+import LeadFormStepProgress from './LeadFormStepProgress';
 import WizardDraftIndicator from './WizardDraftIndicator';
 import WizardFormBody from './WizardFormBody';
 import { useLeadWizard } from './useLeadWizard';
-import { DRAFT_STORAGE_KEY, defaultLeadSourceForRole, defaultWizardValues } from './constants';
+import { useScrollSpy } from './useScrollSpy';
+import { DRAFT_STORAGE_KEY, LEAD_FORM_STEP_IDS, defaultLeadSourceForRole, defaultWizardValues } from './constants';
 import { leadToWizardValues, wizardValuesToPayload } from './leadWizardUtils';
 import { useAuth } from '../../context/AuthContext';
 
@@ -62,11 +63,16 @@ export default function LeadWizard() {
 
   const wizard = useLeadWizard({ initialValues, draftKey, isEdit });
   const {
-    formApi, step, maxReachable, draftStatus, lastSaved,
-    goNext, goBack, goToStep, clearDraft, setStep, getValues, reset,
+    formApi, draftStatus, lastSaved,
+    validate, clearDraft, getValues, reset,
   } = wizard;
+  const activeAnchorId = useScrollSpy(LEAD_FORM_STEP_IDS);
 
   const saveLead = async (action = 'list') => {
+    if (!validate()) {
+      document.getElementById('step-identity')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
     setSaving(true);
     setError('');
     const values = getValues();
@@ -94,7 +100,6 @@ export default function LeadWizard() {
           ...defaultWizardValues,
           leadSource: defaultLeadSourceForRole(user?.role),
         });
-        setStep(1);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else if (action === 'open') {
         navigate(leadDetailPath(user?.role, saved._id));
@@ -132,7 +137,7 @@ export default function LeadWizard() {
               {isEdit ? 'Edit Lead' : 'Add Lead'}
             </h1>
             <p className="text-sm text-slate-500 mt-1">
-              {isEdit ? 'Update lead information' : 'Create a new lead in 2 simple steps.'}
+              {isEdit ? 'Update lead information' : 'Fill in the details below, then review and save.'}
             </p>
           </div>
         </div>
@@ -140,7 +145,7 @@ export default function LeadWizard() {
       </div>
 
       <div className="mb-5">
-        <WizardStepProgress currentStep={step} maxReachable={maxReachable} onStepClick={goToStep} />
+        <LeadFormStepProgress activeAnchorId={activeAnchorId} />
       </div>
 
       {error && (
@@ -152,21 +157,15 @@ export default function LeadWizard() {
       <WizardFormContext.Provider value={formApi}>
         <form onSubmit={(e) => e.preventDefault()} className="space-y-0">
           <WizardFormBody
-            step={step}
             isEdit={isEdit}
             leadId={id}
             saving={saving}
-            onBack={goBack}
             onClear={() => {
               clearDraft();
               reset({
                 ...defaultWizardValues,
                 leadSource: defaultLeadSourceForRole(user?.role),
               });
-            }}
-            onNext={() => {
-              goNext();
-              window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onSave={saveLead}
           />

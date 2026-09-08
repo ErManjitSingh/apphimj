@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { resolveLeadSourceKey, leadSourceLabel, LEAD_SOURCE_KEYS } = require('../constants/leadSources');
+const { REFERRAL_RELATIONSHIPS } = require('../models/Lead');
 
 const LEAD_SOURCES = LEAD_SOURCE_KEYS;
 
@@ -52,6 +53,40 @@ function hasOwn(body, key) {
   return Object.prototype.hasOwnProperty.call(body || {}, key);
 }
 
+function toObjectIdOrNull(value) {
+  if (value == null || value === '') return null;
+  const raw = typeof value === 'object' && value._id ? value._id : value;
+  const str = String(raw);
+  return mongoose.Types.ObjectId.isValid(str) ? str : null;
+}
+
+/**
+ * Source = 'referral' → build the nested referral object from the wizard payload.
+ * Returns `null` (explicit clear) when the resolved source is anything else, so switching
+ * away from Referral can never leave stale referrer data behind on save.
+ */
+function buildReferralInput(body, resolvedSource) {
+  if (resolvedSource !== 'referral') return null;
+  const r = body.referral && typeof body.referral === 'object' ? body.referral : body;
+  const relationship = REFERRAL_RELATIONSHIPS.includes(r.relationship) ? r.relationship : '';
+  const previousTripWithUs = r.previousTripWithUs === true || r.previousTripWithUs === 'true';
+  const previousTravelDate = r.previousTravelDate ? new Date(r.previousTravelDate) : undefined;
+  return {
+    referrerLeadId: toObjectIdOrNull(r.referrerLeadId),
+    referrerName: String(r.referrerName || '').trim(),
+    referrerPhone: String(r.referrerPhone || '').trim(),
+    referrerCity: String(r.referrerCity || '').trim(),
+    referrerState: String(r.referrerState || '').trim(),
+    relationship,
+    previousTripWithUs,
+    previousDestination: previousTripWithUs ? String(r.previousDestination || '').trim() : '',
+    ...(previousTripWithUs && previousTravelDate && !Number.isNaN(previousTravelDate.getTime())
+      ? { previousTravelDate }
+      : {}),
+    notes: String(r.notes || r.referralNotes || '').trim(),
+  };
+}
+
 /**
  * Sanitize lead create/update body from API / wizard payload.
  * On update: only include fields that were actually sent (avoids wiping / fake diffs).
@@ -93,6 +128,7 @@ function normalizeLeadInput(body = {}, { isUpdate = false } = {}) {
     source,
     sourceLabel: body.sourceLabel ? String(body.sourceLabel).trim() : leadSourceLabel(source),
     leadSource: body.leadSource || source,
+    referral: buildReferralInput(body, source),
     priority: body.priority || 'medium',
     notes: body.notes || body.specialRequirements || '',
     hotelCategory: body.hotelCategory,
@@ -244,6 +280,9 @@ function normalizeLeadUpdateInput(body = {}) {
     if (!hasOwn(body, 'sourceLabel')) {
       normalized.sourceLabel = leadSourceLabel(source);
     }
+    // Recompute referral whenever source is part of this save — this is what clears stale
+    // referrer data the instant the executive switches Source away from Referral.
+    normalized.referral = buildReferralInput(body, source);
   }
 
   if (hasOwn(body, 'isHot')) normalized.isHot = Boolean(body.isHot);

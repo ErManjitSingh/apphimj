@@ -29,7 +29,6 @@ const apiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: clientKey,
-  validate: { keyGeneratorIpFallback: false },
   message: { message: 'Too many requests, please try again later.' },
   skip: isAuthOrHealth,
 });

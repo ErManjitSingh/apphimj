@@ -58,6 +58,7 @@ import {
   ManagerQuotationBuilder,
   TeamPerformancePage,
   ManagerReportsPage,
+  CallReportPage,
   ManagerCalendarPage,
   ManagerNotificationsPage,
   ManagerProfilePage,
@@ -198,6 +199,7 @@ function App() {
                     element={<QuotationApprovalPage />}
                   />
                   <Route path="reports" element={<ManagerReportsPage />} />
+                  <Route path="call-report" element={<CallReportPage />} />
                   <Route
                     path="reactivated-leads"
                     element={<ReactivatedLeadsPage />}
@@ -886,6 +888,14 @@ function App() {
                     element={
                       <RoleRoute roles={["admin", "sales_manager"]}>
                         <MarginControlPage />
+                      </RoleRoute>
+                    }
+                  />
+                  <Route
+                    path="call-report"
+                    element={
+                      <RoleRoute roles={["admin"]}>
+                        <CallReportPage />
                       </RoleRoute>
                     }
                   />

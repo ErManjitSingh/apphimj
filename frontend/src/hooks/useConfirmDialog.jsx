@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 
 const DEFAULT_DIALOG = {
@@ -14,23 +14,28 @@ export function useConfirmDialog() {
   const [dialog, setDialog] = useState(DEFAULT_DIALOG);
   const resolveRef = useRef(null);
 
-  const confirm = (config = {}) =>
-    new Promise((resolve) => {
-      resolveRef.current = resolve;
-      setDialog({
-        ...DEFAULT_DIALOG,
-        ...config,
-        open: true,
-      });
-    });
+  // Stable identity (refs + setState only) so consumers can safely list `confirm`
+  // in their own useCallback/useMemo deps without forcing a new closure every render.
+  const confirm = useCallback(
+    (config = {}) =>
+      new Promise((resolve) => {
+        resolveRef.current = resolve;
+        setDialog({
+          ...DEFAULT_DIALOG,
+          ...config,
+          open: true,
+        });
+      }),
+    []
+  );
 
-  const close = (result) => {
+  const close = useCallback((result) => {
     setDialog((prev) => ({ ...prev, open: false }));
     if (resolveRef.current) {
       resolveRef.current(Boolean(result));
       resolveRef.current = null;
     }
-  };
+  }, []);
 
   const dialogNode = (
     <ConfirmDialog

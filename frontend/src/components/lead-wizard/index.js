@@ -1,2 +1,2 @@
 export { default as LeadWizard } from './LeadWizard';
-export { default as WizardStepProgress } from './WizardStepProgress';
+export { default as LeadFormStepProgress } from './LeadFormStepProgress';
