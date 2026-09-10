@@ -28,11 +28,24 @@ function stampPendingAcceptance(target = {}, leadLike = {}) {
   return target;
 }
 
+/**
+ * Fired every time the assigned executive opens Lead Detail. Stamps `executiveLastViewedAt`
+ * (existing stall-tracking field, overwritten each open) and, only the very first time, also
+ * stamps `firstOpenedAt`/`firstOpenedBy` for the management-only "Opened" timeline entry — the
+ * `firstOpenedAt: null` filter on the second update makes that stamp set-once, never overwritten.
+ */
 async function markLeadViewedByExecutive(leadId, executiveId) {
-  await Lead.updateOne(
-    { _id: leadId, assignedTo: executiveId },
-    { $set: { executiveLastViewedAt: new Date() } }
-  );
+  const now = new Date();
+  await Promise.all([
+    Lead.updateOne(
+      { _id: leadId, assignedTo: executiveId },
+      { $set: { executiveLastViewedAt: now } }
+    ),
+    Lead.updateOne(
+      { _id: leadId, assignedTo: executiveId, firstOpenedAt: null },
+      { $set: { firstOpenedAt: now, firstOpenedBy: executiveId } }
+    ),
+  ]);
 }
 
 function computeExecutiveStallFlags(lead, now = new Date()) {

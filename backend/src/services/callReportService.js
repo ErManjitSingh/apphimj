@@ -32,6 +32,21 @@ function resolvePeriod(dateFrom, dateTo) {
   return { periodStart, periodEnd };
 }
 
+/** Fixed business rule: every Sales Executive has a 2h/day calling target — no configurable target system exists for this yet. */
+const DAILY_CALL_TARGET_SEC = 2 * 60 * 60;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * Number of calendar days spanned by [periodStart, periodEnd] (both inclusive) — Today/Yesterday
+ * are always 1 day; a Custom Range is however many calendar days the manager picked. The talk-time
+ * target is daily, so it scales with this count (e.g. a 3-day range needs 3 × 2h = 6h), matching
+ * the report's own existing semantics of treating every calendar day in range equally (no
+ * working-day/holiday exclusion exists anywhere else in Call Report today).
+ */
+function daysInPeriod(periodStart, periodEnd) {
+  return Math.floor((periodEnd.getTime() - periodStart.getTime()) / MS_PER_DAY) + 1;
+}
+
 const EFFECTIVE_START = { $ifNull: ['$startedAt', '$createdAt'] };
 // Stored timestamps are UTC; bucket by hour/day in the org's local timezone so charts match
 // what managers see elsewhere in the app (e.g. the timeline, which renders in browser-local time).
@@ -129,24 +144,33 @@ async function getExecutiveSummary({ userId, branchId, dateFrom, dateTo }) {
   const c = result?.connectedStats?.[0] || {};
   const uniqueGuestsContacted = (t.uniqueGuests || []).length;
   const totalCalls = t.totalCalls || 0;
+  const totalTalkTimeSec = t.totalTalkTime || 0;
+  // Same daily calling target as Team Overview (2h × calendar days in the selected period) —
+  // reused here so a single executive's summary (Admin/Sales Manager drill-down, or a Sales
+  // Executive viewing their own report) shows the identical Target/Status the team table does.
+  const targetTalkTimeSec = daysInPeriod(periodStart, periodEnd) * DAILY_CALL_TARGET_SEC;
 
   return {
     totalCalls,
     connectedCalls: t.connected || 0,
     noAnswerCalls: t.noAnswer || 0,
     failedCalls: t.failed || 0,
-    totalTalkTimeSec: t.totalTalkTime || 0,
+    totalTalkTimeSec,
     avgCallDurationSec: c.count ? Math.round(c.sum / c.count) : 0,
     longestCallSec: c.longest || 0,
     shortestCallSec: c.shortest || 0,
     uniqueGuestsContacted,
     avgCallsPerGuest: uniqueGuestsContacted ? Math.round((totalCalls / uniqueGuestsContacted) * 10) / 10 : 0,
+    targetTalkTimeSec,
+    targetMet: totalTalkTimeSec >= targetTalkTimeSec,
+    connectionRate: totalCalls ? Math.round(((t.connected || 0) / totalCalls) * 1000) / 10 : 0,
   };
 }
 
 async function getTeamOverview(executives = [], { branchId, dateFrom, dateTo } = {}) {
   if (!executives.length) return [];
   const { periodStart, periodEnd } = resolvePeriod(dateFrom, dateTo);
+  const targetTalkTimeSec = daysInPeriod(periodStart, periodEnd) * DAILY_CALL_TARGET_SEC;
   const idObjects = executives.map((ex) => new mongoose.Types.ObjectId(String(ex._id)));
   const branchObjectId = toObjectId(branchId);
 
@@ -180,9 +204,31 @@ async function getTeamOverview(executives = [], { branchId, dateFrom, dateTo } =
         avgCallDurationSec: r.connected ? Math.round(r.connectedDuration / r.connected) : 0,
         uniqueGuestsContacted: (r.uniqueGuests || []).length,
         connectionRate: r.totalCalls ? Math.round((r.connected / r.totalCalls) * 1000) / 10 : 0,
+        // Daily calling target (2h × number of calendar days in the selected period) — Status is
+        // driven solely by accumulated talk time, never by call count/connection rate/avg duration.
+        targetTalkTimeSec,
+        targetMet: r.totalTalkTime >= targetTalkTimeSec,
       };
     })
-    .sort((a, b) => b.totalCalls - a.totalCalls);
+    .sort(compareTeamOverviewRows);
+}
+
+/**
+ * Ranks by productive calling performance, not raw call volume: an executive who dials more but
+ * connects/talks less must not outrank one who hit the daily target with fewer, better calls.
+ * Lexicographic — each key only breaks ties left by the one before it:
+ *   1. Target Met before Not Met
+ *   2. Talk Time (desc)
+ *   3. Connected Calls (desc)
+ *   4. Connection Rate (desc)
+ *   5. Total Calls (desc)
+ */
+function compareTeamOverviewRows(a, b) {
+  if (a.targetMet !== b.targetMet) return a.targetMet ? -1 : 1;
+  if (b.totalTalkTimeSec !== a.totalTalkTimeSec) return b.totalTalkTimeSec - a.totalTalkTimeSec;
+  if (b.connectedCalls !== a.connectedCalls) return b.connectedCalls - a.connectedCalls;
+  if (b.connectionRate !== a.connectionRate) return b.connectionRate - a.connectionRate;
+  return b.totalCalls - a.totalCalls;
 }
 
 function escapeRegex(str) {

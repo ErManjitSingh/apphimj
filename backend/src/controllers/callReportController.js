@@ -8,9 +8,11 @@ const {
   getAnalytics,
   getHourlyCallDetail,
 } = require('../services/callReportService');
+const { resolveScopedExecutiveId } = require('../utils/callReportScope');
 
 const getTimeline = asyncHandler(async (req, res) => {
-  const { executiveId, dateFrom, dateTo, page, limit } = req.query;
+  const { dateFrom, dateTo, page, limit } = req.query;
+  const executiveId = resolveScopedExecutiveId(req, req.query.executiveId);
   if (!executiveId) throw new ApiError(400, 'executiveId is required');
   const result = await getExecutiveTimeline({
     userId: executiveId,
@@ -24,7 +26,8 @@ const getTimeline = asyncHandler(async (req, res) => {
 });
 
 const getSummary = asyncHandler(async (req, res) => {
-  const { executiveId, dateFrom, dateTo } = req.query;
+  const { dateFrom, dateTo } = req.query;
+  const executiveId = resolveScopedExecutiveId(req, req.query.executiveId);
   if (!executiveId) throw new ApiError(400, 'executiveId is required');
   const summary = await getExecutiveSummary({
     userId: executiveId,
@@ -49,7 +52,8 @@ const getTeamOverviewHandler = asyncHandler(async (req, res) => {
 });
 
 const getAnalyticsHandler = asyncHandler(async (req, res) => {
-  const { executiveId, dateFrom, dateTo } = req.query;
+  const { dateFrom, dateTo } = req.query;
+  const executiveId = resolveScopedExecutiveId(req, req.query.executiveId);
   const analytics = await getAnalytics({
     userId: executiveId || undefined,
     branchId: req.branchId,
@@ -61,9 +65,10 @@ const getAnalyticsHandler = asyncHandler(async (req, res) => {
 
 const getHourDetail = asyncHandler(async (req, res) => {
   const {
-    executiveId, dateFrom, dateTo, hour, outcome, durationGt, sortBy, sortDir, search, page, limit,
+    dateFrom, dateTo, hour, outcome, durationGt, sortBy, sortDir, search, page, limit,
     includeGuestBreakdown,
   } = req.query;
+  const executiveId = resolveScopedExecutiveId(req, req.query.executiveId);
 
   let hourNum;
   if (hour !== undefined && hour !== '') {

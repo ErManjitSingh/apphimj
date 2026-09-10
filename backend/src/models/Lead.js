@@ -25,7 +25,7 @@ const BUDGET_RANGES = [
 
 const LEAD_SCORES = ['low', 'medium', 'high', 'hot'];
 
-const LEAD_TYPES = ['fit', 'group', 'corporate'];
+const LEAD_TYPES = ['fit', 'group', 'corporate', 'family', 'honeymoon'];
 
 const REACTIVATION_STAGES = [
   'reactivated',
@@ -71,6 +71,8 @@ const leadSchema = new mongoose.Schema(
     numberOfRooms: { type: Number, default: 1 },
     roomsWithMattress: { type: Number, default: 0, min: 0 },
     dateOfBirth: { type: Date },
+    occupationCategory: { type: String, enum: ['government', 'private', ''], default: '' },
+    occupation: { type: String, trim: true, default: '' },
     cabType: { type: String, trim: true, default: '' },
     budget: { type: Number, default: 0 },
     budgetRange: { type: String, enum: BUDGET_RANGES, default: 'custom' },
@@ -175,6 +177,16 @@ const leadSchema = new mongoose.Schema(
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
     assignedAt: { type: Date, index: true },
     executiveLastViewedAt: { type: Date },
+    /**
+     * First time the assigned Sales Executive actually opened Lead Detail — set once, never
+     * overwritten (see leadExecutiveStallService.markLeadViewedByExecutive). `select: false` so
+     * every existing Lead.find()/findOne() across the app excludes it by default — management-only
+     * visibility (leadQueryFields.canViewLeadOpenInfo) is enforced by requiring call sites to
+     * explicitly opt in via leadQueryFields.withManagementFields/withManagementPopulate, rather
+     * than relying on every current and future query to remember to leave it out.
+     */
+    firstOpenedAt: { type: Date, default: null, select: false },
+    firstOpenedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, select: false },
     /** SOP: accept within LEAD_ACCEPT_MINUTES or return to unassigned pool */
     assignmentAcceptance: {
       type: String,

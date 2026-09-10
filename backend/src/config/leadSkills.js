@@ -4,6 +4,8 @@ const LEAD_SKILL_LABELS = {
   fit: 'FIT',
   group: 'Group',
   corporate: 'Corporate',
+  family: 'Family Tour',
+  honeymoon: 'Honeymoon Tour',
 };
 
 const GROUP_PAX_THRESHOLD = Number(process.env.LEAD_GROUP_PAX_THRESHOLD || 10);

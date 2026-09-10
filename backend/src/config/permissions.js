@@ -8,6 +8,7 @@ const noPerms = () => ({
   payments: { view: false, create: false, edit: false, delete: false },
   operations: { view: false, create: false, edit: false, delete: false },
   hr: { view: false, create: false, edit: false, delete: false },
+  marketing: { view: false, create: false, edit: false, delete: false },
   whatsapp: { use: false, manage: false },
   email: { send: false, manage: false },
 });
@@ -22,6 +23,7 @@ const fullPerms = () => ({
   payments: { view: true, create: true, edit: true, delete: true },
   operations: { view: true, create: true, edit: true, delete: true },
   hr: { view: true, create: true, edit: true, delete: true },
+  marketing: { view: true, create: true, edit: true, delete: true },
   whatsapp: { use: true, manage: true },
   email: { send: true, manage: true },
 });
@@ -113,6 +115,7 @@ const PERMISSION_MODULES = [
   { key: 'payments', label: 'Payments' },
   { key: 'operations', label: 'Operations' },
   { key: 'hr', label: 'HR Management' },
+  { key: 'marketing', label: 'Marketing Spend' },
   { key: 'whatsapp', label: 'WhatsApp' },
   { key: 'email', label: 'Email' },
 ];

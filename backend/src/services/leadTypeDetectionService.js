@@ -18,6 +18,8 @@ function normalizeLeadType(value) {
   if (raw === 'fit') return 'fit';
   if (raw === 'group') return 'group';
   if (raw === 'corporate') return 'corporate';
+  if (raw === 'family') return 'family';
+  if (raw === 'honeymoon') return 'honeymoon';
   return null;
 }
 

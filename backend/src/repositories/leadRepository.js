@@ -1,5 +1,5 @@
 const Lead = require('../models/Lead');
-const { LEAD_LIST_SELECT } = require('../utils/leadQueryFields');
+const { LEAD_LIST_SELECT, withManagementFields, withManagementPopulate } = require('../utils/leadQueryFields');
 const { buildLeadSearchFilter, LEAD_LIST_POPULATE, enrichLead, startOfDay, endOfDay, isConvertedListQuery, applyConvertedPeriodFilter } = require('../utils/queryHelpers');
 const {
   parsePagination,
@@ -17,6 +17,7 @@ const {
 const { applyListStatusBucket } = require('../utils/listStatusBucketFilter');
 const { findConnectedLeadIds, wantsConnectedFilter } = require('../utils/connectedLeadIds');
 const { attachFirstCall } = require('../utils/firstCallInfo');
+const { resolveDestinationGroupValues } = require('../utils/destinationHierarchy');
 
 function parseLocalDayStart(dateStr) {
   const parts = String(dateStr || '').split('-').map(Number);
@@ -45,11 +46,14 @@ async function buildLeadListFilter(query = {}, { branchId } = {}) {
     filter: listFilter,
     listStatus,
     destination,
+    destinationNames,
     source,
     agent,
     travelMonth,
     budgetMin,
     budgetMax,
+    budgetMinExclusive,
+    budgetMaxExclusive,
     dateFrom,
     dateTo,
     todayOnly,
@@ -106,10 +110,18 @@ async function buildLeadListFilter(query = {}, { branchId } = {}) {
     mongoFilter.priority = priority;
   }
 
+  // Package Cost filter — reuses the same persisted Lead.budget field the Sales Executive
+  // enters on lead creation. `*Exclusive` flags let the "Under ₹50K" / "₹1L – ₹2L" / etc.
+  // ranges express > vs >= (and < vs <=) boundaries so adjacent ranges don't overlap; the
+  // aggregate "Above ₹50K" option is the one range intentionally left open-ended and overlapping.
   if (budgetMin || budgetMax) {
     mongoFilter.budget = {};
-    if (budgetMin) mongoFilter.budget.$gte = Number(budgetMin);
-    if (budgetMax) mongoFilter.budget.$lte = Number(budgetMax);
+    if (budgetMin) {
+      mongoFilter.budget[budgetMinExclusive === 'true' ? '$gt' : '$gte'] = Number(budgetMin);
+    }
+    if (budgetMax) {
+      mongoFilter.budget[budgetMaxExclusive === 'true' ? '$lt' : '$lte'] = Number(budgetMax);
+    }
   }
 
   let dateRange = null;
@@ -149,10 +161,27 @@ async function buildLeadListFilter(query = {}, { branchId } = {}) {
     mongoFilter.$and.push({ _id: { $in: connectedIds } });
   }
 
+  // Top Destinations drill-down: resolve rollup name(s) (a state, or the "Other" bucket) back to
+  // the exact raw destination values via the same state-hierarchy logic the chart itself uses,
+  // scoped by everything else already applied above (branch/status/date range/etc.). Takes
+  // precedence over a plain exact-match `destination` param.
+  if (destinationNames) {
+    const names = String(destinationNames)
+      .split(',')
+      .map((n) => n.trim())
+      .filter(Boolean);
+    if (names.length) {
+      const resolutionScope = withBranch({ ...mongoFilter }, branchId);
+      delete resolutionScope.destination;
+      const values = await resolveDestinationGroupValues(names, resolutionScope);
+      mongoFilter.destination = { $in: values };
+    }
+  }
+
   return mongoFilter;
 }
 
-async function findLeadsPaginated(query = {}, { branchId } = {}) {
+async function findLeadsPaginated(query = {}, { branchId, includeManagementFields = false } = {}) {
   const { page, limit, skip } = parsePagination(query);
   const sort = parseSort(
     query,
@@ -186,8 +215,8 @@ async function findLeadsPaginated(query = {}, { branchId } = {}) {
 
   let [rows, total] = await Promise.all([
     Lead.find(listFilter)
-      .select(LEAD_LIST_SELECT)
-      .populate(LEAD_LIST_POPULATE)
+      .select(withManagementFields(LEAD_LIST_SELECT, includeManagementFields))
+      .populate(withManagementPopulate(LEAD_LIST_POPULATE, includeManagementFields))
       .sort(sort)
       .skip(useCursor ? 0 : skip)
       .limit(fetchLimit)

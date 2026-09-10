@@ -1,5 +1,5 @@
 const Lead = require('../models/Lead');
-const { LEAD_LIST_SELECT } = require('../utils/leadQueryFields');
+const { LEAD_LIST_SELECT, withManagementFields, withManagementPopulate } = require('../utils/leadQueryFields');
 const FollowUp = require('../models/FollowUp');
 const Quotation = require('../models/Quotation');
 const {
@@ -30,6 +30,7 @@ const {
   findPackageSharedLeadIds,
   wantsPackageSharedLeads,
 } = require('../utils/packageSharedLeads');
+const { attachFirstCall } = require('../utils/firstCallInfo');
 
 const LIST_PAGINATION = { defaultLimit: 20, maxLimit: 200 };
 
@@ -205,8 +206,8 @@ async function findManagerLeadsPaginated(query = {}, options = {}) {
 
   const [rows, total] = await Promise.all([
     Lead.find(filter)
-      .select(LEAD_LIST_SELECT)
-      .populate(LEAD_LIST_POPULATE)
+      .select(withManagementFields(LEAD_LIST_SELECT, options.includeManagementFields))
+      .populate(withManagementPopulate(LEAD_LIST_POPULATE, options.includeManagementFields))
       .sort(sort)
       .skip(skip)
       .limit(limit)
@@ -214,7 +215,10 @@ async function findManagerLeadsPaginated(query = {}, options = {}) {
     needsTotal ? Lead.countDocuments(filter) : Promise.resolve(null),
   ]);
 
-  return paginatedResponse(rows.map(enrichLead), {
+  const enriched = rows.map(enrichLead);
+  await attachFirstCall(enriched);
+
+  return paginatedResponse(enriched, {
     page,
     limit,
     total,

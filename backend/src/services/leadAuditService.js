@@ -48,6 +48,8 @@ const LEAD_TRACKED_FIELDS = [
   'companyName',
   'notes',
   'leadScore',
+  'occupationCategory',
+  'occupation',
 ];
 
 const FIELD_LABELS = {
@@ -97,6 +99,8 @@ const FIELD_LABELS = {
   companyName: 'Company',
   notes: 'Notes',
   leadScore: 'Lead score',
+  occupationCategory: 'Occupation category',
+  occupation: 'Occupation',
 };
 
 async function logAudit({

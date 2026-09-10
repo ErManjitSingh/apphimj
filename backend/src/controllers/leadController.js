@@ -18,7 +18,7 @@ const {
 } = require('../services/notificationService');
 const { loadLeadCore, loadLeadFollowups, loadLeadQuotations, loadLeadNotes, loadLeadRelated } = require('../services/leadDetailService');
 const { LEAD_POPULATE, LEAD_LIST_POPULATE, enrichLead, buildLeadSearchFilter } = require('../utils/queryHelpers');
-const { LEAD_LIST_SELECT } = require('../utils/leadQueryFields');
+const { LEAD_LIST_SELECT, canViewLeadOpenInfo } = require('../utils/leadQueryFields');
 const { getLeadListKpis } = require('../services/leadListKpiService');
 const { createFollowUpForLead } = require('../services/followUpService');
 const { scheduleColdLeadReminder, markColdCallDone } = require('../services/coldLeadService');
@@ -70,7 +70,11 @@ const Team = require('../models/Team');
 
 async function loadAccessibleLeadCore(req, leadId) {
   const extraFilter = await getLeadViewerExtraFilter(req);
-  return loadLeadCore(leadId, { branchId: req.branchId, extraFilter });
+  return loadLeadCore(leadId, {
+    branchId: req.branchId,
+    extraFilter,
+    includeManagementFields: canViewLeadOpenInfo(req.user.role),
+  });
 }
 
 async function findAccessibleLeadDoc(req, leadId, extra = {}) {
@@ -179,7 +183,10 @@ const listLeads = asyncHandler(async (req, res) => {
     });
     return res.json(result);
   }
-  const result = await findLeadsPaginated(req.query, { branchId: req.branchId });
+  const result = await findLeadsPaginated(req.query, {
+    branchId: req.branchId,
+    includeManagementFields: canViewLeadOpenInfo(role),
+  });
   res.json(result);
 });
 

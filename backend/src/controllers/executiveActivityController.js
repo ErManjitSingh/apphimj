@@ -12,21 +12,25 @@ const {
   getTeamLoginRoster,
   getTeamLoginSummary,
 } = require('../services/executiveActivityService');
+const { resolveScopedExecutiveId } = require('../utils/callReportScope');
 
 const getTimeline = asyncHandler(async (req, res) => {
-  const { executiveId, dateFrom, dateTo, page, limit } = req.query;
+  const { dateFrom, dateTo, page, limit } = req.query;
+  const executiveId = resolveScopedExecutiveId(req, req.query.executiveId);
   if (!executiveId) throw new ApiError(400, 'executiveId is required');
   res.json(await getActivityTimeline({ userId: executiveId, branchId: req.branchId, dateFrom, dateTo, page, limit }));
 });
 
 const getSummary = asyncHandler(async (req, res) => {
-  const { executiveId, dateFrom, dateTo } = req.query;
+  const { dateFrom, dateTo } = req.query;
+  const executiveId = resolveScopedExecutiveId(req, req.query.executiveId);
   if (!executiveId) throw new ApiError(400, 'executiveId is required');
   res.json(await getActivitySummary({ userId: executiveId, branchId: req.branchId, dateFrom, dateTo }));
 });
 
 const getModuleUsageHandler = asyncHandler(async (req, res) => {
-  const { executiveId, dateFrom, dateTo } = req.query;
+  const { dateFrom, dateTo } = req.query;
+  const executiveId = resolveScopedExecutiveId(req, req.query.executiveId);
   if (!executiveId) throw new ApiError(400, 'executiveId is required');
   res.json(await getModuleUsage({ userId: executiveId, branchId: req.branchId, dateFrom, dateTo }));
 });
@@ -42,12 +46,19 @@ const getTeamOverviewHandler = asyncHandler(async (req, res) => {
 });
 
 const getAnalyticsHandler = asyncHandler(async (req, res) => {
-  const { executiveId, dateFrom, dateTo } = req.query;
+  const { dateFrom, dateTo } = req.query;
+  const executiveId = resolveScopedExecutiveId(req, req.query.executiveId);
   res.json(await getActivityAnalytics({ userId: executiveId || undefined, branchId: req.branchId, dateFrom, dateTo }));
 });
 
+/**
+ * `resolveScopedExecutiveId` always resolves to the caller's own id for a sales_executive (never
+ * '' or 'all'), so the roster branch below — which lists every executive on the branch — is
+ * unreachable for that role and only ever runs for Admin/Sales Manager.
+ */
 const getLoginSessionsHandler = asyncHandler(async (req, res) => {
-  const { executiveId, dateFrom, dateTo } = req.query;
+  const { dateFrom, dateTo } = req.query;
+  const executiveId = resolveScopedExecutiveId(req, req.query.executiveId);
 
   if (executiveId && executiveId !== 'all') {
     const [summary, rows] = await Promise.all([

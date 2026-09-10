@@ -7,19 +7,21 @@ const {
   LEAD_DETAIL_POPULATE,
   FOLLOWUP_ON_LEAD_POPULATE,
   QUOTATION_ON_LEAD_POPULATE,
+  withManagementFields,
+  withManagementPopulate,
 } = require('../utils/leadQueryFields');
 const { parsePagination, paginatedResponse } = require('../utils/pagination');
 const { DETAIL_RELATED_LIMIT } = require('../constants/detailLimits');
 
-async function loadLeadCore(leadId, { branchId, extraFilter = {} } = {}) {
+async function loadLeadCore(leadId, { branchId, extraFilter = {}, includeManagementFields = false } = {}) {
   return Lead.findOne({
     _id: leadId,
     isDeleted: { $ne: true },
     ...(branchId ? { branchId } : {}),
     ...extraFilter,
   })
-    .select(LEAD_DETAIL_SELECT)
-    .populate(LEAD_DETAIL_POPULATE)
+    .select(withManagementFields(LEAD_DETAIL_SELECT, includeManagementFields))
+    .populate(withManagementPopulate(LEAD_DETAIL_POPULATE, includeManagementFields))
     .lean();
 }
 

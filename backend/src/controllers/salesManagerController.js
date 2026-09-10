@@ -34,6 +34,7 @@ const {
   formatNotification,
 } = require('../utils/queryHelpers');
 const { parsePagination, paginatedResponse } = require('../utils/pagination');
+const { canViewLeadOpenInfo } = require('../utils/leadQueryFields');
 const { sumConvertedPackageRevenue } = require('../utils/convertedPackageRevenue');
 const { stampPendingAcceptance } = require('../services/leadExecutiveStallService');
 const { getOrSetFresh, cacheKey, DEFAULT_TTL_MS } = require('../services/dashboardCacheService');
@@ -54,12 +55,18 @@ const getDashboard = asyncHandler(async (req, res) => {
 });
 
 const listLeads = asyncHandler(async (req, res) => {
-  const result = await findManagerLeadsPaginated(req.query, { branchId: req.branchId });
+  const result = await findManagerLeadsPaginated(req.query, {
+    branchId: req.branchId,
+    includeManagementFields: canViewLeadOpenInfo(req.user.role),
+  });
   res.json(result);
 });
 
 const getLeadDetail = asyncHandler(async (req, res) => {
-  const lead = await loadLeadCore(req.params.id, { branchId: req.branchId });
+  const lead = await loadLeadCore(req.params.id, {
+    branchId: req.branchId,
+    includeManagementFields: canViewLeadOpenInfo(req.user.role),
+  });
   if (!lead) throw new ApiError(404, 'Lead not found');
 
   const includeRelated = req.query.includeRelated === '1' || req.query.includeRelated === 'true';

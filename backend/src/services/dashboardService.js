@@ -17,7 +17,8 @@ const { getEnterpriseKpis, getSourceAnalytics, getExecutivePerformance } = requi
 const { getEmailDashboardStats } = require('./emailStatsService');
 const { getMonthlyTargets, buildTargetProgress } = require('./salesTargetService');
 const { withBranch } = require('../utils/branchScope');
-const { rollupCityStatsIntoStates } = require('../utils/destinationHierarchy');
+const { sumMarketingSpendInRange } = require('./marketingSpendService');
+const { rollupCityStatsIntoStates, resolveDestinationGroupValues } = require('../utils/destinationHierarchy');
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DASHBOARD_NEW_LEADS_LIMIT = 5;
@@ -1022,10 +1023,16 @@ async function buildAdminDashboard(options = {}) {
     countLeadsByStatusOption(branchId, statusOptionKeys.cold, prevCreated),
   ]);
 
-  // Bookings / Revenue / Conv. Rate — always all-time (filters do not affect these three)
+  // Bookings / Revenue / Conv. Rate — the top KPI cards must follow the same selected dashboard
+  // period as Leads/Warm/Hot/Cold (same valueBuckets/changeBuckets vs prevBuckets pattern used
+  // above for qualified/quotations/lostLeads). All-time totals are kept separately below only for
+  // the sidebar "Key Highlights" widget (report.keyHighlights), which intentionally always
+  // summarizes lifetime performance.
   const allTimeBookings = convertedLeads;
   const allTimeRevenue = revenue;
   const allTimeConversionRate = conversionRate;
+  const kpiRevenue = isAllTime ? allTimeRevenue : periodRevenue;
+  const kpiConversionRate = isAllTime ? allTimeConversionRate : periodConversionRate;
 
   const reportKpis = {
     totalLeads: withValue(changeMeta(changeTotal, prevTotalLeads), periodTotalLeads),
@@ -1044,11 +1051,11 @@ async function buildAdminDashboard(options = {}) {
     hot: withValue(changeMeta(hotCount, prevHotCount), hotCount),
     cold: withValue(changeMeta(coldCount, prevColdCount), coldCount),
     quotations: withValue(changeMeta(changeBuckets.quotations, prevBuckets.quotations), valueBuckets.quotations),
-    bookings: withValue(changeMeta(allTimeBookings, momBuckets.conversions), allTimeBookings),
+    bookings: withValue(changeMeta(changeBuckets.conversions, prevBuckets.conversions), valueBuckets.conversions),
     lostLeads: withValue(changeMeta(changeBuckets.lost, prevBuckets.lost), valueBuckets.lost),
-    conversions: withValue(changeMeta(allTimeBookings, momBuckets.conversions), allTimeBookings),
-    revenue: withValue(changeMeta(allTimeRevenue, momRevenue), allTimeRevenue),
-    conversionRate: withValue(changeMeta(allTimeConversionRate, momConversionRate), allTimeConversionRate),
+    conversions: withValue(changeMeta(changeBuckets.conversions, prevBuckets.conversions), valueBuckets.conversions),
+    revenue: withValue(changeMeta(changeRevenue, prevRevenue), kpiRevenue),
+    conversionRate: withValue(changeMeta(changeConvRate, prevConversionRate), kpiConversionRate),
   };
 
   const topSource = leadsBySourcePeriod[0] || null;
@@ -1072,7 +1079,7 @@ async function buildAdminDashboard(options = {}) {
     { stage: 'Warm', count: warmCount },
     { stage: 'Hot', count: hotCount },
     { stage: 'Cold', count: coldCount },
-    { stage: 'Bookings', count: allTimeBookings },
+    { stage: 'Bookings', count: valueBuckets.conversions },
   ];
 
   const followUpsDueToday = await FollowUp.countDocuments(
@@ -1120,6 +1127,8 @@ async function buildAdminDashboard(options = {}) {
 
   const todayRevenue = await sumRevenueInRange(branchId, todayStart, todayEnd);
   const yesterdayRevenue = await sumRevenueInRange(branchId, yesterdayStart, yesterdayEnd);
+  const todayMarketingSpend = await sumMarketingSpendInRange(branchId, todayStart, todayEnd);
+  const yesterdayMarketingSpend = await sumMarketingSpendInRange(branchId, yesterdayStart, yesterdayEnd);
   const monthStartFin = startOfDay(new Date(todayStart.getFullYear(), todayStart.getMonth(), 1));
   const lastMonthStartFin = startOfDay(new Date(todayStart.getFullYear(), todayStart.getMonth() - 1, 1));
   const lastMonthEndFin = endOfDay(new Date(monthStartFin.getTime() - 1));
@@ -1127,7 +1136,10 @@ async function buildAdminDashboard(options = {}) {
   const lastMonthRevenue = await sumRevenueInRange(branchId, lastMonthStartFin, lastMonthEndFin);
   const grossMarginRate = 0.16;
   const financials = {
-    marketingSpend: withValue(changeMeta(0, 0), 0),
+    marketingSpend: withValue(
+      changeMeta(todayMarketingSpend, yesterdayMarketingSpend),
+      todayMarketingSpend
+    ),
     sales: withValue(changeMeta(todayRevenue, yesterdayRevenue), todayRevenue),
     grossMargin: withValue(
       changeMeta(
@@ -1269,6 +1281,86 @@ async function buildAdminDashboard(options = {}) {
       revenueVsBookings,
       topDestinations,
       keyHighlights,
+    },
+  };
+}
+
+/** Payment has no destination field — join to Lead the same way its `lead` ref is indexed for. */
+async function sumRevenueForDestination(branchId, start, end, destinationValues) {
+  if (!Array.isArray(destinationValues) || !destinationValues.length) return 0;
+  const match = { status: { $in: ['paid', 'partial'] } };
+  if (start && end) match.paidAt = { $gte: start, $lte: end };
+  const rows = await Payment.aggregate([
+    { $match: withBranch(match, branchId) },
+    {
+      $lookup: {
+        from: Lead.collection.name,
+        localField: 'lead',
+        foreignField: '_id',
+        as: 'leadDoc',
+      },
+    },
+    { $unwind: '$leadDoc' },
+    { $match: { 'leadDoc.destination': { $in: destinationValues } } },
+    { $group: { _id: null, total: { $sum: '$paidAmount' } } },
+  ]);
+  return rows[0]?.total || 0;
+}
+
+/**
+ * Destination drill-down for the Admin Dashboard's Top Destinations chart. `names` is the full
+ * list of rollup names a clicked chart segment represents (usually one state, or several when the
+ * segment is the frontend's merged "Others" slice) — resolved back to raw Lead.destination values
+ * via the exact same state-hierarchy logic buildAdminDashboard's topDestinations already uses, so
+ * the drill-down can never disagree with the chart the admin clicked. Reuses the same period
+ * resolution, status-bucket helpers, and revenue/conversion-rate formulas as buildAdminDashboard —
+ * only the destination scope is new.
+ */
+async function buildDestinationDetail(options = {}) {
+  const { branchId, dateFrom, dateTo, source, names } = options;
+  const { isAllTime, periodStart, periodEnd } = resolveReportPeriod(dateFrom, dateTo);
+  const sourceFilter = source ? { source } : {};
+  const baseScope = activeLeadScope(
+    isAllTime ? { ...sourceFilter } : { createdAt: { $gte: periodStart, $lte: periodEnd }, ...sourceFilter },
+    branchId
+  );
+
+  const destinationValues = await resolveDestinationGroupValues(names, baseScope);
+  const scope = { ...baseScope, destination: { $in: destinationValues } };
+
+  const statusOptionKeys = await resolveStatusOptionKeys();
+  const [totalLeads, statusAgg, warmCount, hotCount, coldCount, revenue] = await Promise.all([
+    Lead.countDocuments(scope),
+    Lead.aggregate([{ $match: scope }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+    countLeadsByStatusOption(branchId, statusOptionKeys.warm, scope),
+    countLeadsByStatusOption(branchId, statusOptionKeys.hot, scope),
+    countLeadsByStatusOption(branchId, statusOptionKeys.cold, scope),
+    sumRevenueForDestination(branchId, isAllTime ? null : periodStart, isAllTime ? null : periodEnd, destinationValues),
+  ]);
+
+  const statusCounts = Object.fromEntries(statusAgg.map((s) => [s._id, s.count]));
+  const buckets = mapStatusBucket(statusCounts);
+  const conversionRate = totalLeads ? Math.round((buckets.conversions / totalLeads) * 1000) / 10 : 0;
+
+  return {
+    period: {
+      from: isAllTime ? null : periodStart.toISOString(),
+      to: periodEnd.toISOString(),
+      isAllTime,
+      label: isAllTime
+        ? 'All Time'
+        : `${periodStart.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} - ${periodEnd.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`,
+    },
+    destinationValues,
+    kpis: {
+      totalLeads,
+      connected: buckets.connected,
+      warm: warmCount,
+      hot: hotCount,
+      cold: coldCount,
+      bookings: buckets.conversions,
+      revenue,
+      conversionRate,
     },
   };
 }
@@ -2426,6 +2518,7 @@ async function buildTeamPerformance(options = {}) {
 
 module.exports = {
   buildAdminDashboard,
+  buildDestinationDetail,
   buildExecutiveDashboard,
   buildSalesManagerDashboard,
   buildTeamLeaderDashboard,

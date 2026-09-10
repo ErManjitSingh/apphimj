@@ -17,7 +17,7 @@ const leadAssignmentLogSchema = new mongoose.Schema(
     leadDestination: { type: String, trim: true },
     destinationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Destination' },
     destinationName: { type: String, trim: true },
-    leadType: { type: String, enum: ['fit', 'group', 'corporate'], index: true },
+    leadType: { type: String, enum: ['fit', 'group', 'corporate', 'family', 'honeymoon'], index: true },
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     assigneeName: { type: String, trim: true },
     assignmentType: { type: String, enum: ASSIGNMENT_TYPES, required: true, index: true },

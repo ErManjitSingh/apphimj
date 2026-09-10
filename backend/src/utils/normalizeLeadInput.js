@@ -143,6 +143,10 @@ function normalizeLeadInput(body = {}, { isUpdate = false } = {}) {
     companyName: body.companyName?.trim() || '',
     leadType: body.leadType,
     leadTypeSource: body.leadTypeSource,
+    occupationCategory: ['government', 'private'].includes(body.occupationCategory)
+      ? body.occupationCategory
+      : '',
+    occupation: body.occupation?.trim() || '',
   };
 
   if (body.dateOfBirth !== undefined) {
@@ -226,6 +230,13 @@ function normalizeLeadUpdateInput(body = {}) {
   setTrim('leadTypeSource');
   setTrim('statusReason');
   setTrim('coldReason');
+  setTrim('occupation');
+
+  if (hasOwn(body, 'occupationCategory')) {
+    normalized.occupationCategory = ['government', 'private'].includes(body.occupationCategory)
+      ? body.occupationCategory
+      : '';
+  }
 
   if (hasOwn(body, 'notes') || hasOwn(body, 'specialRequirements')) {
     normalized.notes = String(body.notes || body.specialRequirements || '');

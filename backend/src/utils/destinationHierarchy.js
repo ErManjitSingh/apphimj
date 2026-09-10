@@ -1,6 +1,7 @@
 const Destination = require('../models/Destination');
 const { normalizeDestinationKey } = require('../models/Destination');
 const { MARGIN_STATES } = require('../services/destinationMarginService');
+const Lead = require('../models/Lead');
 
 const HIERARCHY_CACHE_TTL_MS = 60_000;
 let hierarchyCache = { at: 0, byKey: new Map() };
@@ -215,9 +216,42 @@ function invalidateStateHierarchyCache() {
   hierarchyCache = { at: 0, byKey: new Map() };
 }
 
+/**
+ * Resolve one or more Top Destinations rollup names (e.g. "Himachal Pradesh", or the
+ * "Other" bucket) back to the exact raw `Lead.destination` values that rollupCityStatsIntoStates
+ * would have grouped into them, scoped by `matchFilter` (same branch/date/source scope the
+ * dashboard used to build the chart). This is the single source of truth for what a click on a
+ * Top Destinations segment should filter leads by — never redefine "destination" elsewhere.
+ */
+async function resolveDestinationGroupValues(names, matchFilter = {}) {
+  const list = (Array.isArray(names) ? names : [names])
+    .map((n) => String(n || '').trim())
+    .filter(Boolean);
+  if (!list.length) return [];
+
+  const byKey = await loadStateHierarchyIndex();
+  const targetKeys = new Set(list.map((n) => normalizeDestinationKey(n)));
+  const wantsOther = targetKeys.has(normalizeDestinationKey('Other'));
+
+  const distinctValues = await Lead.distinct('destination', matchFilter);
+  const matches = [];
+  for (const raw of distinctValues) {
+    const trimmed = String(raw || '').trim();
+    const display = trimmed || 'Not specified';
+    const resolved = resolveStateForDestination(display, byKey);
+    if (resolved) {
+      if (targetKeys.has(normalizeDestinationKey(resolved.name))) matches.push(raw);
+    } else if (wantsOther) {
+      matches.push(raw);
+    }
+  }
+  return matches;
+}
+
 module.exports = {
   loadStateHierarchyIndex,
   resolveStateForDestination,
   rollupCityStatsIntoStates,
+  resolveDestinationGroupValues,
   invalidateStateHierarchyCache,
 };

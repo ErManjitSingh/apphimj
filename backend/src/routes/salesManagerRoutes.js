@@ -51,6 +51,14 @@ router.use(protect);
 
 const managerOnly = authorize('sales_manager', 'admin');
 const teamAccess = authorize('sales_manager', 'admin', 'lead_provider');
+/**
+ * Call Report / Executive Activity endpoints that take an `executiveId` — also open to
+ * sales_executive so they can view the same report for themselves. Each handler derives the
+ * scoped id server-side via resolveScopedExecutiveId(), which always overrides `executiveId` with
+ * the authenticated user's own id for that role, so this does not grant access to anyone else's
+ * data. Team-overview endpoints (no per-executive scoping) intentionally stay `managerOnly`.
+ */
+const managerOrExecutiveSelf = authorize('sales_manager', 'admin', 'sales_executive');
 
 router.get('/dashboard', managerOnly, getDashboard);
 router.get('/leads', managerOnly, listLeads);
@@ -67,18 +75,18 @@ router.get('/notifications', managerOnly, listNotifications);
 router.get('/reports', managerOnly, getReports);
 router.get('/calendar', managerOnly, getCalendar);
 
-router.get('/call-report/timeline', managerOnly, getTimeline);
-router.get('/call-report/summary', managerOnly, getSummary);
+router.get('/call-report/timeline', managerOrExecutiveSelf, getTimeline);
+router.get('/call-report/summary', managerOrExecutiveSelf, getSummary);
 router.get('/call-report/team-overview', managerOnly, getTeamOverviewHandler);
-router.get('/call-report/analytics', managerOnly, getAnalyticsHandler);
-router.get('/call-report/hour-detail', managerOnly, getHourDetail);
+router.get('/call-report/analytics', managerOrExecutiveSelf, getAnalyticsHandler);
+router.get('/call-report/hour-detail', managerOrExecutiveSelf, getHourDetail);
 
-router.get('/call-report/activity/timeline', managerOnly, getActivityTimeline);
-router.get('/call-report/activity/summary', managerOnly, getActivitySummary);
-router.get('/call-report/activity/module-usage', managerOnly, getModuleUsageHandler);
+router.get('/call-report/activity/timeline', managerOrExecutiveSelf, getActivityTimeline);
+router.get('/call-report/activity/summary', managerOrExecutiveSelf, getActivitySummary);
+router.get('/call-report/activity/module-usage', managerOrExecutiveSelf, getModuleUsageHandler);
 router.get('/call-report/activity/team-overview', managerOnly, getActivityTeamOverviewHandler);
-router.get('/call-report/activity/analytics', managerOnly, getActivityAnalyticsHandler);
-router.get('/call-report/activity/login-sessions', managerOnly, getLoginSessionsHandler);
+router.get('/call-report/activity/analytics', managerOrExecutiveSelf, getActivityAnalyticsHandler);
+router.get('/call-report/activity/login-sessions', managerOrExecutiveSelf, getLoginSessionsHandler);
 
 router.get('/teams/leaders', teamAccess, listTeamLeaders);
 router.get('/teams/available-executives', teamAccess, listAvailableExecutives);
