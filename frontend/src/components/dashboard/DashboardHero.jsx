@@ -86,8 +86,6 @@ const KPI_ITEMS = [
     icon: Briefcase,
     path: '/leads/converted',
     fallbackKey: 'conversions',
-    /** All-time — do not append period query params */
-    ignorePeriod: true,
     card: 'bg-gradient-to-br from-sky-500 to-blue-600 border-sky-400/30 shadow-sky-500/20',
     iconWrap: 'bg-white/20 text-white',
     labelCls: 'text-sky-50',
@@ -95,7 +93,6 @@ const KPI_ITEMS = [
     upCls: 'text-emerald-100',
     downCls: 'text-rose-100',
     flatCls: 'text-sky-50/85',
-    changeLabel: 'all time',
   },
   {
     key: 'revenue',
@@ -103,7 +100,6 @@ const KPI_ITEMS = [
     icon: IndianRupee,
     path: '/payments',
     currency: true,
-    ignorePeriod: true,
     card: 'bg-gradient-to-br from-teal-500 to-cyan-700 border-teal-400/30 shadow-teal-500/20',
     iconWrap: 'bg-white/20 text-white',
     labelCls: 'text-teal-50',
@@ -111,7 +107,6 @@ const KPI_ITEMS = [
     upCls: 'text-emerald-100',
     downCls: 'text-rose-100',
     flatCls: 'text-teal-50/85',
-    changeLabel: 'all time',
   },
   {
     key: 'conversionRate',
@@ -120,7 +115,6 @@ const KPI_ITEMS = [
     icon: Percent,
     path: '/reports',
     suffix: '%',
-    ignorePeriod: true,
     card: 'bg-gradient-to-br from-fuchsia-500 to-pink-600 border-fuchsia-400/30 shadow-fuchsia-500/20',
     iconWrap: 'bg-white/20 text-white',
     labelCls: 'text-fuchsia-50',
@@ -128,7 +122,6 @@ const KPI_ITEMS = [
     upCls: 'text-emerald-100',
     downCls: 'text-rose-100',
     flatCls: 'text-fuchsia-50/85',
-    changeLabel: 'all time',
   },
 ];
 

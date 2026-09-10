@@ -41,6 +41,7 @@ export default function ExecutiveActivityFilters({
   executives = [],
   executiveId,
   onExecutiveChange,
+  selfOnly = false,
 }) {
   const [showCustom, setShowCustom] = useState(false);
   const active = useMemo(() => activeActivityPreset(filters), [filters]);
@@ -81,16 +82,18 @@ export default function ExecutiveActivityFilters({
           </button>
         </div>
 
-        <select
-          value={executiveId}
-          onChange={(e) => onExecutiveChange?.(e.target.value)}
-          className="h-10 min-w-[200px] rounded-xl border border-subtle bg-white px-3 text-sm font-medium text-content-primary"
-        >
-          <option value="all">All Executives</option>
-          {executives.map((ex) => (
-            <option key={ex._id} value={ex._id}>{ex.name}</option>
-          ))}
-        </select>
+        {!selfOnly && (
+          <select
+            value={executiveId}
+            onChange={(e) => onExecutiveChange?.(e.target.value)}
+            className="h-10 min-w-[200px] rounded-xl border border-subtle bg-white px-3 text-sm font-medium text-content-primary"
+          >
+            <option value="all">All Executives</option>
+            {executives.map((ex) => (
+              <option key={ex._id} value={ex._id}>{ex.name}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {isCustom && (

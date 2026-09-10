@@ -109,13 +109,21 @@ export function formatLeadId(id) {
   return `LD-${String(id).replace(/\D/g, '').slice(-4).padStart(4, '0')}`;
 }
 
+/**
+ * Package Cost filter (Admin → Lead Management → All Leads). Filters on the same `Lead.budget`
+ * field the Sales Executive enters when creating the lead — no separate value.
+ * `minExclusive`/`maxExclusive` make adjacent ranges non-overlapping (e.g. exactly ₹1,00,000
+ * belongs to "₹50K – ₹1L", not "₹1L – ₹2L"). "Above ₹50K" is an intentional aggregate that
+ * overlaps every other range above ₹50K.
+ */
 export const BUDGET_FILTER_OPTIONS = [
-  { value: '', label: 'All Budgets', min: '', max: '' },
-  { value: 'under_50000', label: 'Under ₹50k', min: '0', max: '50000' },
-  { value: '50000_100000', label: '₹50k – ₹1L', min: '50000', max: '100000' },
-  { value: '100000_200000', label: '₹1L – ₹2L', min: '100000', max: '200000' },
-  { value: '200000_300000', label: '₹2L – ₹3L', min: '200000', max: '300000' },
-  { value: 'above_300000', label: '₹3L & Above', min: '300000', max: '' },
+  { value: '', label: 'All Package Costs', min: '', max: '' },
+  { value: 'under_50000', label: 'Under ₹50K', min: '', max: '50000', maxExclusive: true },
+  { value: '50000_100000', label: '₹50K – ₹1L', min: '50000', max: '100000' },
+  { value: '100000_200000', label: '₹1L – ₹2L', min: '100000', max: '200000', minExclusive: true },
+  { value: '200000_300000', label: '₹2L – ₹3L', min: '200000', max: '300000', minExclusive: true },
+  { value: 'above_300000', label: '₹3L & Above', min: '300000', max: '', minExclusive: true },
+  { value: 'above_50000', label: 'Above ₹50K', min: '50000', max: '', minExclusive: true },
 ];
 
 export const emptyFilters = {
@@ -130,6 +138,8 @@ export const emptyFilters = {
   travelMonth: '',
   budgetMin: '',
   budgetMax: '',
+  budgetMinExclusive: '',
+  budgetMaxExclusive: '',
   budgetRange: '',
   dateFrom: '',
   dateTo: '',

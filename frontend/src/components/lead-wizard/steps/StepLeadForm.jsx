@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, User, Phone, MapPin, Plane, Calendar, UtensilsCrossed,
   Mail, Building2, Compass, Zap, Shield, TrendingUp, MessageCircle,
-  Users, History, X, UserCheck,
+  Users, History, X, UserCheck, Briefcase,
 } from 'lucide-react';
 import { checkLeadDuplicate } from '../../../services/leadEnterpriseApi';
 import DuplicateLeadWarning from '../../leads/DuplicateLeadWarning';
@@ -375,6 +375,7 @@ export default function StepLeadForm({ isEdit, leadId }) {
   const phone = watch('phone');
   const alternatePhone = watch('alternatePhone');
   const name = watch('name');
+  const occupationCategory = watch('occupationCategory') || '';
   const destination = watch('destination') || '';
   const leadType = watch('leadType') || 'fit';
   const priority = watch('priority');
@@ -540,6 +541,37 @@ export default function StepLeadForm({ isEdit, leadId }) {
               )}
             />
           </WizardField>
+
+          <WizardField label="Occupation">
+            <div className="flex items-center h-10 gap-2">
+              <Chip
+                active={occupationCategory === 'government'}
+                onClick={() => setValue('occupationCategory', 'government')}
+              >
+                Government
+              </Chip>
+              <Chip
+                active={occupationCategory === 'private'}
+                onClick={() => setValue('occupationCategory', 'private')}
+              >
+                Private
+              </Chip>
+            </div>
+          </WizardField>
+
+          {occupationCategory && (
+            <WizardField label="Occupation">
+              <IconInput
+                icon={Briefcase}
+                {...register('occupation')}
+                placeholder={
+                  occupationCategory === 'government'
+                    ? 'Enter government occupation...'
+                    : 'Enter private occupation...'
+                }
+              />
+            </WizardField>
+          )}
         </div>
       </StepSection>
 

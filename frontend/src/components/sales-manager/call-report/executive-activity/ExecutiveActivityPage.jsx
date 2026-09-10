@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Sparkles, ListTree, BarChart3 } from 'lucide-react';
 import API from '../../../../api/axios';
+import { useAuth } from '../../../../context/AuthContext';
 import { useDataRefresh } from '../../../../hooks/useDataRefresh';
 import ExecutiveActivityFilters, { applyActivityPreset } from './ExecutiveActivityFilters';
 import ActivitySummaryCards from './ActivitySummaryCards';
@@ -13,10 +14,12 @@ import ActivityDetailDrawer from './ActivityDetailDrawer';
 
 const TIMELINE_PAGE_SIZE = 20;
 
-export default function ExecutiveActivityPage() {
+/** `selfOnly` — see CallReportPage.jsx's doc comment; same pattern, same server-side guarantee. */
+export default function ExecutiveActivityPage({ selfOnly = false }) {
+  const { user } = useAuth();
   const [filters, setFilters] = useState(() => applyActivityPreset('today'));
-  const [executiveId, setExecutiveId] = useState('all');
-  const [executives, setExecutives] = useState([]);
+  const [executiveId, setExecutiveId] = useState(() => (selfOnly ? String(user?._id || '') : 'all'));
+  const [executives, setExecutives] = useState(() => (selfOnly && user ? [user] : []));
   const [tab, setTab] = useState('timeline');
 
   const [summary, setSummary] = useState(null);
@@ -35,8 +38,9 @@ export default function ExecutiveActivityPage() {
   const [selectedEvent, setSelectedEvent] = useState(null);
 
   useEffect(() => {
+    if (selfOnly) return;
     API.get('/sales-manager/executives', { skipSuccessToast: true }).then((r) => setExecutives(r.data || []));
-  }, []);
+  }, [selfOnly]);
 
   const fetchSummary = useCallback(() => {
     if (executiveId === 'all') return;
@@ -102,8 +106,8 @@ export default function ExecutiveActivityPage() {
   });
 
   const selectedExecutive = useMemo(
-    () => executives.find((ex) => String(ex._id) === String(executiveId)),
-    [executives, executiveId]
+    () => (selfOnly ? user : executives.find((ex) => String(ex._id) === String(executiveId))),
+    [executives, executiveId, selfOnly, user]
   );
 
   return (
@@ -114,6 +118,7 @@ export default function ExecutiveActivityPage() {
         executives={executives}
         executiveId={executiveId}
         onExecutiveChange={setExecutiveId}
+        selfOnly={selfOnly}
       />
 
       {executiveId === 'all' ? (
@@ -135,13 +140,15 @@ export default function ExecutiveActivityPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          <button
-            type="button"
-            onClick={() => setExecutiveId('all')}
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-violet-600 hover:text-violet-500"
-          >
-            <ArrowLeft className="h-4 w-4" /> Back to team overview
-          </button>
+          {!selfOnly && (
+            <button
+              type="button"
+              onClick={() => setExecutiveId('all')}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-violet-600 hover:text-violet-500"
+            >
+              <ArrowLeft className="h-4 w-4" /> Back to team overview
+            </button>
+          )}
 
           <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50/60 to-white p-3.5 shadow-sm">
             <div className="mb-3 flex items-center gap-2">
@@ -149,7 +156,9 @@ export default function ExecutiveActivityPage() {
                 <Sparkles className="h-4 w-4" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-emerald-700">{selectedExecutive?.name || 'Executive'} — Activity Summary</h3>
+                <h3 className="text-sm font-bold text-emerald-700">
+                  {selfOnly ? 'My Activity Summary' : `${selectedExecutive?.name || 'Executive'} — Activity Summary`}
+                </h3>
                 <p className="text-[11px] text-emerald-600/80">What this executive did in the CRM for the selected period</p>
               </div>
             </div>

@@ -42,6 +42,7 @@ export default function CallReportFilters({
   onExecutiveChange,
   search = '',
   onSearchChange,
+  selfOnly = false,
 }) {
   const [showDates, setShowDates] = useState(false);
   const active = useMemo(() => activeCallReportPreset(filters), [filters]);
@@ -86,28 +87,30 @@ export default function CallReportFilters({
           </button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => onSearchChange?.(e.target.value)}
-              placeholder="Search executive name…"
-              className="h-10 w-52 rounded-xl border border-subtle bg-white pl-9 pr-3 text-sm font-medium text-content-primary outline-none focus:border-violet-400"
-            />
+        {!selfOnly && (
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => onSearchChange?.(e.target.value)}
+                placeholder="Search executive name…"
+                className="h-10 w-52 rounded-xl border border-subtle bg-white pl-9 pr-3 text-sm font-medium text-content-primary outline-none focus:border-violet-400"
+              />
+            </div>
+            <select
+              value={executiveId}
+              onChange={(e) => onExecutiveChange?.(e.target.value)}
+              className="h-10 min-w-[200px] rounded-xl border border-subtle bg-white px-3 text-sm font-medium text-content-primary"
+            >
+              <option value="all">All Executives</option>
+              {executives.map((ex) => (
+                <option key={ex._id} value={ex._id}>{ex.name}</option>
+              ))}
+            </select>
           </div>
-          <select
-            value={executiveId}
-            onChange={(e) => onExecutiveChange?.(e.target.value)}
-            className="h-10 min-w-[200px] rounded-xl border border-subtle bg-white px-3 text-sm font-medium text-content-primary"
-          >
-            <option value="all">All Executives</option>
-            {executives.map((ex) => (
-              <option key={ex._id} value={ex._id}>{ex.name}</option>
-            ))}
-          </select>
-        </div>
+        )}
       </div>
 
       {isCustom && (

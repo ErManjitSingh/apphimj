@@ -14,6 +14,30 @@ export function formatCallDurationExact(totalSeconds = 0) {
   return `${formatCallDuration(s)} (${s}s)`;
 }
 
+/**
+ * Human-readable h/m(/s) duration for report summaries — same underlying seconds value as
+ * formatCallDuration, just presented as "1h 20m 51s" instead of "80:51". Only non-zero units are
+ * shown (e.g. "2h" not "2h 0m"). Pass `includeSeconds: true` when the exact seconds matter (e.g. a
+ * single call's duration); leave it off for aggregate/report totals where whole minutes suffice
+ * (e.g. "1h 20m" rather than "1h 20m 51s").
+ */
+export function formatDurationHuman(totalSeconds = 0, { includeSeconds = false } = {}) {
+  const s = Math.max(0, Math.round(Number(totalSeconds) || 0));
+  const hours = Math.floor(s / 3600);
+  const minutes = Math.floor((s % 3600) / 60);
+  const seconds = s % 60;
+
+  const parts = [];
+  if (hours) parts.push(`${hours}h`);
+  if (minutes) parts.push(`${minutes}m`);
+  if (includeSeconds && seconds) parts.push(`${seconds}s`);
+
+  if (parts.length) return parts.join(' ');
+  // Sub-minute total with no seconds shown would otherwise render as nothing — fall back to
+  // seconds so real (if brief) activity is never displayed as blank.
+  return seconds ? `${seconds}s` : '0m';
+}
+
 export function startCallSession({ leadId, leadName, phone }) {
   if (!leadId || !phone) return null;
   const session = {

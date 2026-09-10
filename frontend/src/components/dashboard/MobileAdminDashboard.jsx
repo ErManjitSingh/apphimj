@@ -81,7 +81,6 @@ const KPI_CONFIG = [
     tone: "from-sky-400 to-blue-600",
     color: "#0ea5e9",
     path: "/leads/converted",
-    ignorePeriod: true,
   },
   {
     key: "revenue",
@@ -92,7 +91,6 @@ const KPI_CONFIG = [
     color: "#14b8a6",
     currency: true,
     path: "/payments",
-    ignorePeriod: true,
   },
   {
     key: "conversionRate",
@@ -103,7 +101,6 @@ const KPI_CONFIG = [
     color: "#d946ef",
     suffix: "%",
     path: "/reports",
-    ignorePeriod: true,
   },
 ];
 

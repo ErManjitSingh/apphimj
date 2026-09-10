@@ -16,11 +16,19 @@ function ChartTooltip({ active, payload }) {
       <p className="text-violet-600">
         {Number(row.queries || 0).toLocaleString('en-IN')} leads · {row.pct}%
       </p>
+      <p className="mt-0.5 text-[11px] text-slate-400">Click to view details</p>
     </div>
   );
 }
 
-export default function TopDestinationsDonut({ data = [] }) {
+/**
+ * Each rendered slice/legend row is clickable and carries `constituents`: the full list of
+ * backend Top Destinations rollup names (states, or the "Other" bucket) it represents. A
+ * top-5 slice constituents is just its own name; the synthesized "Others" slice (rank 6+,
+ * merged for chart readability) constituents is every name it absorbed, so a click always
+ * maps back to exactly the same grouping the chart itself used — never a re-derived one.
+ */
+export default function TopDestinationsDonut({ data = [], onSelect }) {
   const normalized = (Array.isArray(data) ? data : [])
     .map((d) => ({
       name: String(d?.name || 'Unknown').trim() || 'Unknown',
@@ -31,35 +39,44 @@ export default function TopDestinationsDonut({ data = [] }) {
 
   const total = normalized.reduce((s, d) => s + d.queries, 0);
   const top = normalized.slice(0, 5);
-  const used = top.reduce((s, r) => s + r.queries, 0);
-  const others = Math.max(0, total - used);
+  const rest = normalized.slice(5);
+  const restTotal = rest.reduce((s, r) => s + r.queries, 0);
 
   const rows = top.map((d, i) => ({
     name: d.name,
     queries: d.queries,
+    constituents: [d.name],
     pct: total ? Math.round((d.queries / total) * 1000) / 10 : 0,
     color: COLORS[i % (COLORS.length - 1)],
   }));
 
-  if (others > 0) {
-    // Merge leftover with any existing "Other/Others" slice from rollup
+  if (restTotal > 0) {
+    const restNames = rest.map((r) => r.name);
     const otherIdx = rows.findIndex((r) => /^others?$/i.test(r.name));
     if (otherIdx >= 0) {
+      const mergedQueries = rows[otherIdx].queries + restTotal;
       rows[otherIdx] = {
         ...rows[otherIdx],
-        queries: rows[otherIdx].queries + others,
-        pct: total ? Math.round(((rows[otherIdx].queries + others) / total) * 1000) / 10 : 0,
+        queries: mergedQueries,
+        constituents: [...rows[otherIdx].constituents, ...restNames],
+        pct: total ? Math.round((mergedQueries / total) * 1000) / 10 : 0,
         color: COLORS[COLORS.length - 1],
       };
     } else {
       rows.push({
         name: 'Others',
-        queries: others,
-        pct: total ? Math.round((others / total) * 1000) / 10 : 0,
+        queries: restTotal,
+        constituents: restNames,
+        pct: total ? Math.round((restTotal / total) * 1000) / 10 : 0,
         color: COLORS[COLORS.length - 1],
       });
     }
   }
+
+  const handleSelect = (row) => {
+    if (!onSelect || !row?.constituents?.length) return;
+    onSelect(row);
+  };
 
   return (
     <DashboardPanel
@@ -85,9 +102,15 @@ export default function TopDestinationsDonut({ data = [] }) {
                   outerRadius={74}
                   paddingAngle={2}
                   strokeWidth={0}
+                  onClick={onSelect ? (entry) => handleSelect(entry) : undefined}
+                  className={onSelect ? 'cursor-pointer' : undefined}
                 >
                   {rows.map((row) => (
-                    <Cell key={row.name} fill={row.color} />
+                    <Cell
+                      key={row.name}
+                      fill={row.color}
+                      style={onSelect ? { cursor: 'pointer' } : undefined}
+                    />
                   ))}
                 </Pie>
                 <Tooltip content={<ChartTooltip />} />
@@ -105,7 +128,27 @@ export default function TopDestinationsDonut({ data = [] }) {
 
           <ul className="w-full space-y-2">
             {rows.map((row) => (
-              <li key={row.name} className="flex items-center gap-2 text-[12px]">
+              <li
+                key={row.name}
+                className={
+                  onSelect
+                    ? 'flex cursor-pointer items-center gap-2 rounded-lg px-1 -mx-1 text-[12px] transition-colors hover:bg-slate-50'
+                    : 'flex items-center gap-2 text-[12px]'
+                }
+                role={onSelect ? 'button' : undefined}
+                tabIndex={onSelect ? 0 : undefined}
+                onClick={() => handleSelect(row)}
+                onKeyDown={
+                  onSelect
+                    ? (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleSelect(row);
+                        }
+                      }
+                    : undefined
+                }
+              >
                 <span
                   className="h-2.5 w-2.5 shrink-0 rounded-full"
                   style={{ background: row.color }}

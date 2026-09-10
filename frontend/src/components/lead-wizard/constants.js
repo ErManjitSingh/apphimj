@@ -155,6 +155,8 @@ export const LEAD_TYPES = [
   { value: 'fit', label: 'FIT', description: 'Individual / family' },
   { value: 'group', label: 'Group', description: '10+ travelers' },
   { value: 'corporate', label: 'Corporate', description: 'Business / MICE' },
+  { value: 'family', label: 'Family Tour', description: 'Family group getaway' },
+  { value: 'honeymoon', label: 'Honeymoon Tour', description: 'Couple / honeymoon trip' },
 ];
 
 export const DESTINATIONS = [
@@ -225,6 +227,8 @@ export const defaultWizardValues = {
   numberOfRooms: 1,
   roomsWithMattress: 0,
   dateOfBirth: '',
+  occupationCategory: '',
+  occupation: '',
   cabType: 'sedan',
   adults: 2,
   children: 0,

@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import API from "../api/axios";
 import { useAuth } from "../context/AuthContext";
@@ -41,6 +42,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const isLeadProvider = user?.role === "lead_provider";
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [filters, setFilters] = useState(getDefaultDashboardFilters);
   const [showFilters, setShowFilters] = useState(false);
   const {
@@ -73,6 +75,21 @@ export default function Dashboard() {
   }, [queryClient, filters]);
 
   useDataRefresh(["dashboard"], softRefreshDashboard);
+
+  // Top Destinations drill-down — carries the exact backend rollup name(s) the clicked slice
+  // represents plus the dashboard's current period, so /destination never falls back to all-time.
+  const handleDestinationSelect = useCallback(
+    (row) => {
+      const names = (row.constituents || [row.name]).join(",");
+      const params = new URLSearchParams();
+      params.set("names", names);
+      if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
+      if (filters.dateTo) params.set("dateTo", filters.dateTo);
+      if (filters.source) params.set("source", filters.source);
+      navigate(`/destination/${encodeURIComponent(row.name)}?${params.toString()}`);
+    },
+    [navigate, filters]
+  );
 
   const report = stats?.report;
 
@@ -156,7 +173,10 @@ export default function Dashboard() {
             </Suspense>
           </div>
           <div className="min-w-0 xl:col-span-3">
-            <TopDestinationsDonut data={report?.topDestinations || []} />
+            <TopDestinationsDonut
+              data={report?.topDestinations || []}
+              onSelect={handleDestinationSelect}
+            />
           </div>
           <div className="min-w-0 xl:col-span-4">
             <SalesTeamPerformanceTable

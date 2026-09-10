@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Phone, PhoneCall, PhoneMissed, PhoneOff, Clock, Timer, TrendingUp, TrendingDown, Users, Repeat, ChevronRight,
+  Target, CheckCircle2, Percent,
 } from 'lucide-react';
-import { formatCallDuration } from '../../../lib/callSession';
+import { cn } from '../../../lib/utils';
+import { formatCallDuration, formatDurationHuman } from '../../../lib/callSession';
 import KpiDrilldownModal from './KpiDrilldownModal';
 
 const CARDS = [
@@ -24,7 +26,7 @@ const CARDS = [
     drill: { mode: 'calls', title: 'Failed / Cancelled Calls', outcome: 'failed' },
   },
   {
-    key: 'totalTalkTimeSec', label: 'Total Talk Time', icon: Clock, cardBg: 'bg-indigo-50 border-indigo-100', iconSolid: 'bg-indigo-500 text-white', valueColor: 'text-indigo-700', format: formatCallDuration,
+    key: 'totalTalkTimeSec', label: 'Total Talk Time', icon: Clock, cardBg: 'bg-indigo-50 border-indigo-100', iconSolid: 'bg-indigo-500 text-white', valueColor: 'text-indigo-700', format: (v) => formatDurationHuman(v, { includeSeconds: true }),
     drill: { mode: 'calls', title: 'Total Talk Time' },
   },
   {
@@ -47,6 +49,21 @@ const CARDS = [
     key: 'avgCallsPerGuest', label: 'Avg Calls / Guest', icon: Repeat, cardBg: 'bg-rose-50 border-rose-100', iconSolid: 'bg-rose-500 text-white', valueColor: 'text-rose-700',
     drill: { mode: 'guests', title: 'Avg Calls / Guest' },
   },
+  {
+    key: 'connectionRate', label: 'Connection Rate', icon: Percent, cardBg: 'bg-cyan-50 border-cyan-100', iconSolid: 'bg-cyan-500 text-white', valueColor: 'text-cyan-700',
+    format: (v) => `${v}%`,
+  },
+  {
+    // Same fixed 2h/day target computed server-side by getExecutiveSummary (daysInPeriod × 2h) —
+    // no separate target calculation here.
+    key: 'targetTalkTimeSec', label: 'Target', icon: Target, cardBg: 'bg-slate-50 border-slate-200', iconSolid: 'bg-slate-500 text-white', valueColor: 'text-slate-700',
+    format: (v) => formatDurationHuman(v),
+  },
+  {
+    // Status is driven solely by summary.targetMet (talk time only) — rendered as the badge below.
+    key: 'targetMet', label: 'Status', icon: CheckCircle2, cardBg: 'bg-slate-50 border-slate-200', iconSolid: 'bg-slate-500 text-white', valueColor: 'text-slate-700',
+    isStatus: true,
+  },
 ];
 
 export default function ExecutiveSummaryCards({ summary, loading, executiveId, executiveName, dateFrom, dateTo }) {
@@ -67,28 +84,50 @@ export default function ExecutiveSummaryCards({ summary, loading, executiveId, e
   return (
     <>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-        {CARDS.map(({ key, label, icon: Icon, cardBg, iconSolid, valueColor, format, drill }, i) => (
-          <motion.button
-            key={key}
-            type="button"
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.04 }}
-            onClick={() => setSelectedKpi({ ...drill, key })}
-            className={`group relative rounded-2xl border p-3.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md hover:ring-1 hover:ring-black/5 ${cardBg}`}
-          >
-            <ChevronRight className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-content-muted/40 transition group-hover:translate-x-0.5 group-hover:text-content-muted" />
-            <div className="flex items-start justify-between gap-2 pr-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-content-muted leading-tight">{label}</p>
-              <div className={`inline-flex p-1.5 rounded-xl shadow-sm ${iconSolid}`}>
-                <Icon className="h-3.5 w-3.5" strokeWidth={2.75} />
+        {CARDS.map(({ key, label, icon: Icon, cardBg, iconSolid, valueColor, format, drill, isStatus }, i) => {
+          const targetMet = Boolean(summary?.targetMet);
+          return (
+            <motion.button
+              key={key}
+              type="button"
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.04 }}
+              onClick={() => drill && setSelectedKpi({ ...drill, key })}
+              disabled={!drill}
+              className={cn(
+                'group relative rounded-2xl border p-3.5 text-left shadow-sm transition',
+                drill && 'hover:-translate-y-0.5 hover:shadow-md hover:ring-1 hover:ring-black/5',
+                !drill && 'cursor-default',
+                cardBg
+              )}
+            >
+              {drill && (
+                <ChevronRight className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-content-muted/40 transition group-hover:translate-x-0.5 group-hover:text-content-muted" />
+              )}
+              <div className="flex items-start justify-between gap-2 pr-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-content-muted leading-tight">{label}</p>
+                <div className={`inline-flex p-1.5 rounded-xl shadow-sm ${iconSolid}`}>
+                  <Icon className="h-3.5 w-3.5" strokeWidth={2.75} />
+                </div>
               </div>
-            </div>
-            <p className={`mt-2 text-xl font-bold tabular-nums ${valueColor}`}>
-              {format ? format(summary[key] || 0) : (summary[key] ?? 0)}
-            </p>
-          </motion.button>
-        ))}
+              {isStatus ? (
+                <span
+                  className={cn(
+                    'mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-bold',
+                    targetMet ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                  )}
+                >
+                  {targetMet ? 'Target Met' : 'Not Met'}
+                </span>
+              ) : (
+                <p className={`mt-2 text-xl font-bold tabular-nums ${valueColor}`}>
+                  {format ? format(summary[key] || 0) : (summary[key] ?? 0)}
+                </p>
+              )}
+            </motion.button>
+          );
+        })}
       </div>
 
       <KpiDrilldownModal

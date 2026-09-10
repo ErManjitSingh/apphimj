@@ -32,7 +32,7 @@ export const customerSchema = z.object({
 });
 
 export const travelFieldsSchema = z.object({
-  leadType: z.enum(['fit', 'group', 'corporate']).optional(),
+  leadType: z.enum(['fit', 'group', 'corporate', 'family', 'honeymoon']).optional(),
   companyName: z.string().optional(),
   destination: z.string().min(2, 'Destination is required'),
   travelDate: z.string().min(1, 'Travel date is required'),

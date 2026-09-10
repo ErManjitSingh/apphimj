@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   IndianRupee,
   Megaphone,
@@ -5,8 +8,14 @@ import {
   TrendingDown,
   TrendingUp,
   Activity,
+  Plus,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { usePermissions } from '../../hooks/usePermissions';
+import { useToast } from '../../context/ToastContext';
+import { createMarketingSpend } from '../../services/marketingSpendApi';
+import { invalidateDashboard } from '../../lib/queryInvalidation';
+import MarketingSpendModal from './MarketingSpendModal';
 
 function formatCurrency(n) {
   const amount = Number(n || 0);
@@ -59,6 +68,23 @@ const CARDS = [
 
 export default function FinancialMetricsRow({ financials }) {
   const data = financials || {};
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const { can } = usePermissions();
+  const [addOpen, setAddOpen] = useState(false);
+  const canManageMarketing = can('marketing', 'create');
+
+  const addMutation = useMutation({
+    mutationFn: createMarketingSpend,
+    onSuccess: () => {
+      toast.success('Marketing spend recorded');
+      setAddOpen(false);
+      invalidateDashboard(queryClient);
+      queryClient.invalidateQueries({ queryKey: ['marketing-spend'] });
+    },
+    onError: (err) => toast.error(err?.response?.data?.message || 'Failed to add marketing spend'),
+  });
 
   return (
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
@@ -71,12 +97,39 @@ export default function FinancialMetricsRow({ financials }) {
             ? `${isUp || isDown ? (isUp ? '+' : '-') : ''}${Math.abs(Number(meta.change || 0) / 100).toFixed(2)}x`
             : `${isUp ? '+' : isDown ? '-' : ''}${Math.abs(meta.change || 0)}%`;
         const Icon = card.icon;
+        const isMarketingSpend = card.key === 'marketingSpend';
 
         return (
           <div
             key={card.key}
-            className="flex items-center gap-3.5 rounded-2xl border border-slate-100 bg-white px-4 py-4 shadow-sm"
+            role={isMarketingSpend ? 'button' : undefined}
+            tabIndex={isMarketingSpend ? 0 : undefined}
+            onClick={isMarketingSpend ? () => navigate('/marketing-spend') : undefined}
+            onKeyDown={
+              isMarketingSpend
+                ? (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') navigate('/marketing-spend');
+                  }
+                : undefined
+            }
+            className={cn(
+              'relative flex items-center gap-3.5 rounded-2xl border border-slate-100 bg-white px-4 py-4 shadow-sm',
+              isMarketingSpend && 'cursor-pointer transition-shadow hover:shadow-md'
+            )}
           >
+            {isMarketingSpend && canManageMarketing && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAddOpen(true);
+                }}
+                title="Add marketing spend"
+                className="absolute right-2.5 top-2.5 flex h-6 w-6 items-center justify-center rounded-full bg-violet-600 text-white shadow-sm transition-colors hover:bg-violet-500"
+              >
+                <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
+              </button>
+            )}
             <div
               className={cn(
                 'flex h-11 w-11 shrink-0 items-center justify-center rounded-full',
@@ -109,6 +162,16 @@ export default function FinancialMetricsRow({ financials }) {
           </div>
         );
       })}
+
+      {canManageMarketing && (
+        <MarketingSpendModal
+          open={addOpen}
+          record={null}
+          onClose={() => setAddOpen(false)}
+          loading={addMutation.isPending}
+          onSubmit={(payload) => addMutation.mutate(payload)}
+        />
+      )}
     </div>
   );
 }

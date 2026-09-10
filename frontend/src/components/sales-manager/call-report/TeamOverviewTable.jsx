@@ -1,5 +1,6 @@
 import { Users, Trophy } from 'lucide-react';
-import { formatCallDuration } from '../../../lib/callSession';
+import { formatDurationHuman } from '../../../lib/callSession';
+import { cn } from '../../../lib/utils';
 
 export default function TeamOverviewTable({ rows, loading, onSelectExecutive }) {
   return (
@@ -26,7 +27,7 @@ export default function TeamOverviewTable({ rows, loading, onSelectExecutive }) 
           <table className="min-w-full text-left text-sm">
             <thead className="sticky top-0 z-10 bg-blue-600">
               <tr>
-                {['Executive', 'Total Calls', 'Connected', 'No Answer', 'Talk Time', 'Avg Duration', 'Guests', 'Connection %'].map((h) => (
+                {['Executive', 'Total Calls', 'Connected', 'No Answer', 'Talk Time', 'Target', 'Status', 'Connection %'].map((h) => (
                   <th key={h} className="whitespace-nowrap px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide text-white">{h}</th>
                 ))}
               </tr>
@@ -47,9 +48,18 @@ export default function TeamOverviewTable({ rows, loading, onSelectExecutive }) 
                   <td className="px-3 py-2.5 tabular-nums font-semibold text-slate-700">{row.totalCalls}</td>
                   <td className="px-3 py-2.5 tabular-nums font-semibold text-emerald-600">{row.connectedCalls}</td>
                   <td className="px-3 py-2.5 tabular-nums font-semibold text-amber-600">{row.noAnswerCalls}</td>
-                  <td className="px-3 py-2.5 tabular-nums text-indigo-600">{formatCallDuration(row.totalTalkTimeSec)}</td>
-                  <td className="px-3 py-2.5 tabular-nums text-violet-600">{formatCallDuration(row.avgCallDurationSec)}</td>
-                  <td className="px-3 py-2.5 tabular-nums text-fuchsia-600">{row.uniqueGuestsContacted}</td>
+                  <td className="px-3 py-2.5 tabular-nums text-indigo-600">{formatDurationHuman(row.totalTalkTimeSec)}</td>
+                  <td className="px-3 py-2.5 tabular-nums text-slate-500">{formatDurationHuman(row.targetTalkTimeSec)}</td>
+                  <td className="px-3 py-2.5">
+                    <span
+                      className={cn(
+                        'rounded-full px-2.5 py-1 text-xs font-bold whitespace-nowrap',
+                        row.targetMet ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                      )}
+                    >
+                      {row.targetMet ? 'Target Met' : 'Not Met'}
+                    </span>
+                  </td>
                   <td className="px-3 py-2.5">
                     <span className="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-bold tabular-nums text-sky-700">
                       {row.connectionRate}%

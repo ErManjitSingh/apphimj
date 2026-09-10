@@ -57,6 +57,8 @@ export function leadToWizardValues(lead) {
     numberOfRooms: lead.numberOfRooms || 1,
     roomsWithMattress: lead.roomsWithMattress ?? 0,
     dateOfBirth: lead.dateOfBirth ? String(lead.dateOfBirth).split('T')[0] : '',
+    occupationCategory: lead.occupationCategory || '',
+    occupation: lead.occupation || '',
     cabType: lead.cabType || lead.transportRequirement || 'sedan',
     adults,
     children,
@@ -120,6 +122,8 @@ export function wizardValuesToPayload(values) {
     dateOfBirth: values.dateOfBirth
       ? new Date(values.dateOfBirth).toISOString()
       : undefined,
+    occupationCategory: values.occupationCategory || undefined,
+    occupation: values.occupation || undefined,
     cabType: values.cabType || undefined,
     transportRequirement: values.cabType || undefined,
     adults: Number(values.adults) || 2,

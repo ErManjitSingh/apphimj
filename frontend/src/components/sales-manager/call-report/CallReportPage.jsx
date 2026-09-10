@@ -15,11 +15,21 @@ import ExecutiveActivityPage from './executive-activity/ExecutiveActivityPage';
 
 const TIMELINE_PAGE_SIZE = 20;
 
-export default function CallReportPage() {
+/**
+ * `selfOnly` (Sales Executive access): locks the report to the authenticated user's own data —
+ * the team roster is never fetched (that endpoint isn't authorized for this role anyway), the
+ * executive selector/search/Team Overview/"back to team" UI are hidden, and `executiveId` never
+ * becomes 'all', so every existing single-executive code path (summary/timeline/analytics) below
+ * runs unchanged, just always scoped to `user`. The backend independently re-derives and enforces
+ * this same scoping from the authenticated session — this prop only controls presentation.
+ */
+export default function CallReportPage({ selfOnly = false }) {
   const { user } = useAuth();
   const [filters, setFilters] = useState(() => applyCallReportPreset('today'));
-  const [executiveId, setExecutiveId] = useState('all');
-  const [executives, setExecutives] = useState([]);
+  const [executiveId, setExecutiveId] = useState(() => (selfOnly ? String(user?._id || '') : 'all'));
+  // selfOnly: synthesize the one-item "team" from the already-authenticated user — no roster
+  // fetch, since /sales-manager/executives isn't (and shouldn't be) authorized for this role.
+  const [executives, setExecutives] = useState(() => (selfOnly && user ? [user] : []));
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState('timeline');
   const [topTab, setTopTab] = useState('callReport');
@@ -37,8 +47,9 @@ export default function CallReportPage() {
   const [selectedEvent, setSelectedEvent] = useState(null);
 
   useEffect(() => {
+    if (selfOnly) return;
     API.get('/sales-manager/executives', { skipSuccessToast: true }).then((r) => setExecutives(r.data || []));
-  }, []);
+  }, [selfOnly]);
 
   const fetchSummary = useCallback(() => {
     if (executiveId === 'all') return;
@@ -91,8 +102,8 @@ export default function CallReportPage() {
   });
 
   const selectedExecutive = useMemo(
-    () => executives.find((ex) => String(ex._id) === String(executiveId)),
-    [executives, executiveId]
+    () => (selfOnly ? user : executives.find((ex) => String(ex._id) === String(executiveId))),
+    [executives, executiveId, selfOnly, user]
   );
 
   const filteredTeamRows = useMemo(() => {
@@ -133,9 +144,16 @@ export default function CallReportPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Call Report"
-        description="Chronological calling history, summary metrics, and analytics for every sales executive"
-        breadcrumbs={[user?.role === 'admin' ? 'Admin' : 'Sales Manager', 'Call Report']}
+        title={selfOnly ? 'My Call Report' : 'Call Report'}
+        description={
+          selfOnly
+            ? 'Your chronological calling history, summary metrics, and daily target progress'
+            : 'Chronological calling history, summary metrics, and analytics for every sales executive'
+        }
+        breadcrumbs={[
+          selfOnly ? 'Sales Executive' : user?.role === 'admin' ? 'Admin' : 'Sales Manager',
+          'Call Report',
+        ]}
       />
 
       <CallReportHero
@@ -169,7 +187,7 @@ export default function CallReportPage() {
       </div>
 
       {topTab === 'executiveActivity' ? (
-        <ExecutiveActivityPage />
+        <ExecutiveActivityPage selfOnly={selfOnly} />
       ) : (
         <>
       <CallReportFilters
@@ -180,6 +198,7 @@ export default function CallReportPage() {
         onExecutiveChange={setExecutiveId}
         search={search}
         onSearchChange={setSearch}
+        selfOnly={selfOnly}
       />
 
       {executiveId === 'all' ? (
@@ -201,13 +220,15 @@ export default function CallReportPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          <button
-            type="button"
-            onClick={() => setExecutiveId('all')}
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-violet-600 hover:text-violet-500"
-          >
-            <ArrowLeft className="h-4 w-4" /> Back to team overview
-          </button>
+          {!selfOnly && (
+            <button
+              type="button"
+              onClick={() => setExecutiveId('all')}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-violet-600 hover:text-violet-500"
+            >
+              <ArrowLeft className="h-4 w-4" /> Back to team overview
+            </button>
+          )}
 
           <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50/60 to-white p-3.5 shadow-sm dark:bg-slate-900/80">
             <div className="mb-3 flex items-center gap-2">
@@ -215,7 +236,9 @@ export default function CallReportPage() {
                 <Sparkles className="h-4 w-4" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-emerald-700">{selectedExecutive?.name || 'Executive'} — Summary</h3>
+                <h3 className="text-sm font-bold text-emerald-700">
+                  {selfOnly ? 'My Summary' : `${selectedExecutive?.name || 'Executive'} — Summary`}
+                </h3>
                 <p className="text-[11px] text-emerald-600/80">Key call metrics for the selected period</p>
               </div>
             </div>

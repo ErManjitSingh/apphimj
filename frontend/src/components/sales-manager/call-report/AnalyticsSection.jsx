@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { BarChart3, Percent, Repeat2, Clock4, CalendarRange, Users, PhoneOff, CalendarDays } from 'lucide-react';
 import API from '../../../api/axios';
+import { formatDurationHuman } from '../../../lib/callSession';
 import { CALL_REPORT_PRESETS, applyCallReportPreset, activeCallReportPreset } from './CallReportFilters';
 import HourlyCallChart from './HourlyCallChart';
 import DayCallDetailModal from './DayCallDetailModal';
@@ -287,14 +288,14 @@ export default function AnalyticsSection({ executiveId, executives = [] }) {
                       <Tooltip
                         cursor={{ fill: 'rgba(5,150,105,0.06)' }}
                         contentStyle={{ borderRadius: 10, fontSize: 12 }}
-                        formatter={(value) => [`${value} min`, 'Talk time']}
+                        formatter={(value) => [formatDurationHuman(value * 60), 'Talk time']}
                         labelFormatter={(_, payload) => payload?.[0]?.payload?.fullLabel || ''}
                       />
                       <Bar dataKey="talkTimeMin" name="Talk time" fill="#059669" radius={[8, 8, 0, 0]} maxBarSize={48}>
                         <LabelList
                           dataKey="talkTimeMin"
                           position="top"
-                          formatter={(v) => (v > 0 ? `${v}m` : '')}
+                          formatter={(v) => (v > 0 ? formatDurationHuman(v * 60) : '')}
                           style={{ fill: '#065F46', fontSize: 11, fontWeight: 700 }}
                         />
                       </Bar>

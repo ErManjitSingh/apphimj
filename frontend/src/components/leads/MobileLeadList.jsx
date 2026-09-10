@@ -289,6 +289,8 @@ export default function MobileLeadList({
                         budgetRange: event.target.value,
                         budgetMin: opt?.min ?? '',
                         budgetMax: opt?.max ?? '',
+                        budgetMinExclusive: opt?.minExclusive ? 'true' : '',
+                        budgetMaxExclusive: opt?.maxExclusive ? 'true' : '',
                       });
                     }}
                     className="h-9 rounded-xl border border-slate-200 bg-white px-2 text-[9px] text-slate-600 outline-none"

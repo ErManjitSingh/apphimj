@@ -1,4 +1,4 @@
-import { MapPin, User, Users, MessageCircle, Calendar, Clock, Phone, ClipboardList, Snowflake, Sun, Flame, XCircle, CircleDashed, Trophy } from 'lucide-react';
+import { MapPin, User, Users, MessageCircle, Calendar, Clock, Phone, Eye, ClipboardList, Snowflake, Sun, Flame, XCircle, CircleDashed, Trophy } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
@@ -98,7 +98,13 @@ export function LeadTimingLines({ lead, className }) {
   const firstCall = hasFirstCallData ? lead.firstCall : undefined;
   const firstCallAt = firstCall ? formatLeadArrivedAt(firstCall.at) : null;
 
-  if (!created && !assigned && !selfCreatedByExec && !hasFirstCallData) return null;
+  // Management-only field — the API only includes `firstOpenedAt` for admin/sales_manager
+  // requests, so an absent key here means "not authorized to see it", same idiom as firstCall.
+  const hasOpenedData = Boolean(lead) && Object.prototype.hasOwnProperty.call(lead, 'firstOpenedAt');
+  const openedAt = hasOpenedData ? formatLeadArrivedAt(lead.firstOpenedAt) : null;
+  const openedByName = lead?.firstOpenedBy?.name;
+
+  if (!created && !assigned && !selfCreatedByExec && !hasFirstCallData && !hasOpenedData) return null;
 
   return (
     <div className={cn('mt-0.5 space-y-0.5 text-[11px] leading-tight text-slate-500', className)}>
@@ -131,6 +137,31 @@ export function LeadTimingLines({ lead, className }) {
             {assigned}
           </span>
         </p>
+      ) : null}
+      {hasOpenedData ? (
+        openedAt ? (
+          <p
+            className="flex items-center gap-1 min-w-0"
+            title={`Opened ${openedAt}${openedByName ? ` · ${openedByName}` : ''}`}
+          >
+            <Eye className="w-3 h-3 shrink-0 text-slate-400" />
+            <span className="truncate">
+              <span className="font-semibold text-slate-600">Opened</span>
+              {' · '}
+              {openedAt}
+              {openedByName ? ` · ${openedByName}` : ''}
+            </span>
+          </p>
+        ) : (
+          <p className="flex items-center gap-1 min-w-0 text-rose-600" title="Not opened yet">
+            <Eye className="w-3 h-3 shrink-0 text-rose-500" />
+            <span className="truncate">
+              <span className="font-semibold text-rose-600">Opened</span>
+              {' · '}
+              Not opened yet
+            </span>
+          </p>
+        )
       ) : null}
       {hasFirstCallData ? (
         firstCall && firstCallAt ? (

@@ -8,6 +8,8 @@ export const RoleDashboard = lazy(() => import('../pages/RoleDashboard'));
 export const Dashboard = lazy(() => import('../pages/Dashboard'));
 export const Leads = lazy(() => import('../pages/Leads'));
 export const LeadDetail = lazy(() => import('../pages/LeadDetail'));
+export const DestinationDetail = lazy(() => import('../pages/DestinationDetail'));
+export const MarketingSpendReport = lazy(() => import('../pages/MarketingSpendReport'));
 export const LeadForm = lazy(() => import('../pages/LeadForm'));
 export const Followups = lazy(() => import('../pages/Followups'));
 export const Reminders = lazy(() => import('../pages/Reminders'));

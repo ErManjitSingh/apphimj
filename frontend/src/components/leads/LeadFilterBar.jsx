@@ -93,6 +93,8 @@ export default function LeadFilterBar({
       budgetRange: value,
       budgetMin: opt?.min ?? '',
       budgetMax: opt?.max ?? '',
+      budgetMinExclusive: opt?.minExclusive ? 'true' : '',
+      budgetMaxExclusive: opt?.maxExclusive ? 'true' : '',
     });
   };
 
@@ -284,7 +286,7 @@ export default function LeadFilterBar({
           </select>
         </div>
         <div>
-          <FieldLabel>Budget</FieldLabel>
+          <FieldLabel>Package Cost</FieldLabel>
           <select
             value={filters.budgetRange || ''}
             onChange={(e) => setBudgetRange(e.target.value)}

@@ -20,6 +20,8 @@ import {
   Dashboard,
   Leads,
   LeadDetail,
+  DestinationDetail,
+  MarketingSpendReport,
   LeadForm,
   Followups,
   Reminders,
@@ -237,6 +239,10 @@ function App() {
                   <Route
                     path="email-activity"
                     element={<EmailActivityPage />}
+                  />
+                  <Route
+                    path="call-report"
+                    element={<CallReportPage selfOnly />}
                   />
                   <Route
                     path="quotations/new"
@@ -812,6 +818,25 @@ function App() {
                         denyRoles={["sales_executive", "team_leader"]}
                       >
                         <LeadDetail />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="destination/:name"
+                    element={
+                      <PermissionRoute
+                        module="leads"
+                        denyRoles={["sales_executive", "team_leader"]}
+                      >
+                        <DestinationDetail />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="marketing-spend"
+                    element={
+                      <PermissionRoute module="marketing" roles={["admin"]}>
+                        <MarketingSpendReport />
                       </PermissionRoute>
                     }
                   />

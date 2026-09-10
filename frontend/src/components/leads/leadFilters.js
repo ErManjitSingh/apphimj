@@ -81,7 +81,7 @@ export function applyLeadFilters(leads, filters, routeStatus = '') {
 export function countActiveFilters(filters) {
   return Object.entries(filters).filter(([k, v]) => {
     if (v === '' || v == null) return false;
-    if (k === 'search' || k === 'budgetRange') return false;
+    if (k === 'search' || k === 'budgetRange' || k === 'budgetMinExclusive' || k === 'budgetMaxExclusive') return false;
     return true;
   }).length;
 }

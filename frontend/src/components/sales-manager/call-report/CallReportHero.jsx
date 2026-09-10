@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { PhoneCall, PhoneIncoming, Activity, Clock, Users2 } from 'lucide-react';
-import { formatCallDuration } from '../../../lib/callSession';
+import { formatDurationHuman } from '../../../lib/callSession';
 
 export default function CallReportHero({
   totalCalls = 0,
@@ -46,7 +46,7 @@ export default function CallReportHero({
           <StatPill icon={PhoneCall} label="Total calls" value={totalCalls} />
           <StatPill icon={PhoneIncoming} label="Total connected" value={totalConnected} />
           <StatPill icon={Activity} label="Connection rate" value={`${connectionRate}%`} />
-          <StatPill icon={Clock} label="Total talk time" value={formatCallDuration(totalTalkTimeSec)} />
+          <StatPill icon={Clock} label="Total talk time" value={formatDurationHuman(totalTalkTimeSec, { includeSeconds: true })} />
           <StatPill icon={Users2} label="Active executives" value={activeExecutives} />
         </div>
       </div>

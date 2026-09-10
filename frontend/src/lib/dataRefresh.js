@@ -122,6 +122,10 @@ export function keysFromMutationUrl(url, _method) {
     keys.add('dashboard');
   }
 
+  if (/\/marketing-spend/.test(path)) {
+    keys.add('dashboard');
+  }
+
   if (/\/activity-logs/.test(path)) {
     keys.add('activity');
   }

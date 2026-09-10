@@ -21,6 +21,7 @@ import {
   markAllNotificationsRead,
 } from '../api/notificationApi';
 import { subscribeToPush, unsubscribeFromPush } from '../lib/pushNotifications';
+import { playNotificationSound } from '../lib/notificationSound';
 const NotificationDrawer = lazy(() => import('../components/notifications/NotificationDrawer'));
 const NotificationDetailModal = lazy(() => import('../components/notifications/NotificationDetailModal'));
 
@@ -61,9 +62,26 @@ export function NotificationProvider({ children }) {
   const [loading, setLoading] = useState(false);
   const socketRef = useRef(null);
   const lastListLoadedAtRef = useRef(0);
+  // Tracks every notification _id this session has already displayed (from any source: initial
+  // REST load, reconnect history replay, or the socket) — kept in sync by the effect below. The
+  // socket `notification:new` handler below is the only place a NEW id is checked against it, so
+  // the sound plays exactly once per id regardless of how many times it's re-delivered.
+  const seenNotificationIdsRef = useRef(new Set());
+
+  useEffect(() => {
+    notifications.forEach((n) => {
+      if (n?._id) seenNotificationIdsRef.current.add(n._id);
+    });
+  }, [notifications]);
 
   const handleIncoming = useCallback((notification) => {
     if (!notification?._id) return;
+
+    // Identity check happens synchronously, before the (batched, async) state update below, so
+    // it never depends on React's render/commit timing — only on this notification's own _id
+    // never having been seen before in this session.
+    const isNew = !seenNotificationIdsRef.current.has(notification._id);
+    seenNotificationIdsRef.current.add(notification._id);
 
     setNotifications((prev) => {
       if (prev.some((n) => n._id === notification._id)) return prev;
@@ -81,6 +99,11 @@ export function NotificationProvider({ children }) {
     if (NOTIFICATIONS_ENABLED) {
       toast.info(`${notification.title}\n${notification.message}`, 6000);
       showBrowserNotification(notification);
+      // Companion to the toast above — only plays when the toast itself is shown, and (within
+      // that) only for a genuinely new id, so it can never fire twice for the same notification.
+      if (isNew) {
+        playNotificationSound();
+      }
     }
   }, []);
 
