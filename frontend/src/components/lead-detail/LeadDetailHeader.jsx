@@ -28,6 +28,7 @@ import {
   computeLeadScores,
 } from './leadDetailUtils';
 import { toast } from '../../context/ToastContext';
+import { beginLeadCall } from '../../lib/callSession';
 import { cn } from '../../lib/utils';
 import RepeatedLeadBadge from '../leads/RepeatedLeadBadge';
 
@@ -260,6 +261,10 @@ export default function LeadDetailHeader({
                   {lead.phone ? (
                     <a
                       href={`tel:${lead.phone}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        beginLeadCall({ leadId: lead._id, leadName: lead.name, phone: lead.phone });
+                      }}
                       className="inline-flex h-7 items-center gap-1 rounded-lg border border-slate-200/80 bg-white/80 px-2 text-[11px] font-semibold text-slate-700 hover:border-violet-300 hover:text-violet-700"
                     >
                       <Phone className="h-3 w-3 text-violet-500" />

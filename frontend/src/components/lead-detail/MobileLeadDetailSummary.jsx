@@ -12,6 +12,7 @@ import {
   DETAIL_CARD,
 } from './leadDetailUtils';
 import { cn } from '../../lib/utils';
+import { beginLeadCall } from '../../lib/callSession';
 
 function formatTravelRange(lead) {
   const start = lead?.travelDate || lead?.travelStartDate;
@@ -58,11 +59,12 @@ function formatRelativeActivity(lead) {
   return `${days} day${days === 1 ? '' : 's'} ago`;
 }
 
-function ContactChip({ icon: Icon, children, href }) {
+function ContactChip({ icon: Icon, children, href, onClick }) {
   const Comp = href ? 'a' : 'div';
   return (
     <Comp
       href={href}
+      onClick={onClick}
       className={cn(
         'flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-700 shadow-sm',
         href && 'transition-colors hover:border-violet-300 hover:text-violet-700',
@@ -145,7 +147,16 @@ export default function MobileLeadDetailSummary({
 
           <div className="grid grid-cols-1 gap-2.5">
             {lead.phone ? (
-              <ContactChip icon={Phone} href={`tel:${lead.phone}`}>{lead.phone}</ContactChip>
+              <ContactChip
+                icon={Phone}
+                href={`tel:${lead.phone}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  beginLeadCall({ leadId: lead._id || lead.leadId, leadName: lead.name, phone: lead.phone });
+                }}
+              >
+                {lead.phone}
+              </ContactChip>
             ) : null}
             <ContactChip icon={MapPin}>{location}</ContactChip>
           </div>

@@ -3,6 +3,18 @@ const User = require('../models/User');
 const Team = require('../models/Team');
 const ApiError = require('../utils/apiError');
 const { getExecutiveIdsForLeader } = require('./teamScopeService');
+const {
+  ORG_TZ,
+  EOD_HOUR,
+  EOD_MINUTE,
+  EOD_LOGOUT_ROLES,
+  calendarParts,
+  startOfCalendarDay,
+  endOfCalendarDay,
+  timePartsInOrg,
+  getForcedLogoutCutoff,
+  isPastForcedLogoutTime,
+} = require('../utils/orgTimezone');
 
 /** Roles that must check in daily (admin & sales_manager excluded). */
 const CHECK_IN_ROLES = [
@@ -14,51 +26,10 @@ const CHECK_IN_ROLES = [
 
 const TRACKED_ROLES = [...CHECK_IN_ROLES];
 
-const ORG_TZ = process.env.ATTENDANCE_TZ || 'Asia/Kolkata';
 const LATE_HOUR = Number(process.env.ATTENDANCE_LATE_HOUR ?? 10);
 const LATE_MINUTE = Number(process.env.ATTENDANCE_LATE_MINUTE ?? 15);
-/** Sales executive panels force-logout / auto check-out (IST). */
-const EOD_HOUR = Number(process.env.ATTENDANCE_EOD_HOUR ?? 18);
-const EOD_MINUTE = Number(process.env.ATTENDANCE_EOD_MINUTE ?? 20);
-const EOD_LOGOUT_ROLES = ['sales_executive'];
 
 let lastEodProcessedDayKey = null;
-
-function calendarParts(date = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: ORG_TZ,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-  const y = parts.find((p) => p.type === 'year').value;
-  const m = parts.find((p) => p.type === 'month').value;
-  const d = parts.find((p) => p.type === 'day').value;
-  return { y, m, d, key: `${y}-${m}-${d}` };
-}
-
-/** Start of calendar day in org timezone (stored as Date). */
-function startOfCalendarDay(date = new Date()) {
-  const { y, m, d } = calendarParts(date);
-  return new Date(`${y}-${m}-${d}T00:00:00+05:30`);
-}
-
-function endOfCalendarDay(date = new Date()) {
-  const { y, m, d } = calendarParts(date);
-  return new Date(`${y}-${m}-${d}T23:59:59.999+05:30`);
-}
-
-function timePartsInOrg(date) {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: ORG_TZ,
-    hour: 'numeric',
-    minute: 'numeric',
-    hour12: false,
-  }).formatToParts(date);
-  const hour = Number(parts.find((p) => p.type === 'hour').value);
-  const minute = Number(parts.find((p) => p.type === 'minute').value);
-  return { hour, minute };
-}
 
 function deriveStatus(checkIn) {
   const { hour, minute } = timePartsInOrg(checkIn);
@@ -80,18 +51,6 @@ function priorSessionsHours(sessions = []) {
 function firstCheckInOfDay(doc) {
   if (doc?.sessions?.length) return doc.sessions[0].checkIn;
   return doc?.checkIn || null;
-}
-
-/** Today's forced logout cutoff in org timezone (default 18:20 IST). */
-function getForcedLogoutCutoff(date = new Date()) {
-  const { y, m, d } = calendarParts(date);
-  const hh = String(EOD_HOUR).padStart(2, '0');
-  const mm = String(EOD_MINUTE).padStart(2, '0');
-  return new Date(`${y}-${m}-${d}T${hh}:${mm}:00+05:30`);
-}
-
-function isPastForcedLogoutTime(date = new Date()) {
-  return date.getTime() >= getForcedLogoutCutoff(date).getTime();
 }
 
 function requiresEodLogout(role) {

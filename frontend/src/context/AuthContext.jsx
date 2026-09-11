@@ -7,6 +7,8 @@ import { setCredentials, clearCredentials } from '../store/slices/authSlice';
 import { clearBranchState, setSelectedBranch } from '../store/slices/branchSlice';
 import { useRestrictedSessionTimeout } from '../hooks/useRestrictedSessionTimeout';
 import { useSalesExecutiveEodLogout } from '../hooks/useSalesExecutiveEodLogout';
+import { useSessionHeartbeat } from '../hooks/useSessionHeartbeat';
+import { useSessionBeacon } from '../hooks/useSessionBeacon';
 import { unsubscribeFromPush } from '../lib/pushNotifications';
 
 const AuthContext = createContext(null);
@@ -27,6 +29,8 @@ export const AuthProvider = ({ children }) => {
 
   useRestrictedSessionTimeout(user, logout);
   useSalesExecutiveEodLogout(user, logout);
+  useSessionHeartbeat(user);
+  useSessionBeacon(user);
 
   useEffect(() => {
     const bootstrap = async () => {

@@ -164,9 +164,7 @@ export default function LeadContactActions({
               <DropdownMenuItem onClick={onLogCallNote}>Log Call Note</DropdownMenuItem>
             ) : null}
             {phone ? (
-              <DropdownMenuItem asChild>
-                <a href={`tel:${phone}`}>Dial {phone}</a>
-              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleCall}>Dial {phone}</DropdownMenuItem>
             ) : null}
             <DropdownMenuItem disabled>Export Lead</DropdownMenuItem>
           </DropdownMenuContent>

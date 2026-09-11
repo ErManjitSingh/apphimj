@@ -2,6 +2,7 @@ import { ArrowLeft, Phone, Info, UserPlus, PanelRightClose, PanelRightOpen } fro
 import { cn } from '../../lib/utils';
 import LeadStatusBadge from '../leads/LeadStatusBadge';
 import { getInitials, formatWhatsAppPhone, resolveWhatsAppDisplayName } from './whatsappUtils';
+import { beginLeadCall } from '../../lib/callSession';
 
 export default function WhatsAppConversationHeader({
   lead,
@@ -66,6 +67,13 @@ export default function WhatsAppConversationHeader({
         {dialDigits && (
           <a
             href={`tel:+91${dialDigits}`}
+            onClick={(e) => {
+              e.preventDefault();
+              // lead may be null for a WhatsApp-only contact with no linked CRM lead yet —
+              // beginLeadCall() still dials the phone in that case, it just won't create a
+              // trackable session (no leadId to attach it to), so no follow-up popup appears.
+              beginLeadCall({ leadId: lead?._id, leadName: name, phone: `+91${dialDigits}` });
+            }}
             className="p-2 rounded-full hover:bg-slate-50 text-slate-500 transition-colors"
             aria-label="Call"
           >

@@ -5,6 +5,9 @@ import {
   getTodayEodCutoffMs,
   requiresEodLogout,
   shouldForceEodLogout,
+  formatClockLabel,
+  EOD_LOGOUT_HOUR,
+  EOD_LOGOUT_MINUTE,
 } from '../auth/sessionPolicy';
 import { toast } from '../context/ToastContext';
 
@@ -36,7 +39,7 @@ export function useSalesExecutiveEodLogout(user, logout) {
       } catch {
         authStorage.clearSession();
       }
-      toast.info('Work day ended at 6:20 PM. Please sign in again.');
+      toast.info(`Work day ended at ${formatClockLabel(EOD_LOGOUT_HOUR, EOD_LOGOUT_MINUTE)}. Please sign in again.`);
       if (window.location.pathname !== '/login') {
         window.location.replace('/login');
       }

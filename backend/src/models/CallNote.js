@@ -28,7 +28,12 @@ const callNoteSchema = new mongoose.Schema(
     leadId: { type: mongoose.Schema.Types.ObjectId, ref: 'Lead', required: true, index: true },
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', index: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    outcome: { type: String, enum: CALL_OUTCOMES, required: true },
+    // No `enum` here on purpose: outcomes are admin-configurable (see
+    // services/leadStatusConfigService.js), so a static Mongoose enum would silently block a
+    // newly-added admin outcome from ever being saved. The authoritative category<->outcome
+    // check now lives in enterpriseLeadController.addCallNote(), which validates against the
+    // live config before this document is ever created — that is the real gate, not this field.
+    outcome: { type: String, required: true },
     notes: { type: String, default: '', trim: true },
     /** Call talk time in seconds */
     duration: { type: Number, default: 0, min: 0 },
@@ -64,6 +69,13 @@ const OUTCOME_BUCKETS = {
   budget_issue: 'connected',
   call_back_later: 'connected',
   call_back_tomorrow: 'connected',
+  // admin-added outcomes (via the Lead Status config) that were previously falling through to
+  // the 'failed' default below and misclassifying otherwise-connected calls — same rule as
+  // every other substantive outcome above: reaching this outcome required the guest to actually
+  // pick up and speak with the executive, so it's a connected call regardless of sentiment.
+  package_shared: 'connected',
+  plan_cancel: 'connected',
+  no_plan: 'connected',
 };
 
 function bucketOutcome(outcome) {

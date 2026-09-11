@@ -1,10 +1,17 @@
 export const RESTRICTED_SESSION_ROLES = ['admin', 'sales_manager'];
 export const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
 
-/** Sales executives are force-logged out at 6:20 PM IST every day. */
+/**
+ * Sales executives' daily session window (must mirror
+ * backend/src/utils/orgTimezone.js — the backend is the source of truth for
+ * enforcement, this is only used to proactively warn/redirect the client
+ * before its next API call would get a 401 anyway).
+ */
 export const EOD_LOGOUT_ROLES = ['sales_executive'];
-export const EOD_LOGOUT_HOUR = 18;
-export const EOD_LOGOUT_MINUTE = 20;
+export const EOD_LOGOUT_HOUR = 20;
+export const EOD_LOGOUT_MINUTE = 30;
+export const SESSION_START_HOUR = 6;
+export const SESSION_START_MINUTE = 30;
 export const ATTENDANCE_TZ = 'Asia/Kolkata';
 
 export function requiresRestrictedSession(role) {
@@ -13,6 +20,14 @@ export function requiresRestrictedSession(role) {
 
 export function requiresEodLogout(role) {
   return EOD_LOGOUT_ROLES.includes(role);
+}
+
+/** "20:30" -> "8:30 PM" — keeps user-facing messages in sync with the actual
+ * configured cutoff instead of a separately hard-coded string. */
+export function formatClockLabel(hour, minute) {
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${h12}:${String(minute).padStart(2, '0')} ${period}`;
 }
 
 export function getTokenIssuedAtMs(token) {

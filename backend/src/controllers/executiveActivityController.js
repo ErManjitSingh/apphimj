@@ -61,11 +61,17 @@ const getLoginSessionsHandler = asyncHandler(async (req, res) => {
   const executiveId = resolveScopedExecutiveId(req, req.query.executiveId);
 
   if (executiveId && executiveId !== 'all') {
-    const [summary, rows] = await Promise.all([
+    const [summary, sessionResult] = await Promise.all([
       getTeamLoginSummary([{ _id: executiveId }], { branchId: req.branchId, dateFrom, dateTo }),
       getLoginSessions({ userId: executiveId, branchId: req.branchId, dateFrom, dateTo }),
     ]);
-    return res.json({ mode: 'sessions', summary, rows });
+    const { rows, presenceMs, mergedIntervals } = sessionResult;
+    return res.json({
+      mode: 'sessions',
+      summary: { ...summary, presenceMs },
+      rows,
+      presence: { presenceMs, mergedIntervals },
+    });
   }
 
   const executives = await User.find({

@@ -13,6 +13,7 @@ import FollowUpPriorityBadge from '../followups/FollowUpPriorityBadge';
 import { formatFollowUpDateTime } from '../followups/followupUtils';
 import { FOLLOWUP_TYPES } from '../followups/constants';
 import { cn } from '../../lib/utils';
+import { beginLeadCall } from '../../lib/callSession';
 
 function avatarTone(name = '') {
   const tones = [
@@ -141,6 +142,10 @@ export default function ExecutiveFollowUpRow({
                 {phone ? (
                   <a
                     href={`tel:${phone}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      beginLeadCall({ leadId: lead._id, leadName, phone });
+                    }}
                     className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 hover:underline mt-0.5"
                   >
                     <Phone className="w-3 h-3" />

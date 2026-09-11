@@ -16,6 +16,7 @@ import AssignLeadModal from './modals/AssignLeadModal';
 import CreateFollowUpModal from './modals/CreateFollowUpModal';
 import { createExecutiveFollowUp, buildFollowUpPayload } from '../followups/followupApi';
 import { canAssignLeads } from '../../lib/canAssignLeads';
+import { beginLeadCall } from '../../lib/callSession';
 
 function contactFromSelected(selected) {
   if (!selected) return null;
@@ -413,7 +414,7 @@ function WhatsAppLeadsPage() {
     const lead = selected.lead;
     switch (key) {
       case 'call':
-        window.open(`tel:${lead.phone}`, '_self');
+        beginLeadCall({ leadId: lead._id, leadName: lead.name, phone: lead.phone });
         break;
       case 'followup':
         setModals((m) => ({ ...m, followup: true }));

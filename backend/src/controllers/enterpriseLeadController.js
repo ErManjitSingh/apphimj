@@ -206,6 +206,39 @@ const addCallNote = asyncHandler(async (req, res) => {
   });
   if (!lead) throw new ApiError(404, 'Lead not found');
 
+  // Category <-> outcome integrity check. The backend, not the client, is authoritative here:
+  // a raw API call must never be able to save an outcome under a category it doesn't belong to
+  // (e.g. category:'cold' + outcome:'ready_to_book'), regardless of what the client claims.
+  // This must run BEFORE any mutation below (CallNote.create, Lead.save, FollowUp, activity/audit
+  // logging) so an invalid combination is rejected atomically with zero side effects.
+  const outcomeKey = String(outcome || '');
+  const ALLOWED_CATEGORIES = ['warm', 'hot', 'cold'];
+  const hasBodyCategory = bodyCategory !== undefined && bodyCategory !== null && String(bodyCategory).trim() !== '';
+  if (hasBodyCategory && !ALLOWED_CATEGORIES.includes(String(bodyCategory))) {
+    throw new ApiError(400, `Invalid status category "${bodyCategory}" — must be one of: warm, hot, cold`);
+  }
+
+  // Resolve the outcome's REAL category from the admin-configurable Lead Status config — the
+  // same source of truth the frontend's option lists are built from — never a hardcoded list.
+  const { getOptionKeysByCategory } = require('../services/leadStatusConfigService');
+  const authoritativeKeys = await getOptionKeysByCategory();
+  let category = null;
+  if (authoritativeKeys.hot.includes(outcomeKey)) category = 'hot';
+  else if (authoritativeKeys.cold.includes(outcomeKey)) category = 'cold';
+  else if (authoritativeKeys.warm.includes(outcomeKey)) category = 'warm';
+
+  if (!category) {
+    // Unknown outcome (not configured under any category) — never guess, never default to warm.
+    throw new ApiError(400, `Unknown call outcome "${outcomeKey}"`);
+  }
+  if (hasBodyCategory && String(bodyCategory) !== category) {
+    // The client's category disagrees with the outcome's authoritative category — reject.
+    throw new ApiError(
+      400,
+      `Invalid outcome for category: "${outcomeKey}" does not belong to "${bodyCategory}" (it belongs to "${category}")`
+    );
+  }
+
   const startMs = startedAt ? new Date(startedAt).getTime() : NaN;
   const endMs = endedAt ? new Date(endedAt).getTime() : NaN;
   const fromTimestamps =
@@ -254,41 +287,7 @@ const addCallNote = asyncHandler(async (req, res) => {
     recent: prevRecent.slice(-12),
   };
 
-  // Apply Warm / Hot / Cold from call outcome
-  const outcomeKey = String(outcome || '');
-  let category = ['warm', 'hot', 'cold'].includes(String(bodyCategory || ''))
-    ? String(bodyCategory)
-    : null;
-  if (!category) {
-    try {
-      const { getCachedKeysByCategory } = require('../services/leadStatusConfigService');
-      const keys = getCachedKeysByCategory();
-      if (keys.hot.includes(outcomeKey)) category = 'hot';
-      else if (keys.cold.includes(outcomeKey)) category = 'cold';
-      else if (keys.warm.includes(outcomeKey)) category = 'warm';
-    } catch {
-      /* fallback below */
-    }
-  }
-  if (!category) {
-    const WARM_KEYS = new Set(['discussed_package', 'requested_callback', 'cnp_same_day', 'price_negotiation']);
-    const HOT_KEYS = new Set(['ready_to_book']);
-    const COLD_KEYS = new Set([
-      'booked_elsewhere',
-      'language_barrier',
-      'not_interested',
-      'invalid_number',
-      'budget_issues',
-      'budget_issue',
-    ]);
-    category = WARM_KEYS.has(outcomeKey)
-      ? 'warm'
-      : HOT_KEYS.has(outcomeKey)
-        ? 'hot'
-        : COLD_KEYS.has(outcomeKey)
-          ? 'cold'
-          : 'warm';
-  }
+  // category / outcomeKey are already validated and set above (before CallNote.create()).
 
   const COLD_KEYS = new Set([
     ...(function coldFallback() {

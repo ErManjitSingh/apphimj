@@ -11,6 +11,7 @@ import {
 } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
 import { compactTable, compactTh, compactTd } from '../ui/compactTable';
+import { beginLeadCall } from '../../lib/callSession';
 
 export default function FollowUpDataTable({
   followups,
@@ -66,7 +67,17 @@ export default function FollowUpDataTable({
                   {!readOnly && (
                   <td className={compactTd} onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <a href={lead.phone ? `tel:${lead.phone}` : '#'} className="p-1.5 rounded-lg hover:bg-emerald-500/10 text-emerald-600" title="Call">
+                      <a
+                        href={lead.phone ? `tel:${lead.phone}` : '#'}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (!lead.phone) return;
+                          beginLeadCall({ leadId: lead._id, leadName: lead.name, phone: lead.phone });
+                        }}
+                        className="p-1.5 rounded-lg hover:bg-emerald-500/10 text-emerald-600"
+                        title="Call"
+                      >
                         <Phone className="w-3.5 h-3.5" />
                       </a>
                       <a href={lead.phone ? `https://wa.me/${lead.phone.replace(/\D/g, '')}` : '#'} target="_blank" rel="noreferrer" className="p-1.5 rounded-lg hover:bg-green-500/10 text-green-600" title="WhatsApp">

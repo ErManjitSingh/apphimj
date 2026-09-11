@@ -2,8 +2,11 @@ const mongoose = require('mongoose');
 const LeadActivity = require('../models/LeadActivity');
 const ExecutiveActivityLog = require('../models/ExecutiveActivityLog');
 const CallNote = require('../models/CallNote');
+const UserSession = require('../models/UserSession');
 const { bucketOutcome } = require('../models/CallNote');
 const { startOfDay, endOfDay } = require('../utils/queryHelpers');
+const { startOfCalendarDay, endOfCalendarDay } = require('../utils/orgTimezone');
+const { mergeSessionIntervals } = require('../utils/sessionIntervals');
 const { parsePagination, paginatedResponse } = require('../utils/pagination');
 
 /** Same convention as callReportService.js — kept local rather than cross-imported. */
@@ -21,6 +24,22 @@ function resolvePeriod(dateFrom, dateTo) {
   const now = new Date();
   const periodStart = dateFrom ? startOfDay(new Date(dateFrom)) : startOfDay(now);
   const periodEnd = dateTo ? endOfDay(new Date(dateTo)) : endOfDay(dateFrom ? new Date(dateFrom) : now);
+  return { periodStart, periodEnd };
+}
+
+/**
+ * Same "today/yesterday/7d/30d" resolution as resolvePeriod, but using the
+ * org's IST calendar day instead of the server process's local timezone —
+ * used only by the login/logout (UserSession) functions below so their date
+ * filters agree with the EOD cutoff, which is always IST. Every other
+ * function in this file keeps using resolvePeriod unchanged.
+ */
+function resolveLoginPeriod(dateFrom, dateTo) {
+  const now = new Date();
+  const periodStart = dateFrom ? startOfCalendarDay(new Date(dateFrom)) : startOfCalendarDay(now);
+  const periodEnd = dateTo
+    ? endOfCalendarDay(new Date(dateTo))
+    : endOfCalendarDay(dateFrom ? new Date(dateFrom) : now);
   return { periodStart, periodEnd };
 }
 
@@ -478,12 +497,82 @@ function pairSessions(loginLogoutEvents, { lastSeenEvents = [], isLatestGlobalLo
   return sessions;
 }
 
-/** All sessions for ONE executive in range — used for the detailed multi-session view. */
-async function getLoginSessions({ userId, branchId, dateFrom, dateTo }) {
-  const { periodStart, periodEnd } = resolvePeriod(dateFrom, dateTo);
-  const includesNow = periodEnd >= new Date();
+/** Maps a real UserSession doc to the same row shape pairSessions() produces. */
+function mapUserSessionToRow(doc) {
+  const logoutAt = doc.logoutAt || null;
+  // logoutAt is only ever real for a confirmed termination (user_logout/eod). For every
+  // other ended status (inactivity_timeout, expired/connection_timeout, revoked) it's
+  // deliberately null — the true end time is unknown, so duration is measured against
+  // lastActivityAt (last confirmed presence), never "still open until this instant".
+  const isOpen = doc.status === 'active';
+  const endMs = logoutAt
+    ? new Date(logoutAt).getTime()
+    : (isOpen ? Date.now() : new Date(doc.lastActivityAt).getTime());
+  const status = doc.status === 'active' ? 'online' : doc.status === 'logged_out' ? 'logged_out' : 'ended';
+  return {
+    loginAt: doc.loginAt,
+    logoutAt,
+    lastSeenAt: doc.lastActivityAt,
+    status,
+    durationMs: endMs - new Date(doc.loginAt).getTime(),
+    realStatus: doc.status,
+    logoutReason: doc.logoutReason || null,
+    source: 'session',
+  };
+}
 
-  const [loginLogoutDocs, latestDoc, allEvents] = await Promise.all([
+/** For the interval-merge step only: an 'ended' legacy/real row with no logoutAt
+ * shouldn't be treated as "still open until now" — clip it to its last-known-seen
+ * time instead. Never mutates the row returned to the API (which stays truthful
+ * about not having a real logout timestamp). */
+function toMergeInterval(row) {
+  const logoutAt = row.logoutAt || (row.status !== 'online' ? row.lastSeenAt : null);
+  return { loginAt: row.loginAt, logoutAt };
+}
+
+async function getFirstLoginAtMap(idObjects) {
+  const rows = await UserSession.aggregate([
+    { $match: { userId: { $in: idObjects } } },
+    { $sort: { loginAt: 1 } },
+    { $group: { _id: '$userId', firstLoginAt: { $first: '$loginAt' } } },
+  ]);
+  return new Map(rows.map((r) => [toIdString(r._id), r.firstLoginAt]));
+}
+
+async function getRealSessionsMap(idObjects, { branchId, periodStart, periodEnd }) {
+  const branchObjectId = toObjectId(branchId);
+  const docs = await UserSession.find({
+    userId: { $in: idObjects },
+    ...(branchObjectId ? { branchId: branchObjectId } : {}),
+    loginAt: { $lte: periodEnd },
+    $or: [{ logoutAt: null }, { logoutAt: { $gte: periodStart } }],
+  }).sort({ loginAt: 1 }).lean();
+  const map = new Map();
+  docs.forEach((doc) => {
+    const key = toIdString(doc.userId);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(mapUserSessionToRow(doc));
+  });
+  return map;
+}
+
+/** Legacy reconstruction from ExecutiveActivityLog — only used for the portion of a
+ * requested range that predates this executive's first real UserSession (or, for an
+ * executive with no UserSession at all yet, the whole range). Tagged source:'legacy'
+ * so callers can tell reconstructed data from real session data if ever needed. */
+async function getLegacySessions(userId, { branchId, periodStart, periodEnd, includesNow }) {
+  const [carryInEvent, loginLogoutDocs, latestDoc, allEvents] = await Promise.all([
+    // A long-lived token (30 days) plus a once-a-day EOD cutoff means a session can
+    // legitimately span across midnight with no fresh 'login' event on the new day —
+    // e.g. logged in yesterday evening, never force-logged-out, still working today.
+    // Without this, a strict createdAt-in-range filter below would report "no login"
+    // for someone who is demonstrably active right now. Find the most recent
+    // login/logout event BEFORE this period: if it was a 'login' with no logout yet,
+    // that session was already open when the period began — carry it in.
+    ExecutiveActivityLog.findOne({
+      userId, type: { $in: ['login', 'logout'] }, ...(branchId ? { branchId } : {}),
+      createdAt: { $lt: periodStart },
+    }).sort({ createdAt: -1 }).lean(),
     ExecutiveActivityLog.find({
       userId, type: { $in: ['login', 'logout'] }, ...(branchId ? { branchId } : {}),
       createdAt: { $gte: periodStart, $lte: periodEnd },
@@ -491,114 +580,172 @@ async function getLoginSessions({ userId, branchId, dateFrom, dateTo }) {
     ExecutiveActivityLog.findOne({ userId, type: { $in: ['login', 'logout'] } }).sort({ createdAt: -1 }).lean(),
     fetchMergedEvents({ userId, branchId, periodStart, periodEnd }),
   ]);
-
   const loginLogoutEvents = loginLogoutDocs.map((d) => ({ type: d.type, at: d.createdAt }));
-  return pairSessions(loginLogoutEvents, {
+  if (carryInEvent?.type === 'login') {
+    loginLogoutEvents.unshift({ type: 'login', at: carryInEvent.createdAt });
+  }
+  const sessions = pairSessions(loginLogoutEvents, {
     lastSeenEvents: allEvents,
     isLatestGlobalLogin: latestDoc?.type === 'login',
     includesNow,
+  });
+  return sessions.map((s) => ({ ...s, source: 'legacy' }));
+}
+
+/**
+ * The single source of truth for "what were this executive's sessions in this range."
+ * Real UserSession rows are authoritative for any period at/after their first-ever
+ * login; anything before that (or, for an executive with no UserSession at all,
+ * meaning they've never logged in since this feature shipped) falls back to the
+ * legacy ExecutiveActivityLog event-pairing reconstruction. Never fabricates a
+ * session that isn't backed by one of these two real sources.
+ *
+ * firstLoginAt/realSessions may be pre-fetched by a batch caller (roster/summary)
+ * to avoid an N+1 query per executive; omit them for a single-executive lookup.
+ */
+async function resolveExecutiveSessions(userId, {
+  branchId, periodStart, periodEnd, firstLoginAt, realSessions,
+} = {}) {
+  let first = firstLoginAt;
+  if (first === undefined) {
+    const doc = await UserSession.findOne({ userId }).sort({ loginAt: 1 }).select('loginAt').lean();
+    first = doc?.loginAt || null;
+  }
+
+  const segments = [];
+  const needsLegacy = !first || periodStart < new Date(first);
+  if (needsLegacy) {
+    const legacyEnd = first ? new Date(Math.min(new Date(first).getTime(), periodEnd.getTime())) : periodEnd;
+    const includesNow = !first && periodEnd >= new Date();
+    const legacy = await getLegacySessions(userId, { branchId, periodStart, periodEnd: legacyEnd, includesNow });
+    segments.push(...legacy);
+  }
+
+  let real = realSessions;
+  if (real === undefined) {
+    const branchObjectId = toObjectId(branchId);
+    const docs = await UserSession.find({
+      userId,
+      ...(branchObjectId ? { branchId: branchObjectId } : {}),
+      loginAt: { $lte: periodEnd },
+      $or: [{ logoutAt: null }, { logoutAt: { $gte: periodStart } }],
+    }).sort({ loginAt: 1 }).lean();
+    real = docs.map(mapUserSessionToRow);
+  }
+  segments.push(...real);
+
+  segments.sort((a, b) => new Date(a.loginAt) - new Date(b.loginAt));
+  return segments;
+}
+
+/** All sessions for ONE executive in range — used for the detailed multi-session view. */
+async function getLoginSessions({ userId, branchId, dateFrom, dateTo }) {
+  const { periodStart, periodEnd } = resolveLoginPeriod(dateFrom, dateTo);
+  const rows = await resolveExecutiveSessions(userId, { branchId, periodStart, periodEnd });
+  const { mergedIntervals, presenceMs } = mergeSessionIntervals(rows.map(toMergeInterval), periodStart, periodEnd);
+  return { rows, presenceMs, mergedIntervals };
+}
+
+/**
+ * Which session should represent this executive in the roster's single-row view.
+ * Sessions are sorted by loginAt ascending, but the LATEST login is not necessarily
+ * the one still online (e.g. a later device already logged out while an earlier
+ * device is still active) — that would make the roster row disagree with
+ * getTeamLoginSummary's online count, which checks ALL sessions. Prefer any
+ * currently-online session (most recently active one, if more than one); only
+ * fall back to the latest-by-loginAt session when none are online.
+ */
+function pickDisplaySession(sessions) {
+  const online = sessions.filter((s) => s.status === 'online');
+  if (!online.length) return sessions[sessions.length - 1];
+  return online.reduce((best, s) => {
+    const bestTime = new Date(best.lastSeenAt || best.loginAt).getTime();
+    const sTime = new Date(s.lastSeenAt || s.loginAt).getTime();
+    return sTime >= bestTime ? s : best;
   });
 }
 
 /** One row per executive (their latest/current session) — used for the "All Executives" roster view. */
 async function getTeamLoginRoster(executives = [], { branchId, dateFrom, dateTo } = {}) {
   if (!executives.length) return [];
-  const { periodStart, periodEnd } = resolvePeriod(dateFrom, dateTo);
-  const includesNow = periodEnd >= new Date();
+  const { periodStart, periodEnd } = resolveLoginPeriod(dateFrom, dateTo);
   const idObjects = executives.map((ex) => new mongoose.Types.ObjectId(String(ex._id)));
-  const branchObjectId = toObjectId(branchId);
 
-  const [rangeDocs, latestPerUser] = await Promise.all([
-    ExecutiveActivityLog.find({
-      userId: { $in: idObjects }, type: { $in: ['login', 'logout'] },
-      ...(branchObjectId ? { branchId: branchObjectId } : {}), createdAt: { $gte: periodStart, $lte: periodEnd },
-    }).sort({ createdAt: 1 }).lean(),
-    ExecutiveActivityLog.aggregate([
-      { $match: { userId: { $in: idObjects }, type: { $in: ['login', 'logout'] } } },
-      { $sort: { createdAt: -1 } },
-      { $group: { _id: '$userId', latestType: { $first: '$type' } } },
-    ]),
+  const [firstLoginMap, realSessionsMap] = await Promise.all([
+    getFirstLoginAtMap(idObjects),
+    getRealSessionsMap(idObjects, { branchId, periodStart, periodEnd }),
   ]);
 
-  const latestTypeMap = Object.fromEntries(latestPerUser.map((r) => [toIdString(r._id), r.latestType]));
-  const byUser = {};
-  rangeDocs.forEach((d) => {
-    const key = toIdString(d.userId);
-    (byUser[key] = byUser[key] || []).push({ type: d.type, at: d.createdAt });
-  });
+  const rosterEntries = await Promise.all(executives.map(async (ex) => {
+    const key = toIdString(ex._id);
+    const sessions = await resolveExecutiveSessions(ex._id, {
+      branchId, periodStart, periodEnd,
+      firstLoginAt: firstLoginMap.has(key) ? firstLoginMap.get(key) : null,
+      realSessions: realSessionsMap.get(key) || [],
+    });
+    if (!sessions.length) {
+      return {
+        _id: ex._id, name: ex.name, status: 'no_login',
+        loginAt: null, logoutAt: null, lastSeenAt: null, durationMs: 0,
+        sessionCount: 0, presenceMs: 0,
+      };
+    }
+    const display = pickDisplaySession(sessions);
+    const { presenceMs } = mergeSessionIntervals(sessions.map(toMergeInterval), periodStart, periodEnd);
+    return { _id: ex._id, name: ex.name, sessionCount: sessions.length, presenceMs, ...display };
+  }));
 
-  return executives
-    .map((ex) => {
-      const key = toIdString(ex._id);
-      const events = byUser[key] || [];
-      if (!events.length) {
-        return { _id: ex._id, name: ex.name, status: 'no_login', loginAt: null, logoutAt: null, lastSeenAt: null, durationMs: 0, sessionCount: 0 };
-      }
-      // Roster stays cheap (no per-user merged-event fetch) — an unresolved session's
-      // last-seen falls back to its login time rather than an expensive N+1 lookup.
-      const sessions = pairSessions(events, { isLatestGlobalLogin: latestTypeMap[key] === 'login', includesNow });
-      const last = sessions[sessions.length - 1];
-      return { _id: ex._id, name: ex.name, sessionCount: sessions.length, ...last };
-    })
-    .sort((a, b) => (a.status === 'online' ? 0 : 1) - (b.status === 'online' ? 0 : 1));
+  return rosterEntries.sort((a, b) => (a.status === 'online' ? 0 : 1) - (b.status === 'online' ? 0 : 1));
 }
 
 /** Compact KPI summary — logged in / online / logged out / avg completed-session duration. */
 async function getTeamLoginSummary(executives = [], { branchId, dateFrom, dateTo } = {}) {
-  if (!executives.length) return { loggedIn: 0, online: 0, loggedOut: 0, avgSessionMs: 0 };
-  const { periodStart, periodEnd } = resolvePeriod(dateFrom, dateTo);
-  const includesNow = periodEnd >= new Date();
+  if (!executives.length) return { loggedIn: 0, online: 0, loggedOut: 0, avgSessionMs: 0, presenceMs: 0 };
+  const { periodStart, periodEnd } = resolveLoginPeriod(dateFrom, dateTo);
   const idObjects = executives.map((ex) => new mongoose.Types.ObjectId(String(ex._id)));
-  const branchObjectId = toObjectId(branchId);
 
-  const [rangeDocs, latestPerUser] = await Promise.all([
-    ExecutiveActivityLog.find({
-      userId: { $in: idObjects }, type: { $in: ['login', 'logout'] },
-      ...(branchObjectId ? { branchId: branchObjectId } : {}), createdAt: { $gte: periodStart, $lte: periodEnd },
-    }).sort({ createdAt: 1 }).lean(),
-    ExecutiveActivityLog.aggregate([
-      { $match: { userId: { $in: idObjects }, type: { $in: ['login', 'logout'] } } },
-      { $sort: { createdAt: -1 } },
-      { $group: { _id: '$userId', latestType: { $first: '$type' } } },
-    ]),
+  const [firstLoginMap, realSessionsMap] = await Promise.all([
+    getFirstLoginAtMap(idObjects),
+    getRealSessionsMap(idObjects, { branchId, periodStart, periodEnd }),
   ]);
-
-  const latestTypeMap = Object.fromEntries(latestPerUser.map((r) => [toIdString(r._id), r.latestType]));
-  const byUser = {};
-  rangeDocs.forEach((d) => {
-    const key = toIdString(d.userId);
-    (byUser[key] = byUser[key] || []).push({ type: d.type, at: d.createdAt });
-  });
 
   const loggedInSet = new Set();
   const loggedOutSet = new Set();
   let onlineCount = 0;
+  let totalPresenceMs = 0;
   const completedDurations = [];
 
-  executives.forEach((ex) => {
+  for (const ex of executives) {
     const key = toIdString(ex._id);
-    const events = byUser[key] || [];
-    if (!events.length) return;
-    if (events.some((e) => e.type === 'login')) loggedInSet.add(key);
-
-    let open = null;
-    events.forEach((ev) => {
-      if (ev.type === 'login') {
-        open = { loginAt: ev.at };
-      } else if (ev.type === 'logout' && open) {
-        completedDurations.push(new Date(ev.at) - new Date(open.loginAt));
+    // eslint-disable-next-line no-await-in-loop
+    const sessions = await resolveExecutiveSessions(ex._id, {
+      branchId, periodStart, periodEnd,
+      firstLoginAt: firstLoginMap.has(key) ? firstLoginMap.get(key) : null,
+      realSessions: realSessionsMap.get(key) || [],
+    });
+    if (!sessions.length) continue;
+    loggedInSet.add(key);
+    sessions.forEach((s) => {
+      if (s.status === 'logged_out') {
         loggedOutSet.add(key);
-        open = null;
+        completedDurations.push(s.durationMs);
       }
     });
-    if (open && includesNow && latestTypeMap[key] === 'login') onlineCount += 1;
-  });
+    if (sessions.some((s) => s.status === 'online')) onlineCount += 1;
+    totalPresenceMs += mergeSessionIntervals(sessions.map(toMergeInterval), periodStart, periodEnd).presenceMs;
+  }
 
   const avgSessionMs = completedDurations.length
     ? Math.round(completedDurations.reduce((s, v) => s + v, 0) / completedDurations.length)
     : 0;
 
-  return { loggedIn: loggedInSet.size, online: onlineCount, loggedOut: loggedOutSet.size, avgSessionMs };
+  return {
+    loggedIn: loggedInSet.size,
+    online: onlineCount,
+    loggedOut: loggedOutSet.size,
+    avgSessionMs,
+    presenceMs: totalPresenceMs,
+  };
 }
 
 module.exports = {
@@ -612,5 +759,6 @@ module.exports = {
   getLoginSessions,
   getTeamLoginRoster,
   getTeamLoginSummary,
+  resolveExecutiveSessions,
   INACTIVITY_THRESHOLD_MINUTES,
 };

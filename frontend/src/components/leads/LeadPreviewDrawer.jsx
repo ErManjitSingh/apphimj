@@ -24,6 +24,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from '../../context/ToastContext';
 import { openCrmWhatsApp } from '../../lib/openCrmWhatsApp';
+import { beginLeadCall } from '../../lib/callSession';
 import LeadStatusBadge from './LeadStatusBadge';
 import Avatar from '../ui/Avatar';
 import AppDrawer from '../ui/AppDrawer';
@@ -198,7 +199,16 @@ export default function LeadPreviewDrawer({
 
             <div className="flex gap-2">
               {lead.phone && (
-                <ContactBtn href={`tel:${lead.phone}`} icon={Phone} label="Call" tone="blue" />
+                <ContactBtn
+                  href={`tel:${lead.phone}`}
+                  icon={Phone}
+                  label="Call"
+                  tone="blue"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    beginLeadCall({ leadId: lead._id, leadName: lead.name, phone: lead.phone });
+                  }}
+                />
               )}
               {lead.phone && (
                 <ContactBtn

@@ -17,6 +17,10 @@ const { purgeOldActivityLogs } = require('./services/activityService');
 const { startEmailInboxPoller } = require('./services/emailInboxService');
 const { archiveOldTrips } = require('./services/operationsArchiveService');
 const { validateEnvOnBoot: validateFacebookEnv } = require('./services/facebookLeadWebhookService');
+const {
+  reconcileSessions,
+  SESSION_RECONCILE_INTERVAL_MS,
+} = require('./services/sessionReconciliationService');
 
 const app = express();
 
@@ -100,6 +104,9 @@ async function start() {
   setInterval(() => archiveOldTrips().catch(() => {}), 24 * 60 * 60 * 1000);
   setInterval(() => purgeOldActivityLogs().catch(() => {}), 60 * 60 * 1000);
 
+  reconcileSessions().catch(() => {});
+  setInterval(() => reconcileSessions().catch(() => {}), SESSION_RECONCILE_INTERVAL_MS);
+
   httpServer.listen(port, () => {
     console.log(`[API] Running on http://127.0.0.1:${port}`);
     console.log(`[API] Health: http://127.0.0.1:${port}/api/health`);
@@ -108,9 +115,11 @@ async function start() {
   });
 }
 
-start().catch((err) => {
-  console.error('[API] Failed to start:', err.message);
-  process.exit(1);
-});
+if (require.main === module) {
+  start().catch((err) => {
+    console.error('[API] Failed to start:', err.message);
+    process.exit(1);
+  });
+}
 
 module.exports = app;

@@ -7,6 +7,7 @@ import FollowUpStatusBadge from './FollowUpStatusBadge';
 import FollowUpPriorityBadge from './FollowUpPriorityBadge';
 import FollowUpCategoryBadge from './FollowUpCategoryBadge';
 import { formatFollowUpDateTime, enrichFollowUp } from './followupUtils';
+import { beginLeadCall } from '../../lib/callSession';
 
 export default function FollowUpDetailDrawer({ followup, onClose, onComplete, onReschedule, readOnly = false }) {
   const f = followup ? enrichFollowUp(followup) : null;
@@ -74,7 +75,14 @@ export default function FollowUpDetailDrawer({ followup, onClose, onComplete, on
           <div className="p-5 border-t border-subtle space-y-2 shrink-0">
             <p className="text-xs font-semibold uppercase text-content-muted mb-2">Quick Actions</p>
             <div className="grid grid-cols-2 gap-2">
-              <a href={lead.phone ? `tel:${lead.phone}` : '#'}>
+              <a
+                href={lead.phone ? `tel:${lead.phone}` : '#'}
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (!lead.phone) return;
+                  beginLeadCall({ leadId: lead._id, leadName: lead.name, phone: lead.phone });
+                }}
+              >
                 <Button variant="emerald" className="w-full rounded-xl gap-2 h-10"><Phone className="w-4 h-4" /> Call</Button>
               </a>
               <a href={lead.phone ? `https://wa.me/${lead.phone.replace(/\D/g, '')}` : '#'} target="_blank" rel="noreferrer">

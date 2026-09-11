@@ -10,6 +10,7 @@ const LeadActivity = require('../models/LeadActivity');
 const AuditLog = require('../models/AuditLog');
 const CallNote = require('../models/CallNote');
 const ExecutiveActivityLog = require('../models/ExecutiveActivityLog');
+const UserSession = require('../models/UserSession');
 const LeadEscalation = require('../models/LeadEscalation');
 const LeadMergeLog = require('../models/LeadMergeLog');
 const LeadTransferLog = require('../models/LeadTransferLog');
@@ -119,6 +120,12 @@ async function ensureIndexes() {
     Lead.collection.createIndex({ branchId: 1, status: 1, firstContactAt: 1, createdAt: 1 }, { background: true }),
     Lead.collection.createIndex({ branchId: 1, assignedTo: 1, isDeleted: 1, priority: 1 }, { background: true }),
     FollowUp.collection.createIndex({ status: 1, scheduledAt: 1 }, { background: true }),
+
+    UserSession.collection.createIndex({ userId: 1, loginAt: -1 }, { background: true }),
+    UserSession.collection.createIndex({ status: 1, lastActivityAt: 1 }, { background: true }),
+    UserSession.collection.createIndex({ status: 1, disconnectSignalAt: 1 }, { background: true }),
+    UserSession.collection.createIndex({ role: 1, status: 1, loginAt: 1 }, { background: true }),
+    UserSession.collection.createIndex({ branchId: 1, loginAt: -1 }, { background: true }),
   ]);
 
   console.log('[MongoDB] Performance indexes ensured');
