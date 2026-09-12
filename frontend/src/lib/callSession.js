@@ -1,4 +1,17 @@
+import API from '../api/axios';
+
 const CALL_SESSION_KEY = 'uno-crm-active-call-session';
+/** Cap on how long dialing waits for the backend to confirm Opened — keeps a slow/offline
+ * network from blocking the executive's ability to place a call; addCallNote's own
+ * markLeadViewedByExecutive safety net still guarantees Opened gets set once the call lands. */
+const CALL_ACCESS_TIMEOUT_MS = 4000;
+
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => setTimeout(() => resolve(null), ms)),
+  ]);
+}
 
 export function formatCallDuration(totalSeconds = 0) {
   const s = Math.max(0, Math.round(Number(totalSeconds) || 0));
@@ -86,11 +99,29 @@ export function dialLeadPhone(phone) {
 }
 
 /**
+ * Clicking Call is accessing the customer's protected phone number, same as opening the lead —
+ * the backend must establish the Opened state (and its audit trail) before the dialer runs, not
+ * only after the call is logged. Best-effort: a slow/failed request never blocks the call itself
+ * (see CALL_ACCESS_TIMEOUT_MS) — addCallNote's own safety net still guarantees Opened gets set
+ * once the call is captured, so this never regresses to "call happened, lead still Not Opened."
+ */
+async function authorizeLeadCallAccess(leadId) {
+  if (!leadId) return null;
+  try {
+    const { data } = await API.post(`/sales-executive/leads/${leadId}/call-access`);
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Start tracking + open native dialer.
  * Returns the session for callers that need it.
  */
-export function beginLeadCall({ leadId, leadName, phone }) {
+export async function beginLeadCall({ leadId, leadName, phone }) {
   const session = startCallSession({ leadId, leadName, phone });
+  await withTimeout(authorizeLeadCallAccess(leadId), CALL_ACCESS_TIMEOUT_MS);
   dialLeadPhone(phone);
   return session;
 }

@@ -16,51 +16,10 @@ function optionKeysByLength() {
     .sort((a, b) => b.length - a.length);
 }
 
-/** Explicit / legacy markers that mean Cold → Warm (not Connected auto-promote). */
-const COLD_TO_WARM_REASON_KEYS = new Set(['cold_to_warm', 'working_progress']);
-
-const COLD_TO_WARM_LABEL = 'Cold to Warm';
-const WORKING_IN_PROGRESS_LABEL = 'Working in Progress';
-
+/** Internal/system markers that are never a real user-selected option. */
 function isSystemReasonKey(key) {
-  return (
-    !key ||
-    COLD_TO_WARM_REASON_KEYS.has(String(key).trim()) ||
-    String(key).trim() === 'auto_connected_24h'
-  );
-}
-
-/**
- * True only when this lead was Cold and moved to Warm.
- * Do NOT treat every working_progress / Connected auto row as Cold→Warm.
- */
-function isColdToWarmLead(lead, reasonKey = '') {
-  const status = String(lead?.status || '').trim();
-  const raw = String(lead?.statusReason || '')
-    .trim()
-    .split(/\s*[—–]\s*|\s+-\s+/)[0]
-    ?.replace(/:$/, '')
-    .trim();
-  const key = String(reasonKey || '').trim() || raw;
-
-  // Never treat old Connected→WIP auto as Cold→Warm
-  if (raw === 'auto_connected_24h' || key === 'auto_connected_24h') return false;
-
-  // Explicit stamp we save on Cold→Warm
-  if (raw === 'cold_to_warm' || key === 'cold_to_warm') return true;
-
-  // Cold→Warm path always sets pipeline status working_progress
-  if (status !== 'working_progress') return false;
-
-  // With a Warm option (CNP, package discussed, …) after Cold→Warm
-  const optionBucket = bucketFromOptionKey(key);
-  if (optionBucket === 'warm') return true;
-
-  // Legacy Cold→Warm with reason working_progress / empty + warm temperature
-  if (raw === 'working_progress' || key === 'working_progress') return true;
-  if (!raw && String(lead?.temperature || '').toLowerCase() === 'warm') return true;
-
-  return false;
+  const k = String(key || '').trim();
+  return !k || k === 'working_progress' || k === 'auto_connected_24h';
 }
 
 function extractReasonKey(statusReason) {
@@ -151,22 +110,9 @@ export function getExecutiveSetStatusDisplay(lead) {
       label: optionLabel,
       detail: '',
       pipelineLabel,
-      title: isColdToWarmLead(lead, reasonKey)
-        ? `${WORKING_IN_PROGRESS_LABEL} · ${COLD_TO_WARM_LABEL} · ${optionLabel}`
-        : `${optionLabel} · ${bucket.charAt(0).toUpperCase()}${bucket.slice(1)}`,
+      title: `${optionLabel} · ${bucket.charAt(0).toUpperCase()}${bucket.slice(1)}`,
       bucket,
-      subLabel: isColdToWarmLead(lead, reasonKey) ? COLD_TO_WARM_LABEL : '',
-    };
-  }
-
-  if (isColdToWarmLead(lead, reasonKey)) {
-    return {
-      label: WORKING_IN_PROGRESS_LABEL,
-      detail: '',
-      pipelineLabel,
-      title: `${WORKING_IN_PROGRESS_LABEL} · ${COLD_TO_WARM_LABEL}`,
-      bucket: 'warm',
-      subLabel: COLD_TO_WARM_LABEL,
+      subLabel: '',
     };
   }
 
@@ -187,7 +133,6 @@ export const LIST_STATUS_STYLES = {
   hot: 'bg-rose-500/10 text-rose-700 dark:text-rose-300 ring-rose-500/25',
   new: 'bg-sky-500/10 text-sky-700 dark:text-sky-300 ring-sky-500/25',
   converted: 'bg-emerald-600/10 text-emerald-800 dark:text-emerald-300 ring-emerald-600/25',
-  working: 'bg-orange-500/10 text-orange-800 dark:text-orange-300 ring-orange-500/25',
 };
 
 const LIST_STATUS_DOT = {
@@ -196,7 +141,6 @@ const LIST_STATUS_DOT = {
   hot: 'bg-rose-500',
   new: 'bg-sky-500',
   converted: 'bg-emerald-600',
-  working: 'bg-orange-500',
 };
 
 function humanizeReasonKey(key) {
@@ -216,7 +160,7 @@ function humanizeReasonKey(key) {
 /**
  * Status display for leads.
  * - Only Warm / Hot / Cold when user picked an option (temperature alone ≠ status)
- * - Cold→Warm pipeline → Working in Progress + Cold to Warm subtitle
+ * - The selected option's bucket is always the lead's current Warm/Hot/Cold status
  * - Otherwise → No status
  */
 export function getLeadListStatusDisplay(lead) {
@@ -229,17 +173,12 @@ export function getLeadListStatusDisplay(lead) {
     knownOption ||
     (fromReason ? humanizeReasonKey(reasonKey) : '') ||
     (/^cnp$/i.test(reasonKey) ? 'CNP' : '');
-  const coldToWarm = isColdToWarmLead(lead, reasonKey);
 
   let bucket = 'new';
   if (status === 'converted') {
     bucket = 'converted';
   } else if (fromReason) {
     bucket = fromReason;
-  } else if (coldToWarm) {
-    bucket = 'warm';
-  } else {
-    bucket = 'new';
   }
 
   const categoryLabels = {
@@ -252,58 +191,47 @@ export function getLeadListStatusDisplay(lead) {
 
   const categoryLabel = categoryLabels[bucket] || 'No status';
 
-  // No user option and not converted / Cold→Warm → No status (ignore bare temperature)
-  const hasRealStatus = status === 'converted' || Boolean(optionLabel) || coldToWarm;
+  // No user option and not converted → No status (ignore bare temperature)
+  const hasRealStatus = status === 'converted' || Boolean(optionLabel);
 
   const mainLabel = !hasRealStatus
     ? 'No status'
     : bucket === 'converted'
       ? 'Converted'
-      : coldToWarm
-        ? WORKING_IN_PROGRESS_LABEL
-        : bucket === 'hot'
-          ? 'Hot'
-          : bucket === 'cold'
-            ? 'Cold'
-            : bucket === 'warm'
-              ? 'Warm'
-              : 'No status';
-
-  const listBucket = !hasRealStatus ? 'new' : coldToWarm ? 'working' : bucket;
-  const subLabel = hasRealStatus && coldToWarm ? COLD_TO_WARM_LABEL : '';
+      : bucket === 'hot'
+        ? 'Hot'
+        : bucket === 'cold'
+          ? 'Cold'
+          : bucket === 'warm'
+            ? 'Warm'
+            : 'No status';
 
   let label = 'No status';
   if (bucket === 'converted') {
     label = 'Converted';
   } else if (optionLabel) {
     label = optionLabel;
-  } else if (coldToWarm) {
-    label = WORKING_IN_PROGRESS_LABEL;
   }
 
   return {
     bucket: hasRealStatus ? bucket : 'new',
-    listBucket,
+    listBucket: hasRealStatus ? bucket : 'new',
     label: hasRealStatus ? label : 'No status',
     mainLabel,
-    subLabel,
+    subLabel: '',
     categoryLabel: hasRealStatus ? categoryLabel : 'No status',
     exactLabel: hasRealStatus ? optionLabel || label : 'No status',
     pipelineLabel: hasRealStatus ? categoryLabel : 'No status',
     detail: '',
     title: !hasRealStatus
       ? 'No status'
-      : coldToWarm
-        ? optionLabel
-          ? `${WORKING_IN_PROGRESS_LABEL} · ${COLD_TO_WARM_LABEL} · ${optionLabel}`
-          : `${WORKING_IN_PROGRESS_LABEL} · ${COLD_TO_WARM_LABEL}`
-        : optionLabel && categoryLabel !== optionLabel && bucket !== 'new' && bucket !== 'converted'
-          ? `${categoryLabel} · ${optionLabel}`
-          : label,
+      : optionLabel && categoryLabel !== optionLabel && bucket !== 'new' && bucket !== 'converted'
+        ? `${categoryLabel} · ${optionLabel}`
+        : label,
     className: LIST_STATUS_STYLES[hasRealStatus ? bucket : 'new'] || LIST_STATUS_STYLES.new,
-    listClassName: LIST_STATUS_STYLES[listBucket] || LIST_STATUS_STYLES.new,
+    listClassName: LIST_STATUS_STYLES[hasRealStatus ? bucket : 'new'] || LIST_STATUS_STYLES.new,
     dotClass: LIST_STATUS_DOT[hasRealStatus ? bucket : 'new'] || LIST_STATUS_DOT.new,
-    listDotClass: LIST_STATUS_DOT[listBucket] || LIST_STATUS_DOT.new,
+    listDotClass: LIST_STATUS_DOT[hasRealStatus ? bucket : 'new'] || LIST_STATUS_DOT.new,
     animateLabel: hasRealStatus && bucket === 'hot',
   };
 }

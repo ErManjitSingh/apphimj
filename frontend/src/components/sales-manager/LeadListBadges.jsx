@@ -202,7 +202,6 @@ export function LeadListStatusIcon({ lead, className }) {
     cold: { Icon: Snowflake, wrap: 'bg-slate-100 text-slate-600 ring-slate-200' },
     warm: { Icon: Sun, wrap: 'bg-amber-100 text-amber-700 ring-amber-200' },
     hot: { Icon: Flame, wrap: 'bg-rose-100 text-rose-600 ring-rose-200' },
-    working: { Icon: Sun, wrap: 'bg-orange-100 text-orange-700 ring-orange-200' },
     lost: { Icon: XCircle, wrap: 'bg-red-100 text-red-600 ring-red-200' },
     new: { Icon: CircleDashed, wrap: 'bg-sky-100 text-sky-600 ring-sky-200' },
     converted: { Icon: Trophy, wrap: 'bg-emerald-100 text-emerald-700 ring-emerald-200' },

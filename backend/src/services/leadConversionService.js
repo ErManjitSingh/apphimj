@@ -61,7 +61,15 @@ function resolveAdvanceAmount(amount, options = {}) {
 }
 
 async function ensurePaymentForConversion(lead, quotation, actor, options = {}) {
-  const amount = quotation?.pricing?.total || quotation?.costing?.grandTotal || lead.budget || 0;
+  // An explicit total (Sales Executive's "Total Package Cost" field) always wins over the
+  // quotation/budget-derived guess — that derivation is only a fallback for entry points that
+  // don't collect an explicit total, e.g. followUpService.updateFollowUpRecord's no-options call
+  // to onLeadConverted when a 'converted' follow-up is marked complete.
+  const explicitTotal = Number(options.totalPackageCost);
+  const amount =
+    Number.isFinite(explicitTotal) && explicitTotal > 0
+      ? explicitTotal
+      : quotation?.pricing?.total || quotation?.costing?.grandTotal || lead.budget || 0;
   const paidAmount = resolveAdvanceAmount(amount, options);
   const method = ['cash', 'upi', 'card', 'bank_transfer', 'cheque'].includes(options.paymentMethod)
     ? options.paymentMethod
@@ -128,7 +136,7 @@ async function notifyOperationsTeam(lead, booking) {
 /**
  * @param {object} lead
  * @param {object} actor
- * @param {{ advanceAmount?: number, tokenAmount?: number, paymentMethod?: string, sendReceipt?: boolean, paymentScreenshotBase64?: string, paymentScreenshotName?: string, paymentScreenshots?: Array<{base64:string,name?:string}> }} [options]
+ * @param {{ totalPackageCost?: number, advanceAmount?: number, tokenAmount?: number, paymentMethod?: string, sendReceipt?: boolean, paymentScreenshotBase64?: string, paymentScreenshotName?: string, paymentScreenshots?: Array<{base64:string,name?:string}> }} [options]
  */
 async function onLeadConverted(lead, actor, options = {}) {
   const existingBooking = await Booking.findOne({ lead: lead._id });
@@ -141,12 +149,14 @@ async function onLeadConverted(lead, actor, options = {}) {
     await Lead.findByIdAndUpdate(lead._id, { convertedAt });
   }
 
-  if (quotation) {
-    const total = quotation.pricing?.total || quotation.costing?.grandTotal || 0;
-    if (total > 0 && (!lead.budget || lead.budget < total)) {
-      lead.budget = total;
-      await Lead.findByIdAndUpdate(lead._id, { budget: total });
-    }
+  // Same "explicit total wins" preference as ensurePaymentForConversion — keeps lead.budget in
+  // sync with what the closer actually entered instead of a stale/derived quotation number.
+  const explicitTotal = Number(options.totalPackageCost);
+  const quotationTotal = quotation?.pricing?.total || quotation?.costing?.grandTotal || 0;
+  const total = Number.isFinite(explicitTotal) && explicitTotal > 0 ? explicitTotal : quotationTotal;
+  if (total > 0 && (!lead.budget || lead.budget < total)) {
+    lead.budget = total;
+    await Lead.findByIdAndUpdate(lead._id, { budget: total });
   }
 
   const payment = await ensurePaymentForConversion(lead, quotation, actor, options);

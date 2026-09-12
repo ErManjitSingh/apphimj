@@ -5,9 +5,8 @@ import {
 } from '../../lib/executiveStatusDisplay';
 
 /**
- * listMode=true (default): Warm / Hot / Cold / Converted / Working in Progress.
+ * listMode=true (default): Warm / Hot / Cold / Converted / No status.
  * listMode=false (lead open / modal): exact selected option when available.
- * Cold→Warm: primary "Working in Progress", subtitle "Cold to Warm".
  */
 export default function LeadStatusBadge({
   status,
@@ -31,17 +30,17 @@ export default function LeadStatusBadge({
     ? display.listDotClass || display.dotClass
     : display.dotClass;
 
-  const coldToWarmSub = display.subLabel || '';
+  const subLabelText = display.subLabel || '';
   const showExactHint =
     !listMode &&
-    !coldToWarmSub &&
+    !subLabelText &&
     display.exactLabel &&
     display.categoryLabel &&
     display.exactLabel !== display.categoryLabel &&
     !['No status', 'Converted'].includes(display.categoryLabel) &&
     display.label === display.exactLabel;
 
-  const subtitle = coldToWarmSub || (showExactHint ? display.categoryLabel : '');
+  const subtitle = subLabelText || (showExactHint ? display.categoryLabel : '');
 
   return (
     <div className="flex min-w-0 flex-col items-start gap-0.5">
@@ -52,7 +51,7 @@ export default function LeadStatusBadge({
           className,
           showPulse && 'animate-pulse-soft'
         )}
-        title={listMode ? [primaryLabel, coldToWarmSub].filter(Boolean).join(' · ') : display.title}
+        title={listMode ? [primaryLabel, subLabelText].filter(Boolean).join(' · ') : display.title}
       >
         <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', dotClass, showPulse && 'animate-pulse')} />
         <span className={listStatusTextClass(display)}>{primaryLabel}</span>

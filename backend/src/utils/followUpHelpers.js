@@ -56,30 +56,10 @@ const CALL_PICKED_OUTCOME_LABELS = {
   rescheduled: 'Rescheduled per customer request',
   qualified: 'Qualified (requirements confirmed)',
   working_progress: 'Working in Progress',
-  cold_to_warm: 'Cold to Warm',
-  auto_connected_24h: 'Cold to Warm',
+  auto_connected_24h: 'Working in Progress',
 };
 
 const TERMINAL_STATUSES = ['converted', 'lost', 'booked_from_another_company'];
-
-const COLD_OUTCOME_KEYS = new Set([
-  'booked_elsewhere',
-  'language_barrier',
-  'not_interested',
-  'invalid_number',
-  'budget_issues',
-  'budget_issue',
-]);
-
-function coldKeysSet() {
-  try {
-    const { getCachedKeysByCategory } = require('../services/leadStatusConfigService');
-    const keys = getCachedKeysByCategory().cold || [];
-    return new Set([...COLD_OUTCOME_KEYS, ...keys]);
-  } catch {
-    return COLD_OUTCOME_KEYS;
-  }
-}
 
 function outcomeLabel(category, key) {
   try {
@@ -107,20 +87,6 @@ function outcomeLabel(category, key) {
     COLD_OUTCOME_LABELS[key] ||
     key
   );
-}
-
-function isLeadCurrentlyCold(lead) {
-  if (!lead) return false;
-  if (String(lead.temperature || '').toLowerCase() === 'cold') return true;
-  const reason = String(lead.statusReason || '')
-    .trim()
-    .split(/\s*[—–]\s*|\s+-\s+/)[0]
-    ?.replace(/:$/, '')
-    .trim();
-  const coldKeys = coldKeysSet();
-  if (coldKeys.has(reason)) return true;
-  if (lead.coldReason && coldKeys.has(String(lead.coldReason))) return true;
-  return false;
 }
 
 function buildFollowUpCategoryFilter(category) {
@@ -178,30 +144,13 @@ async function applyCategoryToLead(lead, category, status, body = {}) {
       lead.status = 'negotiation';
     }
   } else if (category === 'warm' || category === 'call_picked') {
-    const fromCold = isLeadCurrentlyCold(lead) || body.fromColdToWarm === true;
     if (!TERMINAL_STATUSES.includes(lead.status)) {
-      if (fromCold) {
-        // Cold → Warm: jump straight to Working Progress (no Cold/Warm badge)
-        lead.status = 'working_progress';
-      } else {
-        lead.status = outcomeKey === 'cnp_same_day' ? 'follow_up' : 'contacted';
-      }
+      lead.status = outcomeKey === 'cnp_same_day' ? 'follow_up' : 'contacted';
     }
     lead.temperature = 'warm';
     lead.isHot = false;
     lead.coldReason = undefined;
-    if (fromCold) {
-      lead.statusReason = body.statusReason
-        ? String(body.statusReason).trim()
-        : (outcomeKey || 'cold_to_warm');
-      const reasonHead = String(lead.statusReason || '')
-        .split(/\s*[—–]\s*|\s+-\s+/)[0]
-        ?.replace(/:$/, '')
-        .trim();
-      if (['working_progress', 'auto_connected_24h'].includes(reasonHead)) {
-        lead.statusReason = outcomeKey || 'cold_to_warm';
-      }
-    } else if (body.statusReason) {
+    if (body.statusReason) {
       lead.statusReason = String(body.statusReason).trim();
     } else if (outcomeKey) {
       lead.statusReason = String(outcomeKey);

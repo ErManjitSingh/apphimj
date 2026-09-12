@@ -791,7 +791,7 @@ export default function StepLeadForm({ isEdit, leadId }) {
         </div>
       </StepSection>
 
-      <StepSection number={2} title="Travellers & Budget">
+      <StepSection number={2} title="Travellers & Package Cost">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           {[
             { key: 'adults', label: 'Adults', min: 1 },
@@ -809,7 +809,7 @@ export default function StepLeadForm({ isEdit, leadId }) {
             </WizardField>
           ))}
 
-          <WizardField label="Budget (₹)" error={errors.budget?.message} labelClassName="text-emerald-700">
+          <WizardField label="Package Cost (₹)" error={errors.budget?.message} labelClassName="text-emerald-700">
             <IconInput
               icon={TrendingUp}
               {...register('budget')}

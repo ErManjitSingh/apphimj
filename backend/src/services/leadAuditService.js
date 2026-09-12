@@ -216,7 +216,6 @@ function formatStatusChangeDescription({
   toTemperature,
   fromReason,
   toReason,
-  fromColdToWarm = false,
 } = {}) {
   const parts = [];
   if (fromStatus || toStatus) {
@@ -236,7 +235,6 @@ function formatStatusChangeDescription({
   } else if (toReason) {
     parts.push(`Option: ${displayValue('statusReason', toReason)}`);
   }
-  if (fromColdToWarm) parts.push('Cold to Warm');
   return parts.join('\n') || 'Status updated';
 }
 

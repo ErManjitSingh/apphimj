@@ -18,7 +18,13 @@ const {
 } = require('../services/notificationService');
 const { loadLeadCore, loadLeadFollowups, loadLeadQuotations, loadLeadNotes, loadLeadRelated } = require('../services/leadDetailService');
 const { LEAD_POPULATE, LEAD_LIST_POPULATE, enrichLead, buildLeadSearchFilter } = require('../utils/queryHelpers');
-const { LEAD_LIST_SELECT, canViewLeadOpenInfo } = require('../utils/leadQueryFields');
+const {
+  LEAD_LIST_SELECT,
+  canViewLeadOpenInfo,
+  applyAdminPhoneVisibility,
+  withManagementFields,
+  withManagementPopulate,
+} = require('../utils/leadQueryFields');
 const { getLeadListKpis } = require('../services/leadListKpiService');
 const { createFollowUpForLead } = require('../services/followUpService');
 const { scheduleColdLeadReminder, markColdCallDone } = require('../services/coldLeadService');
@@ -187,6 +193,7 @@ const listLeads = asyncHandler(async (req, res) => {
     branchId: req.branchId,
     includeManagementFields: canViewLeadOpenInfo(role),
   });
+  result.data = applyAdminPhoneVisibility(result.data, role);
   res.json(result);
 });
 
@@ -195,10 +202,11 @@ const getLead = asyncHandler(async (req, res) => {
   if (!lead) throw new ApiError(404, 'Lead not found');
 
   const paymentSummary = await getLeadPaymentSummary(lead._id);
+  const visibleLead = applyAdminPhoneVisibility(enrichLead(lead), req.user.role);
 
   const includeRelated = req.query.includeRelated === '1' || req.query.includeRelated === 'true';
   if (!includeRelated) {
-    res.json({ ...enrichLead(lead), paymentSummary });
+    res.json({ ...visibleLead, paymentSummary });
     return;
   }
 
@@ -206,7 +214,7 @@ const getLead = asyncHandler(async (req, res) => {
     branchId: req.branchId,
     followupsLimit: req.query.followupsLimit,
   });
-  res.json({ ...enrichLead(lead), ...related, paymentSummary });
+  res.json({ ...visibleLead, ...related, paymentSummary });
 });
 
 const getLeadPaymentReceiptDoc = asyncHandler(async (req, res) => {
@@ -291,17 +299,19 @@ const listLostLeads = asyncHandler(async (req, res) => {
     status: { $in: LOST_LEAD_STATUSES },
     ...buildLeadSearchFilter(req.query.search),
   };
+  const includeManagementFields = canViewLeadOpenInfo(role);
   const [rows, total] = await Promise.all([
     Lead.find(filter)
-      .select(LEAD_LIST_SELECT)
-      .populate(LEAD_LIST_POPULATE)
+      .select(withManagementFields(LEAD_LIST_SELECT, includeManagementFields))
+      .populate(withManagementPopulate(LEAD_LIST_POPULATE, includeManagementFields))
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean(),
     Lead.countDocuments(filter),
   ]);
-  res.json(paginatedResponse(rows.map(enrichLead), { page, limit, total }));
+  const enriched = applyAdminPhoneVisibility(rows.map(enrichLead), role);
+  res.json(paginatedResponse(enriched, { page, limit, total }));
 });
 
 const getListKpis = asyncHandler(async (req, res) => {
@@ -571,45 +581,24 @@ const updateLead = asyncHandler(async (req, res) => {
   if (data.status && data.status !== prevStatus && isLeadStatusLocked(prevStatus)) {
     throw new ApiError(400, 'Lead status cannot be changed after conversion or closure');
   }
+  if (data.status === 'converted' && prevStatus !== 'converted') {
+    // Must run before Object.assign/lead.save() below — a missing advance amount or payment
+    // screenshot must reject the request with zero side effects, not leave the lead already
+    // persisted as converted before the 400 is thrown (same requirement as the Sales Executive
+    // path in salesExecutiveController.updateLead).
+    const advance = Number(req.body.advanceAmount ?? req.body.tokenAmount);
+    if (!Number.isFinite(advance) || advance < 0) {
+      throw new ApiError(400, 'Enter advance / token amount received (₹)');
+    }
+    const hasMulti =
+      Array.isArray(req.body.paymentScreenshots) &&
+      req.body.paymentScreenshots.some((s) => s?.base64);
+    if (!req.body.paymentScreenshotBase64 && !hasMulti) {
+      throw new ApiError(400, 'Upload payment screenshot (UPI / bank transfer proof)');
+    }
+  }
 
   const prevTemperature = lead.temperature;
-  const wasColdBeforeAssign =
-    String(lead.temperature || '').toLowerCase() === 'cold' ||
-    [
-      'booked_elsewhere',
-      'language_barrier',
-      'not_interested',
-      'invalid_number',
-      'budget_issues',
-      'budget_issue',
-    ].includes(
-      String(lead.statusReason || '')
-        .trim()
-        .split(/\s*[—–]\s*|\s+-\s+/)[0]
-        ?.replace(/:$/, '')
-        .trim()
-    ) ||
-    Boolean(lead.coldReason);
-
-  // Cold → Warm: keep pipeline status working_progress; stamp user option or cold_to_warm
-  if (
-    (data.temperature === 'warm' || req.body.fromColdToWarm === true) &&
-    wasColdBeforeAssign &&
-    data.status &&
-    !['converted', 'lost', 'booked_from_another_company'].includes(data.status)
-  ) {
-    data.status = 'working_progress';
-    const reasonHead = String(data.statusReason || '')
-      .split(/\s*[—–]\s*|\s+-\s+/)[0]
-      ?.replace(/:$/, '')
-      .trim();
-    if (!reasonHead || ['working_progress', 'auto_connected_24h', 'cold_to_warm'].includes(reasonHead)) {
-      data.statusReason = req.body.warmOption
-        ? String(req.body.warmOption).trim()
-        : 'cold_to_warm';
-    }
-    data.coldReason = undefined;
-  }
 
   Object.assign(lead, data);
   if (data.temperature === 'warm' || data.status === 'working_progress') {
@@ -681,7 +670,6 @@ const updateLead = asyncHandler(async (req, res) => {
         toTemperature: after.temperature,
         fromReason: before.statusReason,
         toReason: after.statusReason,
-        fromColdToWarm: wasColdBeforeAssign && data.status === 'working_progress',
       }),
       actor: req.user,
       meta: {
@@ -715,12 +703,6 @@ const updateLead = asyncHandler(async (req, res) => {
   }
 
   if (data.status === 'converted' && prevStatus !== 'converted') {
-    const hasMulti =
-      Array.isArray(req.body.paymentScreenshots) &&
-      req.body.paymentScreenshots.some((s) => s?.base64);
-    if (!req.body.paymentScreenshotBase64 && !hasMulti) {
-      throw new ApiError(400, 'Upload payment screenshot (UPI / bank transfer proof)');
-    }
     await onLeadConverted(lead, req.user, {
       advanceAmount: req.body.advanceAmount ?? req.body.tokenAmount,
       paymentMethod: req.body.paymentMethod,

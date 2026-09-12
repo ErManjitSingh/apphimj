@@ -202,6 +202,35 @@ const getLeadDetail = asyncHandler(async (req, res) => {
   res.json({ ...enrichLead(lead), ...related, paymentSummary });
 });
 
+/**
+ * Clicking Call directly from the Leads list/card must count as accessing the lead — the
+ * customer's phone number is protected info, same as opening Lead Detail. Reuses the exact
+ * same open/access stamp as getLeadDetail (markLeadViewedByExecutive + logExecutiveActivity)
+ * so a direct call and an "open then call" both leave identical Opened-state/audit data.
+ * Idempotent: markLeadViewedByExecutive only ever sets firstOpenedAt once, so repeat calls to
+ * an already-opened lead don't create a duplicate open event — they just re-confirm access.
+ * The frontend awaits this before dialing (see frontend/src/lib/callSession.js) so the backend
+ * establishes the Opened state before the protected phone number is used, not after.
+ */
+const authorizeLeadCallAccess = asyncHandler(async (req, res) => {
+  const lead = await loadLeadCore(req.params.id, {
+    branchId: req.branchId,
+    extraFilter: { assignedTo: req.user._id },
+  });
+  if (!lead) throw new ApiError(404, 'Lead not found');
+
+  await markLeadViewedByExecutive(lead._id, req.user._id);
+  await logExecutiveActivity({
+    userId: req.user._id,
+    branchId: req.branchId,
+    type: 'lead_viewed',
+    refId: lead._id,
+    meta: { leadName: lead.name, via: 'call' },
+  });
+
+  res.json({ opened: true, phone: lead.phone });
+});
+
 const getLeadPaymentReceiptDoc = asyncHandler(async (req, res) => {
   const data = await getLeadPaymentReceipt(req.params.id, {
     branchId: req.branchId,
@@ -271,17 +300,16 @@ const updateLead = asyncHandler(async (req, res) => {
   const {
     status,
     statusReason,
+    totalPackageCost,
     advanceAmount,
     tokenAmount,
     paymentMethod,
     sendReceipt,
-    paymentScreenshotBase64,
-    paymentScreenshotName,
-    paymentScreenshots,
   } = req.body;
   const statusOnlyKeys = new Set([
     'status',
     'statusReason',
+    'totalPackageCost',
     'advanceAmount',
     'tokenAmount',
     'paymentMethod',
@@ -327,13 +355,19 @@ const updateLead = asyncHandler(async (req, res) => {
       }
     }
     if (status === 'converted') {
-      const advance = Number(advanceAmount ?? tokenAmount);
-      if (!Number.isFinite(advance) || advance < 0) {
-        throw new ApiError(400, 'Enter advance / token amount received (₹)');
+      // Sales Executive conversion no longer requires payment proof — just the deal numbers.
+      // Remaining amount is always derived server-side (totalCost - token), never trusted from
+      // the client.
+      const totalCost = Number(totalPackageCost);
+      if (!Number.isFinite(totalCost) || totalCost <= 0) {
+        throw new ApiError(400, 'Enter total package cost (₹)');
       }
-      const hasMulti = Array.isArray(paymentScreenshots) && paymentScreenshots.some((s) => s?.base64);
-      if (!paymentScreenshotBase64 && !hasMulti) {
-        throw new ApiError(400, 'Upload payment screenshot (UPI / bank transfer proof)');
+      const token = Number(tokenAmount ?? advanceAmount ?? 0);
+      if (!Number.isFinite(token) || token < 0) {
+        throw new ApiError(400, 'Enter token amount received (₹)');
+      }
+      if (token > totalCost) {
+        throw new ApiError(400, 'Token amount received cannot exceed total package cost');
       }
     }
     if (isLeadStatusLocked(lead.status)) {
@@ -343,36 +377,9 @@ const updateLead = asyncHandler(async (req, res) => {
     const prevStatus = lead.status;
     const prevTemperature = String(lead.temperature || '').toLowerCase();
     const prevReason = String(lead.statusReason || '').trim();
-    const wasCold =
-      String(lead.temperature || '').toLowerCase() === 'cold' ||
-      ['booked_elsewhere', 'language_barrier', 'not_interested', 'invalid_number', 'budget_issues', 'budget_issue'].includes(
-        String(lead.statusReason || '')
-          .trim()
-          .split(/\s*[—–]\s*|\s+-\s+/)[0]
-          ?.replace(/:$/, '')
-          .trim()
-      ) ||
-      Boolean(lead.coldReason);
 
-    // Cold → Warm: keep pipeline status working_progress; stamp user option or "cold_to_warm"
-    let nextStatus = status;
-    let nextReason = trimmedReason;
-    if (
-      (req.body.temperature === 'warm' || req.body.fromColdToWarm === true) &&
-      wasCold &&
-      !['converted', 'lost', 'booked_from_another_company'].includes(status)
-    ) {
-      nextStatus = 'working_progress';
-      const reasonHead = String(nextReason || '')
-        .split(/\s*[—–]\s*|\s+-\s+/)[0]
-        ?.replace(/:$/, '')
-        .trim();
-      if (!nextReason || ['working_progress', 'auto_connected_24h', 'cold_to_warm'].includes(reasonHead)) {
-        nextReason = req.body.warmOption
-          ? String(req.body.warmOption).trim()
-          : 'cold_to_warm';
-      }
-    }
+    const nextStatus = status;
+    const nextReason = trimmedReason;
 
     lead.status = nextStatus;
     if (nextStatus === 'converted' && prevStatus !== 'converted' && !lead.convertedAt) {
@@ -432,7 +439,6 @@ const updateLead = asyncHandler(async (req, res) => {
           toTemperature: lead.temperature,
           fromReason: prevReason,
           toReason: reasonText || lead.statusReason,
-          fromColdToWarm: wasCold && nextStatus === 'working_progress',
         }),
         actor: req.user,
         meta: {
@@ -442,7 +448,6 @@ const updateLead = asyncHandler(async (req, res) => {
           toTemperature: lead.temperature || undefined,
           fromReason: prevReason || undefined,
           toReason: lead.statusReason || undefined,
-          fromColdToWarm: wasCold && nextStatus === 'working_progress',
           advanceAmount: nextStatus === 'converted' ? Number(advanceAmount ?? tokenAmount) : undefined,
           changes: [
             {
@@ -476,8 +481,7 @@ const updateLead = asyncHandler(async (req, res) => {
       if (
         (req.body.temperature && nextTemp !== prevTemperature) ||
         (nextReasonSaved && nextReasonSaved !== prevReason) ||
-        req.body.coldReason ||
-        req.body.fromColdToWarm
+        req.body.coldReason
       ) {
         await logLeadActivity({
           leadId: lead._id,
@@ -490,7 +494,6 @@ const updateLead = asyncHandler(async (req, res) => {
             toTemperature: nextTemp,
             fromReason: prevReason,
             toReason: nextReasonSaved,
-            fromColdToWarm: wasCold && nextTemp === 'warm',
           }),
           actor: req.user,
           meta: {
@@ -500,7 +503,6 @@ const updateLead = asyncHandler(async (req, res) => {
             toTemperature: nextTemp || undefined,
             fromReason: prevReason || undefined,
             toReason: nextReasonSaved || undefined,
-            fromColdToWarm: wasCold && nextTemp === 'warm',
             changes: [
               nextTemp !== prevTemperature
                 ? {
@@ -526,12 +528,10 @@ const updateLead = asyncHandler(async (req, res) => {
 
     if (nextStatus === 'converted' && prevStatus !== 'converted') {
       await onLeadConverted(lead, req.user, {
-        advanceAmount: Number(advanceAmount ?? tokenAmount),
+        totalPackageCost: Number(totalPackageCost),
+        advanceAmount: Number(tokenAmount ?? advanceAmount),
         paymentMethod,
         sendReceipt: sendReceipt !== false,
-        paymentScreenshotBase64,
-        paymentScreenshotName,
-        paymentScreenshots,
       }).catch((err) => {
         console.error('[LeadConversion]', err.message);
       });
@@ -1230,6 +1230,7 @@ module.exports = {
   getDashboard,
   listLeads,
   getLeadDetail,
+  authorizeLeadCallAccess,
   getLeadQuotationsList,
   getLeadNotesList,
   getLeadPaymentReceiptDoc,

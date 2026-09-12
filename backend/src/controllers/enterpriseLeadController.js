@@ -206,6 +206,14 @@ const addCallNote = asyncHandler(async (req, res) => {
   });
   if (!lead) throw new ApiError(404, 'Lead not found');
 
+  // Safety net: a call being captured here means the executive accessed this lead's protected
+  // phone number, so it must count as Opened — regardless of whether the frontend's pre-dial
+  // authorizeLeadCallAccess request ever reached the backend (offline, race, older client, …).
+  // markLeadViewedByExecutive no-ops for non-assigned users and only ever sets firstOpenedAt
+  // once, so this never creates a duplicate open event or misattributes an already-opened lead.
+  const { markLeadViewedByExecutive } = require('../services/leadExecutiveStallService');
+  await markLeadViewedByExecutive(lead._id, req.user._id).catch(() => {});
+
   // Category <-> outcome integrity check. The backend, not the client, is authoritative here:
   // a raw API call must never be able to save an outcome under a category it doesn't belong to
   // (e.g. category:'cold' + outcome:'ready_to_book'), regardless of what the client claims.
@@ -289,28 +297,8 @@ const addCallNote = asyncHandler(async (req, res) => {
 
   // category / outcomeKey are already validated and set above (before CallNote.create()).
 
-  const COLD_KEYS = new Set([
-    ...(function coldFallback() {
-      try {
-        return require('../services/leadStatusConfigService').getCachedKeysByCategory().cold;
-      } catch {
-        return ['booked_elsewhere', 'language_barrier', 'not_interested', 'invalid_number', 'budget_issues', 'budget_issue'];
-      }
-    })(),
-  ]);
-
   const prevStatus = lead.status;
   const reasonStamp = String(bodyStatusReason || '').trim() || outcomeKey;
-  const wasCold =
-    String(lead.temperature || '').toLowerCase() === 'cold' ||
-    COLD_KEYS.has(
-      String(lead.statusReason || '')
-        .trim()
-        .split(/\s*[—–]\s*|\s+-\s+/)[0]
-        ?.replace(/:$/, '')
-        .trim()
-    ) ||
-    Boolean(lead.coldReason && COLD_KEYS.has(String(lead.coldReason)));
 
   if (category === 'hot') {
     if (!['converted', 'lost', 'booked_from_another_company'].includes(lead.status)) {
@@ -328,22 +316,6 @@ const addCallNote = asyncHandler(async (req, res) => {
     lead.isHot = false;
     lead.coldReason = outcomeKey;
     lead.statusReason = reasonStamp;
-  } else if (wasCold) {
-    // Cold → Warm (from call): stamp user option or cold_to_warm
-    if (!['converted', 'lost', 'booked_from_another_company'].includes(lead.status)) {
-      lead.status = 'working_progress';
-    }
-    lead.temperature = 'warm';
-    lead.isHot = false;
-    lead.coldReason = undefined;
-    const reasonHead = String(reasonStamp || '')
-      .split(/\s*[—–]\s*|\s+-\s+/)[0]
-      ?.replace(/:$/, '')
-      .trim();
-    lead.statusReason =
-      reasonHead && !['working_progress', 'auto_connected_24h', 'cold_to_warm'].includes(reasonHead)
-        ? reasonStamp
-        : outcomeKey || 'cold_to_warm';
   } else {
     if (!['converted', 'lost', 'booked_from_another_company'].includes(lead.status)) {
       lead.status = outcomeKey === 'cnp_same_day' ? 'follow_up' : 'contacted';
@@ -479,50 +451,11 @@ const bulkUpdateStatus = asyncHandler(async (req, res) => {
   if (!leads.length) throw new ApiError(404, 'No matching leads found');
 
   const results = [];
-  const COLD_REASON_KEYS = new Set([
-    'booked_elsewhere',
-    'language_barrier',
-    'not_interested',
-    'invalid_number',
-    'budget_issues',
-    'budget_issue',
-  ]);
-  const isLeadCold = (lead) => {
-    if (String(lead.temperature || '').toLowerCase() === 'cold') return true;
-    const reason = String(lead.statusReason || '')
-      .trim()
-      .split(/\s*[—–]\s*|\s+-\s+/)[0]
-      ?.replace(/:$/, '')
-      .trim();
-    if (COLD_REASON_KEYS.has(reason)) return true;
-    if (lead.coldReason && COLD_REASON_KEYS.has(String(lead.coldReason))) return true;
-    return false;
-  };
 
   for (const lead of leads) {
     const prev = lead.status;
-    const wasCold = isLeadCold(lead);
-    let nextStatus = status;
-    let nextReason = statusReason ? String(statusReason).trim() : lead.statusReason;
-
-    // Cold → Warm: keep pipeline status; stamp user option or cold_to_warm
-    if (
-      (temperature === 'warm' || req.body.fromColdToWarm === true) &&
-      wasCold &&
-      !LOST_STATUSES.includes(status) &&
-      status !== 'converted'
-    ) {
-      nextStatus = 'working_progress';
-      const reasonHead = String(nextReason || '')
-        .split(/\s*[—–]\s*|\s+-\s+/)[0]
-        ?.replace(/:$/, '')
-        .trim();
-      if (!reasonHead || ['working_progress', 'auto_connected_24h', 'cold_to_warm'].includes(reasonHead)) {
-        nextReason = req.body.warmOption
-          ? String(req.body.warmOption).trim()
-          : 'cold_to_warm';
-      }
-    }
+    const nextStatus = status;
+    const nextReason = statusReason ? String(statusReason).trim() : lead.statusReason;
 
     lead.status = nextStatus;
     if (normalizedLostReason) {
@@ -560,7 +493,6 @@ const bulkUpdateStatus = asyncHandler(async (req, res) => {
         toStatus: nextStatus,
         toTemperature: lead.temperature,
         toReason: lead.statusReason,
-        fromColdToWarm: wasCold && nextStatus === 'working_progress',
       }),
       actor: req.user,
       meta: {
@@ -568,7 +500,6 @@ const bulkUpdateStatus = asyncHandler(async (req, res) => {
         to: nextStatus,
         statusReason: lead.statusReason || undefined,
         temperature: lead.temperature || undefined,
-        fromColdToWarm: wasCold && nextStatus === 'working_progress',
         bulk: true,
         changes: [
           {

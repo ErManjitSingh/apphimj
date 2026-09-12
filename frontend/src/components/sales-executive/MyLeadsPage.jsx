@@ -32,7 +32,6 @@ import AddFollowUpModal from '../followups/AddFollowUpModal';
 import { createExecutiveFollowUp, buildFollowUpPayload } from '../followups/followupApi';
 import ConvertedLeadsTable from '../leads/ConvertedLeadsTable';
 import PostConvertCommercialModal from '../leads/PostConvertCommercialModal';
-import LeadFollowUpOutcomeModal from './LeadFollowUpOutcomeModal';
 import { getFollowUpOutcome } from '../../constants/leadFollowUpOutcomes';
 import { useSidebarCounts } from '../../hooks/useSidebarCounts';
 import { resolveListTotal } from '../../lib/resolveListTotal';
@@ -127,21 +126,6 @@ export default function MyLeadsPage() {
     setPriorityFilter('');
     setSourceFilter('');
   }, [filter]);
-
-  const handleFollowUpOutcome = async (payload, meta = {}) => {
-    if (!modal?.lead) return;
-    await API.put(`/sales-executive/leads/${modal.lead._id}`, payload);
-    if (meta.comment && ['lost', 'booked_from_another_company'].includes(payload.status)) {
-      await API.post(`/sales-executive/leads/${modal.lead._id}/notes`, {
-        text: meta.comment,
-      }).catch(() => {});
-    }
-    const becameConverted = payload.status === 'converted';
-    const convertedId = modal.lead._id;
-    setModal(null);
-    fetchLeads();
-    if (becameConverted) setCommercialLeadId(convertedId);
-  };
 
   const saveFollowUpForLead = async (data, lead) => {
     const leadId = lead?._id;
@@ -251,11 +235,7 @@ export default function MyLeadsPage() {
         <div className="flex items-center justify-end gap-0 pr-1">
           <LeadActionsMenu
             lead={row.original}
-            canChangeStatus={!isLeadStatusLocked(row.original.status)}
             onScheduleFollowUp={(lead) => { setModal({ type: 'followup', lead }); }}
-            onChangeStatus={(lead) => {
-              setModal({ type: 'status', lead });
-            }}
           />
         </div>
         );
@@ -367,13 +347,6 @@ export default function MyLeadsPage() {
       <ExecutivePipelineCta />
     </ExecutivePageShell>
       </div>
-
-      <LeadFollowUpOutcomeModal
-        open={modal?.type === 'status'}
-        lead={modal?.lead}
-        onClose={() => setModal(null)}
-        onSubmit={handleFollowUpOutcome}
-      />
 
       <AddFollowUpModal
         open={modal?.type === 'followup'}

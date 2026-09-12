@@ -20,8 +20,6 @@ import { openCrmWhatsApp } from '../../lib/openCrmWhatsApp';
 export default function LeadActionsMenu({
   lead,
   onScheduleFollowUp,
-  onChangeStatus,
-  canChangeStatus = true,
   contactLocked = false,
 }) {
   const navigate = useNavigate();

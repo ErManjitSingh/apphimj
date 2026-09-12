@@ -153,7 +153,7 @@ async function getAllOptionKeys({ enabledOnly = true } = {}) {
 
 async function getLabelMap() {
   const cfg = await getConfig({ includeDisabled: true });
-  const map = { working_progress: 'Working in Progress', cold_to_warm: 'Cold to Warm', auto_connected_24h: 'Cold to Warm' };
+  const map = { working_progress: 'Working in Progress', auto_connected_24h: 'Working in Progress' };
   for (const cat of ['warm', 'hot', 'cold']) {
     for (const o of cfg[cat]) map[o.key] = o.label;
   }

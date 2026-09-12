@@ -10,8 +10,6 @@ import {
   FOLLOWUP_CATEGORY_OPTIONS,
   getOutcomesForCategory,
 } from '../components/followups/constants';
-import { getColdOutcomes, bucketFromOptionKey } from './leadStatusOptionsStore';
-
 export {
   WARM_OUTCOMES,
   HOT_OUTCOMES,
@@ -36,34 +34,10 @@ export const ALL_LEAD_STATUS_OUTCOMES = [
   ...CONVERTED_OUTCOMES.map((o) => ({ ...o, category: 'converted', temperature: 'hot' })),
 ];
 
-const COLD_OPTION_KEYS = new Set([
-  ...COLD_OUTCOMES.map((o) => o.value),
-  'budget_issue',
-]);
-
-function extractHeadReason(statusReason) {
-  const raw = String(statusReason || '').trim();
-  if (!raw) return '';
-  return raw.split(/\s*[—–]\s*|\s+-\s+/)[0]?.replace(/:$/, '').trim() || '';
-}
-
-/** True when lead is currently Cold (temperature or cold option). */
-export function isLeadCurrentlyCold(lead) {
-  if (!lead) return false;
-  if (String(lead.temperature || '').toLowerCase() === 'cold') return true;
-  const reason = extractHeadReason(lead.statusReason);
-  if (bucketFromOptionKey(reason) === 'cold') return true;
-  if (lead.coldReason && bucketFromOptionKey(String(lead.coldReason)) === 'cold') return true;
-  const coldKeys = new Set([...getColdOutcomes().map((o) => o.value), ...COLD_OPTION_KEYS]);
-  if (coldKeys.has(reason)) return true;
-  if (lead.coldReason && coldKeys.has(String(lead.coldReason))) return true;
-  return false;
-}
-
 /**
  * Map Warm/Hot/Cold/Converted + option → API lead update payload.
- * Cold → Warm (only when lead was Cold) keeps pipeline status working_progress
- * and shows "Working in Progress" + "Cold to Warm" in the UI.
+ * The selected outcome becomes the lead's current temperature directly —
+ * a Cold lead picking a Warm outcome is just Warm, same as any other Warm pick.
  * Converted requires payment screenshot + advanceAmount on the request (added by UI).
  */
 export function buildLeadStatusPayload(category, option, comment = '', lead = null) {
@@ -71,18 +45,6 @@ export function buildLeadStatusPayload(category, option, comment = '', lead = nu
   const statusReason = note ? `${option} — ${note}` : option;
 
   if (category === 'warm') {
-    const fromCold = isLeadCurrentlyCold(lead);
-    if (fromCold) {
-      return {
-        status: 'working_progress',
-        statusReason,
-        temperature: 'warm',
-        isHot: false,
-        coldReason: '',
-        fromColdToWarm: true,
-        warmOption: option,
-      };
-    }
     return {
       status: option === 'cnp_same_day' ? 'follow_up' : 'contacted',
       statusReason,
@@ -127,8 +89,6 @@ export function buildLeadStatusPayload(category, option, comment = '', lead = nu
 export function pipelineStatusToTemperatureLabel(status) {
   const s = String(status || '').toLowerCase();
   if (s === 'converted') return 'Converted';
-  // Bare working_progress is not enough — Cold→Warm UI uses getLeadListStatusDisplay
-  if (s === 'cold_to_warm') return 'Cold to Warm';
   if (s === 'working_progress') return 'No status';
   if (s === 'warm') return 'Warm';
   if (s === 'hot') return 'Hot';

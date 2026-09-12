@@ -20,6 +20,8 @@ const emptyForm = {
   priority: 'medium',
   remarks: '',
   outcome: '',
+  totalPackageCost: '',
+  tokenAmount: '',
 };
 
 function buildStatusFromCategory(form, lead = null) {
@@ -77,7 +79,9 @@ export default function AddFollowUpModal({
           editData.hotOutcome ||
           editData.coldReason ||
           editData.notPickedReason ||
-          '',
+          (cat === 'converted' ? 'converted' : ''),
+        totalPackageCost: '',
+        tokenAmount: '',
       });
     } else {
       const today = new Date().toISOString().split('T')[0];
@@ -96,6 +100,8 @@ export default function AddFollowUpModal({
       ...prev,
       category: nextCategory,
       outcome: nextCategory === 'converted' ? 'converted' : '',
+      totalPackageCost: '',
+      tokenAmount: '',
     }));
   };
 
@@ -115,6 +121,22 @@ export default function AddFollowUpModal({
       setError(`Please select a ${form.category} option`);
       return;
     }
+    if (form.category === 'converted') {
+      const total = Number(form.totalPackageCost);
+      if (!Number.isFinite(total) || total <= 0) {
+        setError('Enter total package cost (₹)');
+        return;
+      }
+      const token = Number(form.tokenAmount);
+      if (!Number.isFinite(token) || token < 0) {
+        setError('Enter token amount received (₹)');
+        return;
+      }
+      if (token > total) {
+        setError('Token amount received cannot exceed total package cost');
+        return;
+      }
+    }
 
     setSaving(true);
     try {
@@ -130,11 +152,11 @@ export default function AddFollowUpModal({
               : `Cold — ${outcomeLabel}`;
       remarks = remarks ? `${prefix}. ${remarks}` : prefix;
 
-      // Converted needs payment proof — use Lead follow up / Change status modal instead
-      const statusUpdate =
-        showLeadOutcome && form.category !== 'converted'
-          ? buildStatusFromCategory(form, lead)
-          : null;
+      const statusUpdate = showLeadOutcome ? buildStatusFromCategory(form, lead) : null;
+      if (statusUpdate && form.category === 'converted') {
+        statusUpdate.totalPackageCost = Number(form.totalPackageCost);
+        statusUpdate.tokenAmount = Number(form.tokenAmount);
+      }
 
       await onSubmit({
         ...form,
@@ -241,7 +263,7 @@ export default function AddFollowUpModal({
             {form.category === 'warm' && 'Warm — select option'}
             {form.category === 'hot' && 'Hot — select option'}
             {form.category === 'cold' && 'Cold — select option'}
-            {form.category === 'converted' && 'Converted — booking / payment (use Lead follow up to convert with proof)'}
+            {form.category === 'converted' && 'Converted — select option'}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {outcomeOptions.map((item) => (
@@ -255,7 +277,9 @@ export default function AddFollowUpModal({
                       ? 'border-rose-500 bg-rose-100 text-rose-900'
                       : form.category === 'cold'
                         ? 'border-sky-500 bg-sky-100 text-sky-800'
-                        : 'border-amber-500 bg-amber-100 text-amber-900'
+                        : form.category === 'converted'
+                          ? 'border-emerald-500 bg-emerald-100 text-emerald-900'
+                          : 'border-amber-500 bg-amber-100 text-amber-900'
                     : 'border-subtle bg-white text-content-secondary hover:border-amber-300'
                 }`}
               >
@@ -264,6 +288,48 @@ export default function AddFollowUpModal({
             ))}
           </div>
         </div>
+
+        {form.category === 'converted' ? (
+          <div className="space-y-3 rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
+            <p className="text-xs font-medium text-emerald-900">
+              Converted starts the booking — enter the total package cost and token amount received.
+            </p>
+            <div>
+              <label className="text-xs font-medium text-content-muted mb-1 block">
+                Total package cost (₹) *
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={form.totalPackageCost}
+                onChange={(e) => setForm((prev) => ({ ...prev, totalPackageCost: e.target.value }))}
+                placeholder="e.g. 50000"
+                className="input-premium w-full h-11 rounded-xl"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-content-muted mb-1 block">
+                Token amount received (₹) *
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={form.tokenAmount}
+                onChange={(e) => setForm((prev) => ({ ...prev, tokenAmount: e.target.value }))}
+                placeholder="e.g. 10000"
+                className="input-premium w-full h-11 rounded-xl"
+              />
+            </div>
+            <p className="text-xs font-semibold text-emerald-900">
+              Remaining amount: ₹{Math.max(
+                0,
+                (Number(form.totalPackageCost) || 0) - (Number(form.tokenAmount) || 0)
+              ).toLocaleString('en-IN')}
+            </p>
+          </div>
+        ) : null}
 
         <div className="grid grid-cols-2 gap-3">
           <div>

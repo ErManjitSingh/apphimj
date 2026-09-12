@@ -160,7 +160,6 @@ export default function LeadDetailHeader({
   // Show the option the user selected (e.g. Ready to Book), not just Warm/Hot/Cold
   const tempCapitalized = listDisplay.label || 'No status';
   const isHot = listDisplay.bucket === 'hot';
-  const isWorking = listDisplay.bucket === 'working';
   const isConverted = listDisplay.bucket === 'converted';
   const scorePct = Math.max(0, Math.min(100, Number(scores.overall) || 0));
   const summary = summaryProp || lead?.paymentSummary;
@@ -306,13 +305,11 @@ export default function LeadDetailHeader({
                     ? 'text-emerald-600'
                     : isHot
                       ? 'text-orange-600'
-                      : isWorking
-                        ? 'text-orange-600'
-                        : listDisplay.bucket === 'warm'
-                          ? 'text-amber-600'
-                          : listDisplay.bucket === 'cold'
-                            ? 'text-slate-600'
-                            : 'text-sky-600'
+                      : listDisplay.bucket === 'warm'
+                        ? 'text-amber-600'
+                        : listDisplay.bucket === 'cold'
+                          ? 'text-slate-600'
+                          : 'text-sky-600'
                 )}
                 title={tempCapitalized}
                 >

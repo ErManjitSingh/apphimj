@@ -29,14 +29,22 @@ function stampPendingAcceptance(target = {}, leadLike = {}) {
 }
 
 /**
- * Fired every time the assigned executive opens Lead Detail. Stamps `executiveLastViewedAt`
- * (existing stall-tracking field, overwritten each open) and, only the very first time, also
- * stamps `firstOpenedAt`/`firstOpenedBy` for the management-only "Opened" timeline entry — the
- * `firstOpenedAt: null` filter on the second update makes that stamp set-once, never overwritten.
+ * Fired every time the assigned executive opens Lead Detail — or accesses the lead's protected
+ * phone number some other way (e.g. clicking Call directly from the Leads list, see
+ * salesExecutiveController.authorizeLeadCallAccess / enterpriseLeadController.addCallNote).
+ * Stamps `executiveLastViewedAt` (existing stall-tracking field, overwritten each open) and,
+ * only the very first time, also stamps `firstOpenedAt`/`firstOpenedBy` for the management-only
+ * "Opened" timeline entry — the `firstOpenedAt: null` filter on the second update makes that
+ * stamp set-once, never overwritten, so calling this repeatedly for an already-opened lead never
+ * creates a duplicate open event. No-ops (matches nothing) if `executiveId` isn't the lead's
+ * assignedTo — safe to call from any role without an extra ownership check at the call site.
+ *
+ * Returns `{ firstOpened }` — true only when this call is the one that just transitioned the
+ * lead from Not Opened to Opened, for callers that want to know/log that specifically.
  */
 async function markLeadViewedByExecutive(leadId, executiveId) {
   const now = new Date();
-  await Promise.all([
+  const [, firstOpenResult] = await Promise.all([
     Lead.updateOne(
       { _id: leadId, assignedTo: executiveId },
       { $set: { executiveLastViewedAt: now } }
@@ -46,6 +54,7 @@ async function markLeadViewedByExecutive(leadId, executiveId) {
       { $set: { firstOpenedAt: now, firstOpenedBy: executiveId } }
     ),
   ]);
+  return { firstOpened: Boolean(firstOpenResult?.modifiedCount) };
 }
 
 function computeExecutiveStallFlags(lead, now = new Date()) {
