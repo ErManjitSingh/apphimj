@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { useSelector } from 'react-redux';
 import { Search, RotateCcw, Filter, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -67,10 +66,10 @@ export default function LeadFilterBar({
   onQuickFilter,
 }) {
   const { user } = useAuth();
-  const { availableBranches = [] } = useSelector((s) => s.branch);
   const [executives, setExecutives] = useState([]);
   const [teams, setTeams] = useState([]);
-  const canFilterBranch = ['admin', 'lead_provider', 'hr_admin'].includes(user?.role);
+  const [branches, setBranches] = useState([]);
+  const canFilterBranch = ['admin', 'lead_provider', 'hr_admin', 'sales_manager'].includes(user?.role);
   const [mode, setMode] = useState('basic');
   const [showMore, setShowMore] = useState(() => hasMoreFilterValues(filters, canFilterBranch));
   const morePanelRef = useRef(null);
@@ -83,6 +82,16 @@ export default function LeadFilterBar({
       .then((res) => setTeams(Array.isArray(res.data) ? res.data : []))
       .catch(() => setTeams([]));
   }, []);
+
+  // Fetched directly (not via the redux branch-switcher state) so this dropdown works the
+  // same for every role that can filter by branch, independent of the admin/lead_provider
+  // "switch active branch" feature and its x-branch-id header side effects.
+  useEffect(() => {
+    if (!canFilterBranch) return;
+    API.get('/branches', { skipSuccessToast: true, skipErrorToast: true })
+      .then((res) => setBranches(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setBranches([]));
+  }, [canFilterBranch]);
 
   const set = (key, val) => onChange({ ...filters, [key]: val });
 
@@ -328,7 +337,7 @@ export default function LeadFilterBar({
                     className={fieldClass}
                   >
                     <option value="">All Branches</option>
-                    {availableBranches.map((b) => (
+                    {branches.map((b) => (
                       <option key={b._id} value={b._id}>{b.name}</option>
                     ))}
                   </select>

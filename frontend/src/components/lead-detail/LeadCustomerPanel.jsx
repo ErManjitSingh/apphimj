@@ -1,5 +1,6 @@
 import { computeLeadAge, formatSource, DETAIL_CARD } from './leadDetailUtils';
 import { formatCallDurationExact } from '../../lib/callSession';
+import { useAuth } from '../../context/AuthContext';
 
 function InfoRow({ label, value }) {
   return (
@@ -21,7 +22,14 @@ function Card({ title, children }) {
   );
 }
 
+const SOURCE_HIDDEN_ROLES = ['sales_executive', 'team_leader'];
+
 export default function LeadCustomerPanel({ lead }) {
+  const { user } = useAuth();
+  // Lead Source is hidden from Sales Executive and Team Leader only — Admin/Sales Manager
+  // still see it. The underlying lead.source data/API is untouched; this only skips
+  // rendering the row.
+  const canSeeSource = !SOURCE_HIDDEN_ROLES.includes(user?.role);
   const lastContacted = lead.lastContactedAt
     ? new Date(lead.lastContactedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
     : '—';
@@ -77,7 +85,7 @@ export default function LeadCustomerPanel({ lead }) {
         />
         <InfoRow label="Meal Plan" value={(lead.mealPlan || lead.mealPreference || 'map').toString().toUpperCase()} />
         <InfoRow label="Intent" value={lead.priority || '—'} />
-        <InfoRow label="Source" value={formatSource(lead)} />
+        {canSeeSource && <InfoRow label="Source" value={formatSource(lead)} />}
         <InfoRow label="Package Type" value={lead.leadType?.replace(/_/g, ' ') || '—'} />
         <InfoRow
           label="Calls"

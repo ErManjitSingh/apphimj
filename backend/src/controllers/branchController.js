@@ -2,9 +2,15 @@ const Branch = require('../models/Branch');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/apiError');
 
+// Read-only: id + name (+status) only, no write access implied. Admin and Sales Manager see
+// every active branch (Sales Manager needs this to populate the "All Leads" Branch filter —
+// see LeadFilterBar.jsx / findManagerLeadsPaginated's effectiveBranchId); every other role
+// still only sees its own branch.
+const FULL_LIST_ROLES = ['admin', 'sales_manager'];
+
 const listBranches = asyncHandler(async (req, res) => {
   let filter = { status: 'active' };
-  if (req.user?.role !== 'admin') {
+  if (!FULL_LIST_ROLES.includes(req.user?.role)) {
     filter = { _id: req.user.branchId };
   }
 

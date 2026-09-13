@@ -8,7 +8,6 @@ import {
   FileText,
   Filter,
   Flame,
-  Link2,
   List,
   MapPin,
   Menu,
@@ -27,10 +26,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useSidebar } from '../../context/SidebarContext';
 import { useSidebarCounts } from '../../hooks/useSidebarCounts';
 import { beginLeadCall } from '../../lib/callSession';
-import { LEAD_SOURCE_FILTER_OPTIONS } from '../../lib/leadSourceLabels';
 import { DESTINATIONS, INDIAN_STATES } from '../leads/constants';
 import { LEAD_FOLLOW_UP_OUTCOMES } from '../../constants/leadFollowUpOutcomes';
-import { SourceBadge } from '../sales-manager/LeadListBadges';
 import { getLeadListStatusDisplay, listStatusTextClass } from '../../lib/executiveStatusDisplay';
 import { cn } from '../../lib/utils';
 import { toast } from '../../context/ToastContext';
@@ -431,11 +428,6 @@ export default function MobileExecutiveLeads({
                     <option key={o.value || 'all'} value={o.value}>{o.label}</option>
                   ))}
                 </FilterSelect>
-                <FilterSelect icon={Link2} value={sourceFilter} onChange={onSourceChange}>
-                  {LEAD_SOURCE_FILTER_OPTIONS.map((o) => (
-                    <option key={o.value || 'all'} value={o.value}>{o.label === 'All sources' ? 'All Sources' : o.label}</option>
-                  ))}
-                </FilterSelect>
                 <FilterSelect icon={User} value="" onChange={() => {}}>
                   <option value="">All Executives</option>
                   <option value="me">{user?.name || 'Me'}</option>
@@ -631,7 +623,7 @@ export default function MobileExecutiveLeads({
                   ) : null}
 
                   <div className="mt-3 flex items-end gap-2 rounded-xl bg-slate-50 px-3 py-2.5">
-                    <div className="min-w-0 flex-1 grid grid-cols-3 gap-2">
+                    <div className="min-w-0 flex-1 grid grid-cols-2 gap-2">
                       <div>
                         <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Meal Plan</p>
                         <p className="mt-0.5 truncate text-[11px] font-bold text-slate-800">{formatMealPlan(lead)}</p>
@@ -639,16 +631,6 @@ export default function MobileExecutiveLeads({
                       <div>
                         <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Travelers</p>
                         <p className="mt-0.5 truncate text-[11px] font-bold text-slate-800">{formatTravelers(lead)}</p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Source</p>
-                        <div className="mt-0.5 truncate text-[11px] font-bold text-slate-800">
-                          <SourceBadge
-                            source={lead.source}
-                            label={lead.sourceLabel}
-                            sourceShort={lead.sourceShort}
-                          />
-                        </div>
                       </div>
                     </div>
                     <button

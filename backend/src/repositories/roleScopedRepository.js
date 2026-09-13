@@ -1,7 +1,9 @@
+const mongoose = require('mongoose');
 const Lead = require('../models/Lead');
 const { LEAD_LIST_SELECT, withManagementFields, withManagementPopulate } = require('../utils/leadQueryFields');
 const FollowUp = require('../models/FollowUp');
 const Quotation = require('../models/Quotation');
+const { buildLeadListFilter } = require('./leadRepository');
 const {
   LEAD_POPULATE,
   LEAD_LIST_POPULATE,
@@ -119,31 +121,50 @@ function isWorkingProgressFilter(filter) {
   return filter === 'working-progress' || filter === 'working_progress' || filter === 'working';
 }
 
-function buildManagerLeadFilter(query = {}) {
-  const { filter, search, status, destination, priority } = query;
-  const mongoFilter = { ...buildLeadSearchFilter(search) };
+/**
+ * Manager-only buckets (lost / reactivated / working-progress) keep their own dedicated
+ * logic — Admin's Lead Management has no equivalent list-filter values for these. Every
+ * other view (all/unassigned/assigned/hot/returned/arrivals/bookings) delegates to
+ * buildLeadListFilter — the exact same filter builder Admin's Lead Management uses — so
+ * Sales Manager gets full parity (search/source/destination/budget/executive/team/state/
+ * priority/travel-month/connected/date-range routing) instead of a second, drifting
+ * implementation of the same rules.
+ */
+async function buildManagerLeadFilter(query = {}, options = {}) {
+  const { filter, search } = query;
 
-  if (isWorkingProgressFilter(filter)) mongoFilter.status = 'working_progress';
-  else if (filter === 'unassigned') mongoFilter.assignedTo = null;
-  else if (filter === 'assigned') mongoFilter.assignedTo = { $ne: null };
-  else if (filter === 'lost') mongoFilter.status = { $in: ['lost', 'booked_from_another_company'] };
-  else if (filter === 'reactivated') {
-    mongoFilter['reactivation.isReactivated'] = true;
+  if (isWorkingProgressFilter(filter)) {
+    const mongoFilter = { ...buildLeadSearchFilter(search), status: 'working_progress' };
+    applyCreatedAtRange(mongoFilter, query);
+    applyListStatusBucket(mongoFilter, query.listStatus);
+    return mongoFilter;
+  }
+  if (filter === 'lost') {
+    const mongoFilter = {
+      ...buildLeadSearchFilter(search),
+      status: { $in: ['lost', 'booked_from_another_company'] },
+    };
+    applyCreatedAtRange(mongoFilter, query);
+    applyListStatusBucket(mongoFilter, query.listStatus);
+    return mongoFilter;
+  }
+  if (filter === 'reactivated') {
+    const mongoFilter = { ...buildLeadSearchFilter(search), 'reactivation.isReactivated': true };
     applyReactivationQueryFilters(mongoFilter, query);
-  } else if (filter === 'hot') {
-    mongoFilter.isHot = true;
-    mongoFilter.status = { $nin: ['converted', 'lost', 'booked_from_another_company'] };
-  } else if (filter === 'returned') {
-    mongoFilter.assignedTo = null;
-    mongoFilter.assignmentAcceptance = 'expired';
-  } else if (!filter || filter === 'all') {
-    if (status) mongoFilter.status = status;
-    if (destination) mongoFilter.destination = destination;
-    if (priority === 'hot') mongoFilter.isHot = true;
-    else if (priority) mongoFilter.priority = priority;
+    applyCreatedAtRange(mongoFilter, query);
+    applyListStatusBucket(mongoFilter, query.listStatus);
+    return mongoFilter;
   }
 
-  return mongoFilter;
+  return buildLeadListFilter(query, options);
+}
+
+/** Accepts only a well-formed Mongo ObjectId string — an untrusted query param must never
+ * reach a raw Mongo filter unvalidated (a malformed value would otherwise throw a cast error). */
+function parseValidObjectId(value) {
+  if (!value) return null;
+  const raw = String(value).trim();
+  return mongoose.Types.ObjectId.isValid(raw) ? raw : null;
 }
 
 function buildExecutiveLeadFilter(filterKey, query = {}) {
@@ -193,12 +214,23 @@ function buildExecutiveLeadFilter(filterKey, query = {}) {
 async function findManagerLeadsPaginated(query = {}, options = {}) {
   const { page, limit, skip } = parsePagination(query);
   const sort = parseSort(query, { createdAt: -1 });
-  const filter = withActiveLead(withBranch(buildManagerLeadFilter(query), options.branchId));
-  applyCreatedAtRange(filter, query);
-  applyListStatusBucket(filter, query.listStatus);
+
+  // Sales Manager's "All Leads" Branch filter is a read-only widening of this list only.
+  // Read from `leadBranchId`, NOT `branchId` — the generic `branchId` query param is
+  // inspected by the auth middleware (req.branchId resolution) for org-wide branch
+  // switching, and a non-org-wide role sending a mismatched `branchId` gets a 403 before
+  // this code ever runs. This dedicated param avoids that collision entirely, and never
+  // overwrites options.branchId (req.branchId) — every other manager endpoint (assign,
+  // quotations, dashboard, notifications, reports...) stays scoped to their own branch
+  // exactly as before. No branch picked -> falls back to their own branch, same as today.
+  const requestedBranchId = parseValidObjectId(query.leadBranchId);
+  const effectiveBranchId = requestedBranchId || options.branchId;
+
+  const built = await buildManagerLeadFilter(query, { branchId: effectiveBranchId });
+  const filter = withActiveLead(withBranch(built, effectiveBranchId));
 
   if (wantsPackageSharedLeads(query)) {
-    const ids = await findPackageSharedLeadIds({ branchId: options.branchId });
+    const ids = await findPackageSharedLeadIds({ branchId: effectiveBranchId });
     filter._id = { $in: ids.length ? ids : [] };
   }
 

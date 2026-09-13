@@ -11,6 +11,7 @@ import { useLeadReactivate } from '../../hooks/useLeadReactivate';
 import { TooltipProvider } from '../ui/tooltip';
 import { createColumnHelper } from '@tanstack/react-table';
 import { useRoleLeadsQuery } from '../../hooks/useRoleLeadsQuery';
+import { useLeadsQuery } from '../../features/leads/hooks/useLeadsQuery';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import PageHeader from '../ui/PageHeader';
 import { DEFAULT_PAGE_SIZE } from '../ui/TablePagination';
@@ -18,7 +19,10 @@ import VirtualizedRoleTable from '../ui/VirtualizedRoleTable';
 import PriorityBadge from './PriorityBadge';
 import ManagerLeadKpiStrip from './ManagerLeadKpiStrip';
 import ManagerPipelineCard from './ManagerPipelineCard';
-import ExecutiveLeadsFilterBar from '../sales-executive/ExecutiveLeadsFilterBar';
+import LeadFilterBar from '../leads/LeadFilterBar';
+import { emptyFilters } from '../leads/constants';
+import { countActiveFilters } from '../leads/leadFilters';
+import { applyPeriodPreset } from '../../lib/periodFilters';
 import {
   LeadIdPill,
   SourceBadge,
@@ -55,13 +59,20 @@ export default function TeamLeadsPage() {
   const queryClient = useQueryClient();
   const { filter = 'all' } = useParams();
   const [searchParams] = useSearchParams();
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
-  const [destinationFilter, setDestinationFilter] = useState('');
-  const [priorityFilter, setPriorityFilter] = useState('');
+  const [bucketSearch, setBucketSearch] = useState('');
+  const [filters, setFilters] = useState(() => ({
+    ...emptyFilters,
+    status: searchParams.get('status') || '',
+    search: searchParams.get('search') || '',
+  }));
+  const [appliedFilters, setAppliedFilters] = useState(() => ({
+    ...emptyFilters,
+    status: searchParams.get('status') || '',
+    search: searchParams.get('search') || '',
+  }));
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const { dateFrom, dateTo, setPeriod } = useUrlPeriodFilter();
-  const debouncedSearch = useDebouncedValue(search, 350);
+  const debouncedBucketSearch = useDebouncedValue(bucketSearch, 350);
   const [assignLead, setAssignLead] = useState(null);
   const [reactivateLead, setReactivateLead] = useState(null);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: DEFAULT_PAGE_SIZE });
@@ -71,18 +82,39 @@ export default function TeamLeadsPage() {
   const isLostView = filter === 'lost';
   const isAllView = filter === 'all';
 
-  const { data, isLoading } = useRoleLeadsQuery({
+  // "All Leads" gets the same rich filter set (and the same /sales-manager/leads endpoint
+  // param handling) as Admin's Lead Management — see useLeadsQuery/buildLeadListFilter.
+  // Branch is sent as `leadBranchId`, NOT `branchId`: the generic `branchId` query param is
+  // inspected by the auth middleware for org-wide branch-switching and would 403 a Sales
+  // Manager (a non-org-wide role) the moment they pick any branch other than their own. This
+  // list-scoped rename keeps that org-wide mechanism completely untouched.
+  const allLeadsFilters = useMemo(() => {
+    const { branchId, ...rest } = appliedFilters;
+    return branchId ? { ...rest, leadBranchId: branchId } : rest;
+  }, [appliedFilters]);
+
+  const allLeadsQuery = useLeadsQuery({
+    filters: allLeadsFilters,
+    page: pagination.pageIndex + 1,
+    limit: pagination.pageSize,
+    endpoint: '/sales-manager/leads',
+    enabled: isAllView,
+  });
+
+  // Other buckets (unassigned/assigned/hot/lost/reactivated/returned/working-progress) keep
+  // their existing simple search + period filtering, unchanged.
+  const bucketLeadsQuery = useRoleLeadsQuery({
     endpoint: '/sales-manager/leads',
     filter,
-    search: debouncedSearch,
-    status: isAllView ? statusFilter : '',
-    destination: isAllView ? destinationFilter : '',
-    priority: isAllView ? priorityFilter : '',
+    search: debouncedBucketSearch,
     dateFrom,
     dateTo,
     page: pagination.pageIndex + 1,
     limit: pagination.pageSize,
+    enabled: !isAllView,
   });
+
+  const { data, isLoading } = isAllView ? allLeadsQuery : bucketLeadsQuery;
 
   const leads = data?.data ?? [];
   const total = data?.pagination?.total ?? 0;
@@ -90,14 +122,33 @@ export default function TeamLeadsPage() {
 
   const fetchLeads = () => queryClient.invalidateQueries({ queryKey: ['leads', '/sales-manager/leads'] });
 
+  // Deep links into this page (KPI cards / command bar) carry ?status= / ?search=
   useEffect(() => {
-    const nextStatus = searchParams.get('status') || '';
-    setStatusFilter(nextStatus);
+    const status = searchParams.get('status') || '';
+    const search = searchParams.get('search') || '';
+    setFilters((f) => ({ ...f, status, search }));
+    setAppliedFilters((f) => ({ ...f, status, search }));
   }, [searchParams]);
 
   useEffect(() => {
     setPagination((p) => ({ ...p, pageIndex: 0 }));
-  }, [filter, debouncedSearch, statusFilter, destinationFilter, priorityFilter, dateFrom, dateTo]);
+  }, [filter, debouncedBucketSearch, appliedFilters, dateFrom, dateTo]);
+
+  const handleApply = () => setAppliedFilters({ ...filters });
+  const handleReset = () => {
+    const base = { ...emptyFilters };
+    setFilters(base);
+    setAppliedFilters(base);
+  };
+  const handlePeriodSelect = (key) => {
+    const next = { ...filters, ...applyPeriodPreset(key) };
+    setFilters(next);
+    setAppliedFilters(next);
+  };
+  const handleQuickFilter = (next) => {
+    setFilters(next);
+    setAppliedFilters(next);
+  };
 
   const { assignees, assigneesLoading, handleAssign, assignConfirmDialog } = useLeadAssign({
     onAssigned: () => {
@@ -258,18 +309,14 @@ export default function TeamLeadsPage() {
             <ManagerPipelineCard />
           </div>
 
-          <ExecutiveLeadsFilterBar
-            search={search}
-            onSearchChange={setSearch}
-            statusFilter={statusFilter}
-            onStatusChange={setStatusFilter}
-            destinationFilter={destinationFilter}
-            onDestinationChange={setDestinationFilter}
-            priorityFilter={priorityFilter}
-            onPriorityChange={setPriorityFilter}
-            dateFrom={dateFrom}
-            dateTo={dateTo}
-            onPeriodSelect={setPeriod}
+          <LeadFilterBar
+            filters={filters}
+            onChange={setFilters}
+            onApply={handleApply}
+            onReset={handleReset}
+            onPeriodSelect={handlePeriodSelect}
+            onQuickFilter={handleQuickFilter}
+            activeCount={countActiveFilters(appliedFilters)}
           />
         </>
       ) : (
@@ -304,8 +351,8 @@ export default function TeamLeadsPage() {
           <div className="relative max-w-md space-y-3">
             <PeriodPresetChips dateFrom={dateFrom} dateTo={dateTo} onSelect={setPeriod} />
             <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={bucketSearch}
+              onChange={(e) => setBucketSearch(e.target.value)}
               placeholder="Search leads…"
               className="w-full px-4 py-2.5 rounded-xl border border-violet-500/20 bg-surface/80 backdrop-blur-xl text-sm outline-none focus:ring-2 focus:ring-violet-500/40 shadow-sm"
             />

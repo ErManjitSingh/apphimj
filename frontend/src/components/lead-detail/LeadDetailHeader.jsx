@@ -31,6 +31,7 @@ import { toast } from '../../context/ToastContext';
 import { beginLeadCall } from '../../lib/callSession';
 import { cn } from '../../lib/utils';
 import RepeatedLeadBadge from '../leads/RepeatedLeadBadge';
+import { useAuth } from '../../context/AuthContext';
 
 function formatTravelRange(lead) {
   const start = lead?.travelDate || lead?.travelStartDate;
@@ -154,6 +155,11 @@ export default function LeadDetailHeader({
   paymentSummary: summaryProp,
   receiptEndpoint,
 }) {
+  const { user } = useAuth();
+  // Lead Source is hidden from Sales Executive and Team Leader only — Admin/Sales Manager
+  // still see it. The underlying lead.source data/API is untouched; this only skips
+  // rendering the pill.
+  const canSeeSource = !['sales_executive', 'team_leader'].includes(user?.role);
   const status = normalizeLeadStatus(lead.status);
   const scores = computeLeadScores(lead);
   const listDisplay = getLeadListStatusDisplay(lead);
@@ -321,7 +327,7 @@ export default function LeadDetailHeader({
 
           {/* Meta pills */}
           <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-            <MetaPill label="Source" value={formatSource(lead)} />
+            {canSeeSource && <MetaPill label="Source" value={formatSource(lead)} />}
             <MetaPill
               label="Created"
               value={
