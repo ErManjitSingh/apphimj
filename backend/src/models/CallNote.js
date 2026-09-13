@@ -59,6 +59,8 @@ const OUTCOME_BUCKETS = {
   budget_issues: 'connected',
   booked_elsewhere: 'connected',
   cnp_same_day: 'no_answer',
+  cnp_for_same_day: 'no_answer',
+  cnp: 'no_answer',
   busy: 'no_answer',
   no_answer: 'no_answer',
   invalid_number: 'failed',
