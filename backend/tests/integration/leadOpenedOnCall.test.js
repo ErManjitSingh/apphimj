@@ -184,44 +184,27 @@ describe('Lead "Opened" state — direct call must count as opening the lead', (
   });
 });
 
-describe('Admin phone-number visibility follows the Opened state', () => {
-  test('Admin sees the phone masked in the lead list until the lead is opened', async () => {
+describe('Admin phone-number visibility', () => {
+  test('Admin always sees the real phone in the lead list (masking disabled)', async () => {
     const { token: adminToken } = await makeAuthedUser('admin');
     const { user: exec } = await makeAuthedUser('sales_executive');
-    const lead = await makeLead({ assignedTo: exec._id });
+    const lead = await makeLead({ assignedTo: exec._id, phone: '9123456789' });
 
     const res = await getAsAdmin(adminToken, '/api/leads');
     expect(res.status).toBe(200);
     const row = res.body.data.find((l) => String(l._id) === String(lead._id));
-    expect(row.phone).toBe('XXXX');
-    expect(row.contactMasked).toBe(true);
-  });
-
-  test('Admin sees the real phone number in the lead list once opened', async () => {
-    const { token: adminToken } = await makeAuthedUser('admin');
-    const { user: exec, token: execToken } = await makeAuthedUser('sales_executive');
-    const lead = await makeLead({ assignedTo: exec._id, phone: '9123456780' });
-
-    await postCallAccess(execToken, lead._id);
-
-    const res = await getAsAdmin(adminToken, '/api/leads');
-    const row = res.body.data.find((l) => String(l._id) === String(lead._id));
-    expect(row.phone).toBe('9123456780');
+    expect(row.phone).toBe('9123456789');
     expect(row.contactMasked).toBeUndefined();
   });
 
-  test('Admin lead-detail view is masked before opening and revealed after a direct call opens it', async () => {
+  test('Admin lead-detail always shows the real phone', async () => {
     const { token: adminToken } = await makeAuthedUser('admin');
-    const { user: exec, token: execToken } = await makeAuthedUser('sales_executive');
+    const { user: exec } = await makeAuthedUser('sales_executive');
     const lead = await makeLead({ assignedTo: exec._id, phone: '9123456781' });
 
-    const before = await getAsAdmin(adminToken, `/api/leads/${lead._id}`);
-    expect(before.body.phone).toBe('XXXX');
-
-    await postCallNote(execToken, lead._id, { category: 'warm', outcome: 'discussed_package' });
-
-    const after = await getAsAdmin(adminToken, `/api/leads/${lead._id}`);
-    expect(after.body.phone).toBe('9123456781');
+    const res = await getAsAdmin(adminToken, `/api/leads/${lead._id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.phone).toBe('9123456781');
   });
 
   test('non-admin roles are never phone-masked by this feature', async () => {

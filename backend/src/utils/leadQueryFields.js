@@ -80,34 +80,17 @@ function withManagementPopulate(basePopulate, includeManagementFields) {
   return includeManagementFields ? [...basePopulate, ...LEAD_MANAGEMENT_ONLY_POPULATE] : basePopulate;
 }
 
-const PHONE_PROTECTED_FIELDS = ['phone', 'alternatePhone', 'whatsapp'];
-
 /**
- * Admin cannot see a lead's phone/alternatePhone/whatsapp until the assigned executive has
- * accessed it at least once — i.e. `firstOpenedAt` is set (see
- * leadExecutiveStallService.markLeadViewedByExecutive, which both "open lead detail" and a
- * direct Call action stamp). Requires the lead to have been queried with
- * includeManagementFields so firstOpenedAt is actually present to check — every admin lead
- * query already does this (see canViewLeadOpenInfo). Only applies to role 'admin'; every other
- * role's phone visibility is unchanged. Uses the same masked shape (XXXX + contactMasked) as
- * roleScopedRepository.maskReturnedLeadForExecutive so any UI already handling that shape works.
+ * Previously masked admin phones until firstOpenedAt. Disabled — admin always sees full
+ * phone/alternatePhone/whatsapp. Keep helpers as no-ops so existing call sites stay stable.
  */
 function maskLeadPhoneUntilOpened(lead) {
-  if (!lead || lead.firstOpenedAt) return lead;
-  const masked = { ...lead };
-  PHONE_PROTECTED_FIELDS.forEach((field) => {
-    if (masked[field]) masked[field] = 'XXXX';
-  });
-  masked.contactMasked = true;
-  return masked;
+  return lead;
 }
 
-/** Apply maskLeadPhoneUntilOpened to a single lead or an array of leads, admin role only. */
-function applyAdminPhoneVisibility(leadOrList, role) {
-  if (role !== 'admin') return leadOrList;
-  return Array.isArray(leadOrList)
-    ? leadOrList.map(maskLeadPhoneUntilOpened)
-    : maskLeadPhoneUntilOpened(leadOrList);
+/** No-op: admin (and all roles) receive full contact fields. */
+function applyAdminPhoneVisibility(leadOrList, _role) {
+  return leadOrList;
 }
 
 const LEAD_DETAIL_POPULATE = [
