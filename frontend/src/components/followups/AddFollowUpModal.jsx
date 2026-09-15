@@ -68,8 +68,8 @@ export default function AddFollowUpModal({
         lead: editData.lead?._id || fixedLeadId || '',
         type: editData.type || 'call',
         category: cat,
-        date: localDate,
-        time: localTime,
+        date: cat === 'converted' ? '' : localDate,
+        time: cat === 'converted' ? '' : localTime,
         priority: editData.priority || 'medium',
         remarks: editData.notes || '',
         outcome:
@@ -102,14 +102,20 @@ export default function AddFollowUpModal({
       outcome: nextCategory === 'converted' ? 'converted' : '',
       totalPackageCost: '',
       tokenAmount: '',
+      // Converted has no next-follow-up — clear any Date/Time picked under Warm/Hot/Cold so a
+      // stale value never gets submitted once the status is switched to Converted.
+      date: nextCategory === 'converted' ? '' : prev.date || new Date().toISOString().split('T')[0],
+      time: nextCategory === 'converted' ? '' : (prev.time || '10:00'),
     }));
   };
+
+  const isConverted = form.category === 'converted';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    if (!form.date) {
+    if (!isConverted && !form.date) {
       setError('Please select follow-up date');
       return;
     }
@@ -161,7 +167,11 @@ export default function AddFollowUpModal({
       await onSubmit({
         ...form,
         lead: fixedLeadId || form.lead,
-        scheduledAt: `${form.date}T${form.time}:00`,
+        // Converted is no longer in the follow-up lifecycle — never send an active
+        // next-follow-up date/time, even a stale one picked before switching to Converted.
+        date: isConverted ? null : form.date,
+        time: isConverted ? null : form.time,
+        scheduledAt: isConverted ? null : `${form.date}T${form.time}:00`,
         notes: remarks,
         category: form.category,
         coldReason: form.category === 'cold' ? form.outcome : undefined,
@@ -350,16 +360,18 @@ export default function AddFollowUpModal({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs font-medium text-content-muted mb-1 block">Date *</label>
-            <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required className="input-premium w-full h-11 rounded-xl" />
+        {!isConverted && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-content-muted mb-1 block">Date *</label>
+              <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required className="input-premium w-full h-11 rounded-xl" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-content-muted mb-1 block">Time *</label>
+              <input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} required className="input-premium w-full h-11 rounded-xl" />
+            </div>
           </div>
-          <div>
-            <label className="text-xs font-medium text-content-muted mb-1 block">Time *</label>
-            <input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} required className="input-premium w-full h-11 rounded-xl" />
-          </div>
-        </div>
+        )}
 
         <div>
           <label className="text-xs font-medium text-content-muted mb-1 block">

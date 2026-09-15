@@ -184,8 +184,12 @@ describe('Lead "Opened" state — direct call must count as opening the lead', (
   });
 });
 
+// NOTE: phone visibility is no longer gated on "Opened" (firstOpenedAt) at all — see
+// tests/integration/leadPhoneVisibility.test.js for the current call-gated rule. The two tests
+// below only confirm that opening the lead / hitting the pre-dial call-access endpoint, on their
+// own with no CallNote ever recorded, do NOT unlock the phone — the "never" half of that rule.
 describe('Admin phone-number visibility follows the Opened state', () => {
-  test('Admin sees the phone masked in the lead list until the lead is opened', async () => {
+  test('Admin sees the phone masked in the lead list — merely being assigned is not enough', async () => {
     const { token: adminToken } = await makeAuthedUser('admin');
     const { user: exec } = await makeAuthedUser('sales_executive');
     const lead = await makeLead({ assignedTo: exec._id });
@@ -194,10 +198,10 @@ describe('Admin phone-number visibility follows the Opened state', () => {
     expect(res.status).toBe(200);
     const row = res.body.data.find((l) => String(l._id) === String(lead._id));
     expect(row.phone).toBe('XXXX');
-    expect(row.contactMasked).toBe(true);
+    expect(row.phoneMasked).toBe(true);
   });
 
-  test('Admin sees the real phone number in the lead list once opened', async () => {
+  test('opening the lead via the pre-dial call-access endpoint alone (no call recorded) does NOT unlock the phone for Admin', async () => {
     const { token: adminToken } = await makeAuthedUser('admin');
     const { user: exec, token: execToken } = await makeAuthedUser('sales_executive');
     const lead = await makeLead({ assignedTo: exec._id, phone: '9123456780' });
@@ -206,8 +210,8 @@ describe('Admin phone-number visibility follows the Opened state', () => {
 
     const res = await getAsAdmin(adminToken, '/api/leads');
     const row = res.body.data.find((l) => String(l._id) === String(lead._id));
-    expect(row.phone).toBe('9123456780');
-    expect(row.contactMasked).toBeUndefined();
+    expect(row.phone).toBe('XXXX');
+    expect(row.phoneMasked).toBe(true);
   });
 
   test('Admin lead-detail view is masked before opening and revealed after a direct call opens it', async () => {

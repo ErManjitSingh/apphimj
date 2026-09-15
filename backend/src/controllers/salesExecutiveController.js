@@ -47,6 +47,7 @@ const {
 } = require('../utils/queryHelpers');
 const { createFollowUpForLead, updateFollowUpRecord } = require('../services/followUpService');
 const { markLeadViewedByExecutive } = require('../services/leadExecutiveStallService');
+const { applyPhoneVisibilityGate } = require('../utils/leadPhoneVisibility');
 const { logExecutiveActivity } = require('../services/executiveActivityService');
 const {
   getExecutiveLeadIds,
@@ -191,15 +192,18 @@ const getLeadDetail = asyncHandler(async (req, res) => {
   }).catch(() => {});
 
   const paymentSummary = await getLeadPaymentSummary(lead._id);
+  // Phone Number Visibility / Call-Gating: masked until the assigned executive has logged a
+  // first call for this lead — see utils/leadPhoneVisibility.
+  const visibleLead = await applyPhoneVisibilityGate(enrichLead(lead));
 
   const includeRelated = req.query.includeRelated === '1' || req.query.includeRelated === 'true';
   if (!includeRelated) {
-    res.json({ ...enrichLead(lead), paymentSummary });
+    res.json({ ...visibleLead, paymentSummary });
     return;
   }
 
   const related = await loadLeadRelated(lead._id, { branchId: req.branchId });
-  res.json({ ...enrichLead(lead), ...related, paymentSummary });
+  res.json({ ...visibleLead, ...related, paymentSummary });
 });
 
 /**
@@ -1081,7 +1085,7 @@ const listCustomers = asyncHandler(async (req, res) => {
   const { findPackageSharedLeadIds } = require('../utils/packageSharedLeads');
   const sharedIds = await findPackageSharedLeadIds({ branchId: req.branchId });
 
-  const leads = await Lead.find({
+  let leads = await Lead.find({
     assignedTo: req.user._id,
     ...(req.branchId ? { branchId: req.branchId } : {}),
     $or: [
@@ -1091,9 +1095,14 @@ const listCustomers = asyncHandler(async (req, res) => {
       ...(sharedIds.length ? [{ _id: { $in: sharedIds } }] : []),
     ],
   })
-    .select('name email phone destination budget isRepeatCustomer status')
+    .select('name email phone destination budget isRepeatCustomer status assignedTo')
     .sort({ updatedAt: -1 })
     .lean();
+
+  // Same call-gated phone rule as every other lead surface (utils/leadPhoneVisibility.js) — a
+  // repeat/converted customer the executive was never actually assigned to call first is not
+  // exempt just because this is the "Customers" quick view instead of the main Leads List.
+  leads = await applyPhoneVisibilityGate(leads);
 
   res.json(
     leads.map((l) => ({
@@ -1101,6 +1110,7 @@ const listCustomers = asyncHandler(async (req, res) => {
       name: l.name,
       email: l.email,
       phone: l.phone,
+      phoneMasked: l.phoneMasked,
       destination: l.destination,
       trips: l.isRepeatCustomer ? 2 : 1,
       totalSpent: l.budget,

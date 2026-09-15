@@ -104,6 +104,14 @@ export function dialLeadPhone(phone) {
  * only after the call is logged. Best-effort: a slow/failed request never blocks the call itself
  * (see CALL_ACCESS_TIMEOUT_MS) — addCallNote's own safety net still guarantees Opened gets set
  * once the call is captured, so this never regresses to "call happened, lead still Not Opened."
+ *
+ * This is also the ONE sanctioned place the real phone number is allowed to reach the browser
+ * before the first qualifying call: Lead list/detail responses mask it (`phone: 'XXXX'`, see
+ * backend utils/leadPhoneVisibility) until a CallNote exists, so there is no other number to
+ * dial with. The backend re-checks `assignedTo === req.user._id` on this route independently of
+ * whatever the client already has in state, so only the actually-assigned executive — never an
+ * Admin, who has no route to this endpoint at all — can ever obtain it, and only at the moment
+ * of placing the call.
  */
 async function authorizeLeadCallAccess(leadId) {
   if (!leadId) return null;
@@ -117,11 +125,17 @@ async function authorizeLeadCallAccess(leadId) {
 
 /**
  * Start tracking + open native dialer.
+ * `phone` from the caller's own state may be masked ('XXXX') pre-first-call — the real number
+ * for dialing always comes from authorizeLeadCallAccess's response instead (see its doc comment
+ * above). Falls back to the passed-in `phone` only if that request is slow/unavailable.
  * Returns the session for callers that need it.
  */
 export async function beginLeadCall({ leadId, leadName, phone }) {
-  const session = startCallSession({ leadId, leadName, phone });
-  await withTimeout(authorizeLeadCallAccess(leadId), CALL_ACCESS_TIMEOUT_MS);
-  dialLeadPhone(phone);
+  const access = await withTimeout(authorizeLeadCallAccess(leadId), CALL_ACCESS_TIMEOUT_MS);
+  const dialPhone = access?.phone || phone;
+  const session = startCallSession({ leadId, leadName, phone: dialPhone });
+  if (dialPhone && dialPhone !== 'XXXX') {
+    dialLeadPhone(dialPhone);
+  }
   return session;
 }

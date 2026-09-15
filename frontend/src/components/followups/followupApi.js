@@ -12,11 +12,15 @@ export async function updateExecutiveFollowUp(id, payload) {
 }
 
 export function buildFollowUpPayload(form) {
+  const scheduledDate = form.scheduledAt ? new Date(form.scheduledAt) : null;
   return {
     lead: form.lead,
     type: form.type || 'call',
     category: form.category || 'warm',
-    scheduledAt: new Date(form.scheduledAt).toISOString(),
+    // Converted sends no next-follow-up date/time — the backend logs it as an already-resolved
+    // historical entry instead of an active follow-up. See followUpHelpers.normalizeFollowUpPayload.
+    scheduledAt:
+      scheduledDate && !Number.isNaN(scheduledDate.getTime()) ? scheduledDate.toISOString() : null,
     notes: form.notes || form.remarks || '',
     priority: form.priority || 'medium',
     outcome: form.outcome || '',

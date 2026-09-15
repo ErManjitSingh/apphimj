@@ -149,6 +149,21 @@ async function onLeadConverted(lead, actor, options = {}) {
     await Lead.findByIdAndUpdate(lead._id, { convertedAt });
   }
 
+  // Converted leaves the follow-up lifecycle — any Warm/Hot/Cold next-follow-up scheduled before
+  // conversion must stop being active. Historical (completed/missed) follow-ups are untouched.
+  const { cancelPendingFollowUpsForLead, syncLeadFollowUpDates } = require('../utils/followUpHelpers');
+  await cancelPendingFollowUpsForLead(lead._id);
+  if (lead.coldCallPending || lead.coldCallReminderAt || lead.coldCallFollowUpId) {
+    await Lead.findByIdAndUpdate(lead._id, {
+      $set: { coldCallPending: false },
+      $unset: { coldCallReminderAt: '', coldCallFollowUpId: '' },
+    });
+    lead.coldCallPending = false;
+    lead.coldCallReminderAt = undefined;
+    lead.coldCallFollowUpId = undefined;
+  }
+  await syncLeadFollowUpDates(lead._id);
+
   // Same "explicit total wins" preference as ensurePaymentForConversion — keeps lead.budget in
   // sync with what the closer actually entered instead of a stale/derived quotation number.
   const explicitTotal = Number(options.totalPackageCost);

@@ -19,6 +19,43 @@ const { getMonthlyTargets, buildTargetProgress } = require('./salesTargetService
 const { withBranch } = require('../utils/branchScope');
 const { sumMarketingSpendInRange } = require('./marketingSpendService');
 const { rollupCityStatsIntoStates, resolveDestinationGroupValues } = require('../utils/destinationHierarchy');
+const { attachPhoneVisibility, maskLeadPhone } = require('../utils/leadPhoneVisibility');
+
+/**
+ * Apply the SAME call-gated phone visibility rule (see utils/leadPhoneVisibility.js) to a batch
+ * of lean lead docs before they leave a dashboard widget — one CallNote aggregation for the
+ * whole batch, never per-lead. Admin/Sales-Executive dashboards must not leak a raw phone number
+ * any earlier/differently than the Leads List / Lead Detail APIs already gate it.
+ */
+async function maskDashboardLeads(leads = []) {
+  if (!leads.length) return leads;
+  await attachPhoneVisibility(leads);
+  // Mutate each lead in place (rather than returning a new masked array) — these lean docs are
+  // `const`-destructured from a single big Promise.all and get passed through further
+  // .map(enrichLead)/manual-shape calls afterward by the SAME array reference, so the mask must
+  // be visible to those later reads, not just to whatever this function itself returns.
+  leads.forEach((lead) => {
+    const masked = maskLeadPhone(lead);
+    if (masked !== lead) Object.assign(lead, masked);
+  });
+  return leads;
+}
+
+/**
+ * Same gate, applied to the populated `.lead` sub-document of a list of parent docs (e.g.
+ * FollowUp.find(...).populate('lead', '...')) instead of to the lead docs themselves. The
+ * populate select must include `assignedTo` — attachPhoneVisibility uses it as the CallNote
+ * lookup key — same requirement as any other lead projection this gate is applied to.
+ */
+async function maskDashboardLeadRefs(items = [], leadKey = 'lead') {
+  const leads = items.map((item) => item[leadKey]).filter(Boolean);
+  if (!leads.length) return items;
+  await attachPhoneVisibility(leads);
+  items.forEach((item) => {
+    if (item[leadKey]) item[leadKey] = maskLeadPhone(item[leadKey]);
+  });
+  return items;
+}
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DASHBOARD_NEW_LEADS_LIMIT = 5;
@@ -603,7 +640,7 @@ async function buildAdminDashboard(options = {}) {
       .limit(DASHBOARD_NEW_LEADS_LIMIT)
       .lean(),
     FollowUp.find(withBranch({ status: 'pending', scheduledAt: { $gte: new Date() } }, branchId))
-      .populate('lead', 'name phone destination')
+      .populate('lead', 'name phone destination assignedTo')
       .sort({ scheduledAt: 1 })
       .limit(5)
       .lean(),
@@ -1160,10 +1197,18 @@ async function buildAdminDashboard(options = {}) {
   const todayFollowUps = await FollowUp.find(withBranch({
     scheduledAt: { $gte: todayStart, $lte: todayEnd },
   }, branchId))
-    .populate('lead', 'name phone')
+    .populate('lead', 'name phone assignedTo')
     .sort({ scheduledAt: 1 })
     .limit(10)
     .lean();
+  // Same call-gated phone rule as the Leads List/Detail APIs — a lead surfaced in a dashboard
+  // widget must not show its real number any earlier than anywhere else (see
+  // utils/leadPhoneVisibility.js). Batched: one CallNote aggregation for this whole widget.
+  await maskDashboardLeadRefs(todayFollowUps);
+  await maskDashboardLeadRefs(upcomingFollowups);
+  await maskDashboardLeads(newLeadsRaw);
+  await maskDashboardLeads(unassignedLeadsRaw);
+  await maskDashboardLeads(recentLeadsRaw);
 
   const sourceFilteredLeadSourceAnalytics = (periodSourceAgg.length ? periodSourceAgg : leadsBySource).map((s) => ({
     name: s._id || 'Unknown',
@@ -1213,6 +1258,7 @@ async function buildAdminDashboard(options = {}) {
       _id: f._id,
       customerName: f.lead?.name,
       phone: f.lead?.phone,
+      phoneMasked: f.lead?.phoneMasked,
       scheduledAt: f.scheduledAt,
       status: f.status,
     })),
@@ -1690,12 +1736,17 @@ async function buildExecutiveDashboard(userId, options = {}) {
       coldCallPending: true,
       status: { $nin: ['lost', 'booked_from_another_company', 'converted'] },
     })
-      .select('leadId name phone destination coldReason coldCallReminderAt coldCallFollowUpId')
+      .select('leadId name phone destination assignedTo coldReason coldCallReminderAt coldCallFollowUpId')
       .sort({ coldCallReminderAt: 1 })
       .limit(20)
       .lean(),
     buildDestinationWiseStats(leadScope, destinationPeriod, destinationRange),
   ]);
+
+  // Cold Call Reminders is the one widget in this dashboard whose final response shape still
+  // carries `phone` — gate it the same way every other lead-phone surface is gated (topLeads/
+  // recentLeads below already drop `phone` entirely before returning, so they need no change).
+  await maskDashboardLeads(coldCallRemindersRaw);
 
   const statusCounts = Object.fromEntries(statusAgg.map((s) => [s._id, s.count]));
   const statusDist = buildExclusiveStatusDistribution(statusCounts);
@@ -1862,6 +1913,7 @@ async function buildExecutiveDashboard(userId, options = {}) {
       leadId: lead.leadId,
       name: lead.name,
       phone: lead.phone,
+      phoneMasked: lead.phoneMasked,
       destination: lead.destination,
       coldReason: lead.coldReason,
       scheduledAt: lead.coldCallReminderAt,

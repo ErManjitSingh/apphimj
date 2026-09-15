@@ -33,6 +33,7 @@ const {
   wantsPackageSharedLeads,
 } = require('../utils/packageSharedLeads');
 const { attachFirstCall } = require('../utils/firstCallInfo');
+const { applyPhoneVisibilityGate } = require('../utils/leadPhoneVisibility');
 
 const LIST_PAGINATION = { defaultLimit: 20, maxLimit: 200 };
 
@@ -390,6 +391,11 @@ async function findExecutiveLeadsPaginated(userId, query = {}, options = {}) {
     const { attachPaymentSummariesToLeads } = require('../services/paymentReceiptService');
     enriched = await attachPaymentSummariesToLeads(enriched);
   }
+  // Phone Number Visibility / Call-Gating: the Sales Executive doesn't see the real number on
+  // their own leads until they've logged a first call for it either — same gate as Admin (see
+  // utils/leadPhoneVisibility). Already-masked returned-to-pool rows (assignedTo cleared above)
+  // are simply re-masked as a no-op.
+  enriched = await applyPhoneVisibilityGate(enriched);
 
   return paginatedResponse(enriched, {
     page,
