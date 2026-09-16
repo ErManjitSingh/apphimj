@@ -685,8 +685,8 @@ async function probePageTokenHealth() {
 function getDiagnostics() {
   const cfg = getConfig();
   const db = getDbStatus();
-  const primaryCallback = 'https://app.unotrips.com/api/facebook/webhook';
-  const altCallback = 'https://app.unotrips.com/api/webhooks/facebook';
+  const primaryCallback = 'http://localhost:5000/api/facebook/webhook';
+  const altCallback = 'http://localhost:5000/api/webhooks/facebook';
   const envIssues = [];
   if (!cfg.verifyToken) envIssues.push('FACEBOOK_VERIFY_TOKEN missing');
   if (!cfg.pageAccessToken) envIssues.push('FACEBOOK_PAGE_ACCESS_TOKEN missing');

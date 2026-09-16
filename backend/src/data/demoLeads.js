@@ -2,7 +2,7 @@
 const DEMO_LEADS = [
   {
     name: 'Rahul Sharma',
-    email: 'rahul.demo@unotrips.com',
+    email: 'rahul.demo@travelcrm.local',
     phone: '+9199001001',
     destination: 'Goa',
     city: 'Mumbai',
@@ -17,7 +17,7 @@ const DEMO_LEADS = [
   },
   {
     name: 'Priya Mehta',
-    email: 'priya.demo@unotrips.com',
+    email: 'priya.demo@travelcrm.local',
     phone: '+9199001002',
     destination: 'Kerala',
     city: 'Ahmedabad',
@@ -31,7 +31,7 @@ const DEMO_LEADS = [
   },
   {
     name: 'Amit Kumar',
-    email: 'amit.demo@unotrips.com',
+    email: 'amit.demo@travelcrm.local',
     phone: '+9199001003',
     destination: 'Dubai',
     city: 'Delhi',
@@ -46,7 +46,7 @@ const DEMO_LEADS = [
   },
   {
     name: 'Sneha Reddy',
-    email: 'sneha.demo@unotrips.com',
+    email: 'sneha.demo@travelcrm.local',
     phone: '+9199001004',
     destination: 'Thailand',
     city: 'Hyderabad',
@@ -60,7 +60,7 @@ const DEMO_LEADS = [
   },
   {
     name: 'Vikram Singh',
-    email: 'vikram.demo@unotrips.com',
+    email: 'vikram.demo@travelcrm.local',
     phone: '+9199001005',
     destination: 'Manali',
     city: 'Chandigarh',
@@ -75,7 +75,7 @@ const DEMO_LEADS = [
   },
   {
     name: 'Ananya Joshi',
-    email: 'ananya.demo@unotrips.com',
+    email: 'ananya.demo@travelcrm.local',
     phone: '+9199001006',
     destination: 'Maldives',
     city: 'Pune',
@@ -90,7 +90,7 @@ const DEMO_LEADS = [
   },
   {
     name: 'Karan Malhotra',
-    email: 'karan.demo@unotrips.com',
+    email: 'karan.demo@travelcrm.local',
     phone: '+9199001007',
     destination: 'Singapore',
     city: 'Bangalore',
@@ -105,7 +105,7 @@ const DEMO_LEADS = [
   },
   {
     name: 'Neha Gupta',
-    email: 'neha.demo@unotrips.com',
+    email: 'neha.demo@travelcrm.local',
     phone: '+9199001008',
     destination: 'Europe',
     city: 'Jaipur',
@@ -119,7 +119,7 @@ const DEMO_LEADS = [
   },
   {
     name: 'Rohit Verma',
-    email: 'rohit.demo@unotrips.com',
+    email: 'rohit.demo@travelcrm.local',
     phone: '+9199001009',
     destination: 'Goa',
     city: 'Kolkata',
@@ -133,7 +133,7 @@ const DEMO_LEADS = [
   },
   {
     name: 'TechCorp India Pvt Ltd',
-    email: 'corporate.demo@unotrips.com',
+    email: 'corporate.demo@travelcrm.local',
     phone: '+9199001010',
     destination: 'Dubai',
     city: 'Gurgaon',

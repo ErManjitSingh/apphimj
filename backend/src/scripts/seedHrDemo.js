@@ -21,7 +21,7 @@ const HrInterview = require('../models/hr/HrInterview');
 const HrPayrollRun = require('../models/hr/HrPayrollRun');
 
 const PASSWORD = process.env.SEED_PASSWORD || '123456';
-const DEMO_MARKER = 'hr.demo.rohit@unotrips.com';
+const DEMO_MARKER = 'hr.demo.rohit@travelcrm.local';
 
 function startOfDay(d = new Date()) {
   const x = new Date(d);
@@ -141,7 +141,7 @@ async function seedHrDemo() {
   if (!branch) throw new Error('No active branch found — run main seed first');
 
   const execRole = await Role.findOne({ slug: 'sales_executive' });
-  const hrAdmin = await User.findOne({ email: 'hr@unotrips.com' });
+  const hrAdmin = await User.findOne({ email: 'hr@example.com' });
 
   const deptMap = await mapDepartments();
   const desMap = await mapDesignations();
@@ -165,7 +165,7 @@ async function seedHrDemo() {
     {
       firstName: 'Priya',
       lastName: 'Sharma',
-      email: 'hr.demo.priya@unotrips.com',
+      email: 'hr.demo.priya@travelcrm.local',
       phone: '9876500002',
       department: 'Sales',
       designation: 'Team Leader',
@@ -179,7 +179,7 @@ async function seedHrDemo() {
     {
       firstName: 'Amit',
       lastName: 'Singh',
-      email: 'hr.demo.amit@unotrips.com',
+      email: 'hr.demo.amit@travelcrm.local',
       phone: '9876500003',
       department: 'Operations',
       designation: 'Operations Executive',
@@ -194,7 +194,7 @@ async function seedHrDemo() {
     {
       firstName: 'Sneha',
       lastName: 'Iyer',
-      email: 'hr.demo.sneha@unotrips.com',
+      email: 'hr.demo.sneha@travelcrm.local',
       phone: '9876500004',
       department: 'Accounts',
       designation: 'Accountant',
@@ -208,7 +208,7 @@ async function seedHrDemo() {
     {
       firstName: 'Ankit',
       lastName: 'Patel',
-      email: 'hr.demo.ankit@unotrips.com',
+      email: 'hr.demo.ankit@travelcrm.local',
       phone: '9876500005',
       department: 'IT',
       designation: 'Software Engineer',
@@ -222,7 +222,7 @@ async function seedHrDemo() {
     {
       firstName: 'Kavita',
       lastName: 'Rana',
-      email: 'hr.demo.kavita@unotrips.com',
+      email: 'hr.demo.kavita@travelcrm.local',
       phone: '9876500006',
       department: 'HR',
       designation: 'HR Executive',
@@ -236,7 +236,7 @@ async function seedHrDemo() {
     {
       firstName: 'Rajesh',
       lastName: 'Mehta',
-      email: 'hr.demo.rajesh@unotrips.com',
+      email: 'hr.demo.rajesh@travelcrm.local',
       phone: '9876500007',
       department: 'Sales',
       designation: 'Sales Manager',
@@ -250,7 +250,7 @@ async function seedHrDemo() {
     {
       firstName: 'Deepak',
       lastName: 'Verma',
-      email: 'hr.demo.deepak@unotrips.com',
+      email: 'hr.demo.deepak@travelcrm.local',
       phone: '9876500008',
       department: 'Operations',
       designation: 'Operations Manager',
@@ -306,8 +306,8 @@ async function seedHrDemo() {
   const byEmail = Object.fromEntries(employees.map((e) => [e.emp.email, e.emp]));
 
   // Reporting manager — Priya leads Rohit
-  if (byEmail[DEMO_MARKER] && byEmail['hr.demo.priya@unotrips.com']) {
-    byEmail[DEMO_MARKER].reportingManagerId = byEmail['hr.demo.priya@unotrips.com']._id;
+  if (byEmail[DEMO_MARKER] && byEmail['hr.demo.priya@travelcrm.local']) {
+    byEmail[DEMO_MARKER].reportingManagerId = byEmail['hr.demo.priya@travelcrm.local']._id;
     await byEmail[DEMO_MARKER].save();
   }
 
@@ -323,7 +323,7 @@ async function seedHrDemo() {
       status: 'pending',
     },
     {
-      email: 'hr.demo.sneha@unotrips.com',
+      email: 'hr.demo.sneha@travelcrm.local',
       leaveType: 'sick',
       fromDate: daysFromNow(1),
       toDate: daysFromNow(1),
@@ -332,7 +332,7 @@ async function seedHrDemo() {
       status: 'pending',
     },
     {
-      email: 'hr.demo.ankit@unotrips.com',
+      email: 'hr.demo.ankit@travelcrm.local',
       leaveType: 'earned',
       fromDate: daysFromNow(5),
       toDate: daysFromNow(7),
@@ -341,7 +341,7 @@ async function seedHrDemo() {
       status: 'pending',
     },
     {
-      email: 'hr.demo.amit@unotrips.com',
+      email: 'hr.demo.amit@travelcrm.local',
       leaveType: 'casual',
       fromDate: today,
       toDate: today,
@@ -350,7 +350,7 @@ async function seedHrDemo() {
       status: 'approved',
     },
     {
-      email: 'hr.demo.deepak@unotrips.com',
+      email: 'hr.demo.deepak@travelcrm.local',
       leaveType: 'earned',
       fromDate: today,
       toDate: daysFromNow(1),
@@ -408,7 +408,7 @@ async function seedHrDemo() {
       openings: 2,
       location: 'Shimla / Remote',
       employmentType: 'full_time',
-      description: 'React developer for UNO Trips CRM',
+      description: 'React developer for Travel CRM',
       status: 'open',
       createdBy: hrAdmin?._id,
     },
@@ -435,7 +435,7 @@ async function seedHrDemo() {
       job: jobFrontend,
       firstName: 'Arjun',
       lastName: 'Malhotra',
-      email: 'demo.candidate.arjun@unotrips.com',
+      email: 'demo.candidate.arjun@travelcrm.local',
       phone: '9876510001',
       stage: 'interview',
       round: 'Tech Round',
@@ -446,7 +446,7 @@ async function seedHrDemo() {
       job: jobSales,
       firstName: 'Neha',
       lastName: 'Gupta',
-      email: 'demo.candidate.neha@unotrips.com',
+      email: 'demo.candidate.neha@travelcrm.local',
       phone: '9876510002',
       stage: 'interview',
       round: 'HR Round',
@@ -457,7 +457,7 @@ async function seedHrDemo() {
       job: jobFrontend,
       firstName: 'Vikram',
       lastName: 'Joshi',
-      email: 'demo.candidate.vikram@unotrips.com',
+      email: 'demo.candidate.vikram@travelcrm.local',
       phone: '9876510003',
       stage: 'interview',
       round: 'Final Round',
@@ -559,7 +559,7 @@ async function seedHrDemo() {
   employeeDefs.filter((e) => e.withUser).forEach((e) => {
     console.log(`  ${e.email}`);
   });
-  console.log('\nHR Portal: /hr/login — hr@unotrips.com / 123456\n');
+  console.log('\nHR Portal: /hr/login — hr@example.com / 123456\n');
 
   await mongoose.disconnect();
 }

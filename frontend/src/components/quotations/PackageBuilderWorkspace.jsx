@@ -43,7 +43,7 @@ function buildQuotationShareText({ lead, pkg, pricing, nights, daysCount, quoteN
   return [
     `Hello ${guest},`,
     '',
-    'Your customised travel quotation from UNO Trips is ready:',
+    'Your customised travel quotation from Travel CRM is ready:',
     '',
     pkg?.name ? `📦 Package: ${pkg.name}` : null,
     destination ? `📍 Destination: ${destination}` : null,
@@ -52,7 +52,7 @@ function buildQuotationShareText({ lead, pkg, pricing, nights, daysCount, quoteN
     quoteNumber ? `🔖 Ref: ${quoteNumber}` : null,
     '',
     'Please reply to confirm or request any changes.',
-    'Thank you — UNO Trips',
+    'Thank you — Travel CRM',
   ]
     .filter(Boolean)
     .join('\n');
@@ -388,7 +388,7 @@ export default function PackageBuilderWorkspace({
       return;
     }
     const payload = {
-      title: `UNO Trips quotation — ${pkg?.name || 'Package'}`,
+      title: `Travel CRM quotation — ${pkg?.name || 'Package'}`,
       text: shareText,
     };
     try {

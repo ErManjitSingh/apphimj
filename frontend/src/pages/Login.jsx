@@ -18,6 +18,7 @@ import { useTheme } from '../context/ThemeContext';
 import { AuthError } from '../auth/authService';
 import { cn } from '../lib/utils';
 import { APP_BRAND_NAME } from '../config/branding';
+import { APP_GREETING } from '../lib/greeting';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -54,7 +55,7 @@ export default function Login() {
           ? err.message
           : err.response?.data?.message
             || (err.message === 'Network Error'
-              ? 'Cannot reach API. Check that the backend is running and you use http://testing.unotrips.com (SSL not configured yet).'
+              ? 'Cannot reach API. Check that the backend is running at http://localhost:5000.'
               : err.message)
             || 'Login failed. Please try again.';
       setError(msg);
@@ -143,7 +144,7 @@ export default function Login() {
                 className="mb-1 text-[1.65rem] font-semibold leading-none text-[#7C3AED]"
                 style={{ fontFamily: '"Caveat", cursive' }}
               >
-                Smile! You are part of the UNO family.
+                {APP_GREETING}
               </p>
               <h1 className="text-[1.55rem] font-bold tracking-tight text-[#1A1D2E] sm:text-[1.7rem]">
                 Sign in to your account

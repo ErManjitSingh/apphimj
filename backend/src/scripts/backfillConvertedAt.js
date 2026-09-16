@@ -6,7 +6,7 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 
 (async () => {
-  const uri = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/app_unotrips_crm';
+  const uri = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/travel_crm';
   await mongoose.connect(uri);
   const Lead = require('../models/Lead');
   const Booking = require('../models/Booking');

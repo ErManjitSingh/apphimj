@@ -1,4 +1,4 @@
-/** UNO Trips Sales SOP — Phase 1 constants */
+/** Travel CRM Sales SOP — Phase 1 constants */
 
 const LEAD_ACCEPT_MINUTES = 30;
 

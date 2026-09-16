@@ -45,11 +45,11 @@ export const HOTEL_CATEGORIES = ['Budget', '3 Star', '4 Star', '5 Star', 'Luxury
 export const MEAL_PLANS = ['EP (Room Only)', 'CP (Breakfast)', 'MAP (Breakfast + Dinner)', 'AP (All Meals)', 'All Inclusive'];
 
 export const COMPANY_INFO = {
-  name: 'UNO TRIPS',
+  name: 'TRAVEL CRM',
   tagline: 'Travel made simple',
   logoUrl: '/homelogo.webp',
-  phone: '+91 8353057000',
-  email: 'info@unotrips.com',
-  website: 'unotrips.com',
-  address: 'Verma Building, Kamla Nagar, Sanjauli, Shimla, Himachal Pradesh 171006',
+  phone: '',
+  email: 'info@example.com',
+  website: '',
+  address: '',
 };

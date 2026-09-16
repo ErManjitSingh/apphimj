@@ -106,7 +106,7 @@ function buildVoucherHtml(voucher, booking) {
             <div>
               <span class="service-index">VEHICLE ${String(index + 1).padStart(2, '0')}</span>
               <h3>${esc(humanize(transport.vehicleType, 'Private Cab'))}</h3>
-              <p>${esc(transport.vendorName || 'UNO Trips Transport Partner')}</p>
+              <p>${esc(transport.vendorName || 'Travel CRM Transport Partner')}</p>
             </div>
             <span class="status ${transport.status === 'confirmed' ? 'confirmed' : ''}">${esc(humanize(transport.status, 'Assigned'))}</span>
           </div>
@@ -245,8 +245,8 @@ function buildVoucherHtml(voucher, booking) {
   <div class="topline"></div>
   <header class="brandbar">
     <div class="brand">
-      <div class="brand-mark">U</div>
-      <div><div class="brand-name">UNO <b>Trips</b></div><div class="brand-sub">Travel · Explore · Remember</div></div>
+      <div class="brand-mark">T</div>
+      <div><div class="brand-name">Travel <b>CRM</b></div><div class="brand-sub">Travel · Explore · Remember</div></div>
     </div>
     <div class="document-label">Official service voucher<strong>${esc(voucher.voucherNumber)}</strong></div>
   </header>
@@ -266,15 +266,15 @@ function buildVoucherHtml(voucher, booking) {
     ${serviceCards}
     <div class="instructions">
       <div class="instruction guest"><strong>For the guest</strong>Present this voucher with a valid photo ID at check-in or pickup. Keep the voucher number available for assistance.</div>
-      <div class="instruction vendor"><strong>For the service partner</strong>Provide services exactly as listed above. Please do not collect payment from the guest unless separately authorized by UNO Trips.</div>
+      <div class="instruction vendor"><strong>For the service partner</strong>Provide services exactly as listed above. Please do not collect payment from the guest unless separately authorized by Travel CRM.</div>
     </div>
     <div class="authorization">
-      <div class="auth-copy"><strong>Authorized by UNO Trips Operations</strong><p>Digitally generated on ${fmtDate(voucher.issuedAt || new Date())} · No signature required</p></div>
-      <div class="stamp">UNO TRIPS<br/>VERIFIED<br/>VOUCHER</div>
+      <div class="auth-copy"><strong>Authorized by Travel CRM Operations</strong><p>Digitally generated on ${fmtDate(voucher.issuedAt || new Date())} · No signature required</p></div>
+      <div class="stamp">TRAVEL CRM<br/>VERIFIED<br/>VOUCHER</div>
     </div>
   </section>
   <footer class="footer">
-    <span><strong>UNO Trips</strong> · Your trusted travel partner</span>
+    <span><strong>Travel CRM</strong> · Your trusted travel partner</span>
     <span>${esc(booking.customerPhone || booking.customerEmail || booking.bookingNumber)}</span>
   </footer>
 </main>
@@ -319,7 +319,7 @@ function buildItineraryHtml(booking) {
     </div>
     <div class="section"><h2>Day-wise Plan</h2>${dayBlocks}</div>
   </div>
-  <div class="footer">UNO Trips · Print this page to save as PDF</div>
+  <div class="footer">Travel CRM · Print this page to save as PDF</div>
 </div>
 <script>window.onload=()=>{if(new URLSearchParams(location.search).get('print')==='1')window.print()}</script>
 </body></html>`;

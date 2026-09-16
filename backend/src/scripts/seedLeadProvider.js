@@ -11,7 +11,7 @@ const Branch = require('../models/Branch');
 const { ROLE_PERMISSIONS } = require('../config/permissions');
 const { ROLE_LABELS } = require('../config/roles');
 
-const EMAIL = process.env.LEAD_PROVIDER_EMAIL || 'leads@unotrips.com';
+const EMAIL = process.env.LEAD_PROVIDER_EMAIL || 'leads@example.com';
 const PASSWORD = process.env.LEAD_PROVIDER_PASSWORD || 'LeadGive@2026';
 const NAME = process.env.LEAD_PROVIDER_NAME || 'Lead Provider';
 
@@ -64,7 +64,7 @@ async function run() {
   }
 
   console.log('\nLead Provider login:');
-  console.log('  URL: https://app.unotrips.com/login');
+  console.log('  URL: http://localhost:5000/login');
   console.log('  Email (username):', EMAIL);
   console.log('  Password:', PASSWORD);
 

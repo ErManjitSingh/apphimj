@@ -193,7 +193,7 @@ export default function PaymentVoucherModal({
               <div className="absolute -left-16 -bottom-20 w-48 h-48 rounded-full bg-black/10 pointer-events-none" />
               <div className="relative z-[1] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/85">UNO TRIPS</p>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/85">TRAVEL CRM</p>
                   <h2 className="text-2xl sm:text-[28px] font-extrabold tracking-tight mt-1.5 leading-tight">
                     Advance / Token Receipt
                   </h2>
@@ -352,7 +352,7 @@ export default function PaymentVoucherModal({
             <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3.5">
               <p className="text-[10px] font-extrabold uppercase tracking-wide text-amber-800 mb-2">Terms &amp; Conditions</p>
               <ol className="list-decimal pl-4 space-y-1 text-[11px] leading-relaxed text-stone-600">
-                <li>All payments to be made against the receipt of UNO Trips.</li>
+                <li>All payments to be made against the receipt of Travel CRM.</li>
                 <li>Interest will be charged @ 18% if not paid to us on presentation.</li>
                 <li>No claim and discrepancy shall be considered if not sent to us in writing and acknowledged by us within three days.</li>
                 <li>Please credit the amount in our bank account as mentioned above.</li>

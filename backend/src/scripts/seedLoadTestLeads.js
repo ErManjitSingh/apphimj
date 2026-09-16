@@ -48,7 +48,7 @@ function buildLeadDoc(index, { branchId, createdBy, baseTs }) {
   return {
     leadId: `LT-${String(i).padStart(5, '0')}`,
     name: `Speed Test Lead ${i}`,
-    email: `loadtest${i}@speedtest.unotrips.local`,
+    email: `loadtest${i}@speedtest.local`,
     phone: `+9198000${String(10000 + i).padStart(5, '0')}`,
     destination: DESTINATIONS[index % DESTINATIONS.length],
     city: CITIES[index % CITIES.length],

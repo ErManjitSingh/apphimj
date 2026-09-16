@@ -11,10 +11,10 @@ self.addEventListener('push', (event) => {
   try {
     data = event.data ? event.data.json() : {};
   } catch {
-    data = { title: 'UNO Trips CRM', body: event.data ? event.data.text() : '' };
+    data = { title: 'Travel CRM', body: event.data ? event.data.text() : '' };
   }
 
-  const title = data.title || 'UNO Trips CRM';
+  const title = data.title || 'Travel CRM';
   const options = {
     body: data.body || '',
     icon: '/favicon.ico',

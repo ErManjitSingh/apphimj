@@ -54,7 +54,7 @@ function formatBranchLabel(name) {
   ) {
     return 'PTW';
   }
-  if (normalized.includes('shimla')) return 'UNO Trips';
+  if (normalized.includes('shimla')) return 'Shimla';
   return raw;
 }
 

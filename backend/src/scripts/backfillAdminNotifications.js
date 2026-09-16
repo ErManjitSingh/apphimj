@@ -12,7 +12,7 @@ const { NOTIFICATION_TYPES: T } = require('../constants/notificationTypes');
 const DAYS = Number(process.env.BACKFILL_DAYS || 14);
 
 async function main() {
-  await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/testing_unotrips_crm');
+  await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/travel_crm');
 
   const admins = await User.find({ role: 'admin', status: 'active' }).select('_id email').lean();
   if (!admins.length) {

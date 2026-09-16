@@ -109,7 +109,7 @@ export default function EmailTemplatesPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <PageHeader
           title="Email Templates"
-          description="Manage templates sent from sales@unotrips.com"
+          description="Manage templates sent from sales@example.com"
           breadcrumbs={['Settings', 'Email Templates']}
         />
         <Button onClick={openCreate} className="rounded-xl gap-2 bg-sky-600 hover:bg-sky-500 text-white border-0">

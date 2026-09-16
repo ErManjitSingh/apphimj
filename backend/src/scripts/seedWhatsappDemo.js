@@ -4,10 +4,6 @@
  * Safe to re-run — skips leads that already exist by demo phone number.
  */
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
-// Prefer live app DB when seeding on VPS (PM2/app.unotrips.com)
-if (!process.env.MONGO_URI || /testing_unotrips_crm/i.test(process.env.MONGO_URI)) {
-  process.env.MONGO_URI = process.env.APP_MONGO_URI || 'mongodb://127.0.0.1:27017/app_unotrips_crm';
-}
 const { connectDB } = require('../config/db');
 const User = require('../models/User');
 const Branch = require('../models/Branch');

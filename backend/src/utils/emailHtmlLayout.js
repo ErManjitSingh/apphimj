@@ -1,9 +1,9 @@
 const BRAND = {
-  name: 'UNO Trips',
+  name: 'Travel CRM',
   tagline: 'Crafting unforgettable journeys',
-  email: 'sales@unotrips.com',
+  email: 'sales@example.com',
   phone: '+91 98765 43210',
-  website: 'https://unotrips.com',
+  website: 'http://localhost:5173',
 };
 
 const CATEGORY_ACCENT = {
@@ -13,7 +13,7 @@ const CATEGORY_ACCENT = {
   payment_confirmation: { primary: '#d97706', secondary: '#fbbf24', label: 'Payment Received' },
   welcome: { primary: '#7c3aed', secondary: '#a78bfa', label: 'Welcome' },
   reactivation: { primary: '#e11d48', secondary: '#fb7185', label: 'We miss you' },
-  custom: { primary: '#0ea5e9', secondary: '#67e8f9', label: 'Message from UNO Trips' },
+  custom: { primary: '#0ea5e9', secondary: '#67e8f9', label: 'Message from Travel CRM' },
 };
 
 function escapeHtml(text) {
@@ -121,16 +121,16 @@ function wrapEmailHtml(bodyText, options = {}) {
                 <tr>
                   <td style="padding:0 32px 36px;text-align:center;">
                     <a href="${BRAND.website}" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,${accent.primary},${accent.secondary});color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;border-radius:12px;box-shadow:0 10px 25px -8px ${accent.primary};font-family:Arial,sans-serif;">
-                      Explore UNO Trips
+                      Explore Travel CRM
                     </a>
                   </td>
                 </tr>
                 <tr>
                   <td style="padding:24px 32px;background:#f8fafc;border-top:1px solid #e2e8f0;">
-                    <p style="margin:0 0 8px;font-size:14px;font-weight:700;color:#0f172a;font-family:Arial,sans-serif;">${escapeHtml(executiveName || 'UNO Trips Sales Team')}</p>
+                    <p style="margin:0 0 8px;font-size:14px;font-weight:700;color:#0f172a;font-family:Arial,sans-serif;">${escapeHtml(executiveName || 'Travel CRM Sales Team')}</p>
                     <p style="margin:0;font-size:13px;line-height:1.6;color:#64748b;font-family:Arial,sans-serif;">
                       📧 <a href="mailto:${BRAND.email}" style="color:${accent.primary};text-decoration:none;">${BRAND.email}</a>
-                      &nbsp;·&nbsp; 🌐 <a href="${BRAND.website}" style="color:${accent.primary};text-decoration:none;">unotrips.com</a>
+                      &nbsp;·&nbsp; 🌐 <a href="${BRAND.website}" style="color:${accent.primary};text-decoration:none;">Travel CRM</a>
                     </p>
                   </td>
                 </tr>
@@ -161,7 +161,7 @@ function wrapQuotationAttachmentHtml(quote = {}, lead = {}) {
     ? new Date(quote.travelDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
     : '—';
 
-  const body = `Thank you for choosing UNO Trips. Your personalised quotation is ready for review.
+  const body = `Thank you for choosing Travel CRM. Your personalised quotation is ready for review.
 
 Our travel experts have prepared this package based on your requirements. Please review the summary below and reach out if you'd like any changes.
 
@@ -175,7 +175,7 @@ We look forward to making your journey memorable!`;
     quotationNumber: quoteNo,
     amount: amountStr,
     travelDate,
-    executiveName: 'UNO Trips Sales Team',
+    executiveName: 'Travel CRM Sales Team',
   });
 }
 

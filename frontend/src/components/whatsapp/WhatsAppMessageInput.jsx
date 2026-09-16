@@ -153,7 +153,7 @@ export default function WhatsAppMessageInput({ onSend, disabled, lead, user, ses
   const openMetaTemplatePreview = (template) => {
     const count = Number(template.bodyParamCount) || 0;
     const customerName = String(lead?.name || '').trim() || 'there';
-    const executiveName = String(user?.name || '').trim() || 'UNO Trips';
+    const executiveName = String(user?.name || '').trim() || 'Travel CRM';
     const destination = String(lead?.destination || '').trim() || 'your trip';
     const defaults = [customerName, executiveName, destination];
     const bodyParams = Array.from({ length: count }, (_, i) => defaults[i] || '');

@@ -9,7 +9,7 @@ import { cn } from '../../lib/utils';
 
 const HR_PRESET = {
   name: 'HR Admin',
-  email: 'hr@unotrips.com',
+  email: 'hr@example.com',
   password: '123456',
   roleName: 'HR Admin',
 };
@@ -93,7 +93,7 @@ export default function HrLogin() {
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-[#5D5FEF] to-indigo-700 text-white shadow-lg shadow-[#5D5FEF]/30 mb-4">
             <Users className="w-7 h-7" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">UNO Trips HR</h1>
+          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Travel CRM HR</h1>
           <p className="text-sm text-slate-600 mt-1">HR Management Portal — sign in to continue</p>
         </div>
 
@@ -116,7 +116,7 @@ export default function HrLogin() {
                   required
                   autoComplete="email"
                   className="w-full h-11 pl-10 pr-4 rounded-xl bg-white/70 border border-white/80 text-slate-800 placeholder:text-slate-400 text-sm outline-none transition-all focus:border-[#5D5FEF] focus:ring-2 focus:ring-[#5D5FEF]/25 focus:bg-white/90"
-                  placeholder="hr@unotrips.com"
+                  placeholder="hr@example.com"
                 />
               </div>
             </div>

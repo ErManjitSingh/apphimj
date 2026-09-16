@@ -145,7 +145,7 @@ export default function MobileExecutiveDashboard({
           </button>
           <div className="flex items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-lg shadow-md">✈️</span>
-            <span className="text-[17px] font-bold">UNO Trips CRM</span>
+            <span className="text-[17px] font-bold">Travel CRM</span>
           </div>
           <div className="flex items-center gap-3">
             <Link to="/sales-executive/leads/all" aria-label="Search leads">

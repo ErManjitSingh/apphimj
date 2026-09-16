@@ -22,10 +22,10 @@ import {
   ColdCallAlertsPanel,
   DestinationWisePanel,
 } from './dashboard/DestinationAndColdPanels';
-import { UNO_FAMILY_GREETING } from '../../lib/greeting';
+import { APP_GREETING } from '../../lib/greeting';
 
 function getGreeting() {
-  return UNO_FAMILY_GREETING;
+  return APP_GREETING;
 }
 
 function formatTodayDate(date) {

@@ -1,8 +1,8 @@
 const BRAND = {
-  name: 'UNO Trips',
+  name: 'Travel CRM',
   tagline: 'Crafting unforgettable journeys',
-  email: 'sales@unotrips.com',
-  website: 'https://unotrips.com',
+  email: 'sales@example.com',
+  website: 'http://localhost:5173',
 };
 
 const CATEGORY_ACCENT = {
@@ -90,12 +90,12 @@ export function wrapEmailHtml(bodyText, options = {}) {
           ${highlight}
           ${paragraphs}
           <div style="text-align:center;margin-top:20px;">
-            <span style="display:inline-block;padding:12px 24px;background:linear-gradient(135deg,${accent.primary},${accent.secondary});color:#fff;font-weight:700;font-size:13px;border-radius:10px;">Explore UNO Trips</span>
+            <span style="display:inline-block;padding:12px 24px;background:linear-gradient(135deg,${accent.primary},${accent.secondary});color:#fff;font-weight:700;font-size:13px;border-radius:10px;">Explore Travel CRM</span>
           </div>
         </div>
         <div style="padding:16px 24px;background:#f8fafc;border-top:1px solid #e2e8f0;">
-          <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#0f172a;">${escapeHtml(executiveName || 'UNO Trips Sales Team')}</p>
-          <p style="margin:0;font-size:12px;color:#64748b;">${BRAND.email} · unotrips.com</p>
+          <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#0f172a;">${escapeHtml(executiveName || 'Travel CRM Sales Team')}</p>
+          <p style="margin:0;font-size:12px;color:#64748b;">${BRAND.email}</p>
         </div>
       </div>
     </div>
@@ -118,7 +118,7 @@ export function buildEmailPreviewOptions(lead, category, extras = {}) {
     quotationNumber: extras.quotationNumber || extras.quoteNumber,
     amount: formattedAmount,
     travelDate,
-    executiveName: extras.executiveName || 'UNO Trips Sales Team',
+    executiveName: extras.executiveName || 'Travel CRM Sales Team',
   };
 }
 

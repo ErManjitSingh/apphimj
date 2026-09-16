@@ -14,7 +14,7 @@ const { ROLE_PERMISSIONS } = require('../config/permissions');
 const { ROLE_LABELS } = require('../config/roles');
 
 const PASSWORD = process.env.SEED_PASSWORD || '123456';
-const HR_EMAIL = 'hr@unotrips.com';
+const HR_EMAIL = 'hr@example.com';
 
 const DEFAULT_DEPARTMENTS = [
   { name: 'Sales', code: 'SALES' },

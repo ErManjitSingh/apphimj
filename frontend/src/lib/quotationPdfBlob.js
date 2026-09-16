@@ -212,7 +212,7 @@ export function buildQuotationWhatsAppMessage({ lead, quote, userName } = {}) {
   return [
     `Hello ${guest},`,
     '',
-    'Your travel quotation from UNO Trips is ready.',
+    'Your travel quotation from Travel CRM is ready.',
     '',
     pkg ? `📦 Package: ${pkg}` : null,
     destination ? `📍 Destination: ${destination}` : null,
@@ -222,7 +222,7 @@ export function buildQuotationWhatsAppMessage({ lead, quote, userName } = {}) {
     'I am sharing the quotation PDF with you.',
     'Please review and reply if you would like any changes.',
     '',
-    `Thank you — ${userName || 'UNO Trips'}`,
+    `Thank you — ${userName || 'Travel CRM'}`,
   ]
     .filter(Boolean)
     .join('\n');
