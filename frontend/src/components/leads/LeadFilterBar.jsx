@@ -126,7 +126,7 @@ export default function LeadFilterBar({
   };
 
   return (
-    <div className="mb-5 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+    <div className="mb-5 overflow-hidden rounded-[24px] border border-slate-100 bg-white p-5 shadow-sm ring-1 ring-slate-100/80">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
         <div className="flex items-center gap-2">
           <h3 className="text-base font-bold text-slate-900">Filters</h3>

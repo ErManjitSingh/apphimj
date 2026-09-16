@@ -7,7 +7,7 @@ import {
 } from '@tanstack/react-table';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Columns3, Download } from 'lucide-react';
+import { Columns3, Download, Inbox } from 'lucide-react';
 import LeadStatusBadge from './LeadStatusBadge';
 import LeadRowActions from './LeadRowActions';
 import { formatLeadId } from './constants';
@@ -32,6 +32,7 @@ import {
   LEAD_LIST_ROW_HOVER,
   leadListRowBg,
   leadListStickyBg,
+  leadRowAccentClass,
 } from './leadListStyles';
 
 const defaultMenuActions = {
@@ -230,7 +231,7 @@ export default function LeadDataTable({
   const rowVirtualizer = useVirtualizer({
     count: tableRows.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 112,
+    estimateSize: () => 120,
     overscan: 6,
   });
   const virtualRows = rowVirtualizer.getVirtualItems();
@@ -240,9 +241,12 @@ export default function LeadDataTable({
 
   if (leads.length === 0) {
     return (
-      <div className="rounded-2xl border border-subtle bg-white p-16 text-center shadow-sm">
-        <p className="text-content-primary font-semibold">No leads match your filters</p>
-        <p className="text-sm text-content-muted mt-1">Try adjusting filters or add a new lead</p>
+      <div className="rounded-[24px] border border-slate-100 bg-white px-6 py-16 text-center shadow-sm ring-1 ring-slate-100/80">
+        <span className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50 text-violet-500 ring-1 ring-violet-100">
+          <Inbox className="h-7 w-7" />
+        </span>
+        <p className="text-base font-bold text-slate-900">No leads match your filters</p>
+        <p className="mt-1 text-sm text-slate-500">Try adjusting filters or add a new lead</p>
       </div>
     );
   }
@@ -250,21 +254,20 @@ export default function LeadDataTable({
   return (
     <TooltipProvider delayDuration={150}>
     <div className={LEAD_LIST_CONTAINER}>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3.5">
-        <div>
-          <h3 className="text-base font-bold text-slate-900">
-            {listTitle}
-            {typeof (serverPagination?.total ?? leads.length) === 'number' && (
-              <span className="ml-1.5 font-semibold text-slate-500">
-                ({Number(serverPagination?.total ?? leads.length).toLocaleString('en-IN')} Leads Found)
-              </span>
-            )}
-          </h3>
+      <div className="relative flex flex-wrap items-center justify-between gap-3 overflow-hidden border-b border-slate-100 bg-gradient-to-r from-violet-50/80 via-white to-orange-50/50 px-5 py-4">
+        <span className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-violet-500 via-fuchsia-400 to-orange-400" />
+        <div className="flex min-w-0 items-center gap-2.5">
+          <h3 className="text-[15px] font-bold tracking-tight text-slate-900">{listTitle}</h3>
+          {typeof (serverPagination?.total ?? leads.length) === 'number' && (
+            <span className="inline-flex items-center rounded-full bg-violet-600 px-2.5 py-0.5 text-[11px] font-bold text-white shadow-sm shadow-violet-500/30">
+              {Number(serverPagination?.total ?? leads.length).toLocaleString('en-IN')} found
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white/90 px-3 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white"
           >
             <Columns3 className="h-3.5 w-3.5" />
             Columns
@@ -273,7 +276,7 @@ export default function LeadDataTable({
             <button
               type="button"
               onClick={onExport}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white/90 px-3 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white"
             >
               <Download className="h-3.5 w-3.5" />
               Export
@@ -328,6 +331,7 @@ export default function LeadDataTable({
                     const colId = cell.column.id;
                     const tdClass = cn(
                       leadsTd,
+                      colId === 'select' && leadRowAccentClass(row.original),
                       colId === 'rowActions' &&
                         cn(
                           'text-right sticky right-0 z-10 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.04)]',

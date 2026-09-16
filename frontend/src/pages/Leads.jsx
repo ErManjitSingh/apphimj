@@ -14,6 +14,7 @@ import LeadKpiStrip from '../components/leads/LeadKpiStrip';
 import LeadFilterBar from '../components/leads/LeadFilterBar';
 import LeadBulkActionsBar from '../components/leads/LeadBulkActionsBar';
 import LeadDataTable from '../components/leads/LeadDataTable';
+import LeadListSkeleton from '../components/leads/LeadListSkeleton';
 import LeadPreviewDrawer from '../components/leads/LeadPreviewDrawer';
 import { pageConfig, emptyFilters } from '../components/leads/constants';
 import { countActiveFilters } from '../components/leads/leadFilters';
@@ -409,9 +410,7 @@ export default function Leads() {
         />
 
         {loading ? (
-          <div className="rounded-2xl border border-subtle bg-white p-16 text-center text-content-muted shadow-sm">
-            Loading leads...
-          </div>
+          <LeadListSkeleton />
         ) : isConvertedPage ? (
           <ConvertedLeadsTable
             leads={tableLeads}

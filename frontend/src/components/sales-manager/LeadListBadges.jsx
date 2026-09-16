@@ -29,6 +29,9 @@ const SOURCE_STYLES = {
   dpw2_wa: 'bg-gradient-to-r from-teal-500/20 to-cyan-500/15 text-teal-700 dark:text-teal-300 ring-teal-400/40',
   dpw2_call: 'bg-gradient-to-r from-violet-500/20 to-indigo-500/15 text-violet-700 dark:text-violet-300 ring-violet-400/40',
   website: 'bg-gradient-to-r from-sky-500/20 to-blue-500/15 text-sky-700 dark:text-sky-300 ring-sky-400/40',
+  website_2: 'bg-gradient-to-r from-indigo-500/20 to-blue-500/15 text-indigo-700 dark:text-indigo-300 ring-indigo-400/40',
+  portal_lead: 'bg-gradient-to-r from-violet-500/20 to-purple-500/15 text-violet-700 dark:text-violet-300 ring-violet-400/40',
+  potal_lead: 'bg-gradient-to-r from-violet-500/20 to-purple-500/15 text-violet-700 dark:text-violet-300 ring-violet-400/40',
   google_ads: 'bg-gradient-to-r from-sky-500/20 to-blue-500/15 text-sky-700 dark:text-sky-300 ring-sky-400/40',
   referral: 'bg-gradient-to-r from-emerald-500/20 to-teal-500/15 text-emerald-700 dark:text-emerald-300 ring-emerald-400/40',
   social: 'bg-gradient-to-r from-violet-500/20 to-purple-500/15 text-violet-700 dark:text-violet-300 ring-violet-400/40',
@@ -106,87 +109,52 @@ export function LeadTimingLines({ lead, className }) {
 
   if (!created && !assigned && !selfCreatedByExec && !hasFirstCallData && !hasOpenedData) return null;
 
+  const Chip = ({ icon: Icon, label, value, tone = 'slate', title }) => (
+    <span
+      title={title || `${label} ${value}`}
+      className={cn(
+        'inline-flex max-w-full items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-tight ring-1',
+        tone === 'emerald' && 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+        tone === 'rose' && 'bg-rose-50 text-rose-600 ring-rose-100',
+        tone === 'slate' && 'bg-slate-50 text-slate-500 ring-slate-100'
+      )}
+    >
+      <Icon className="h-2.5 w-2.5 shrink-0 opacity-80" />
+      <span className="truncate">
+        <span className="font-semibold">{label}</span>
+        {' · '}
+        {value}
+      </span>
+    </span>
+  );
+
   return (
-    <div className={cn('mt-0.5 space-y-0.5 text-[11px] leading-tight text-slate-500', className)}>
+    <div className={cn('mt-1 flex flex-wrap gap-1', className)}>
       {selfCreatedByExec ? (
-        <p className="flex items-center gap-1 min-w-0" title={`Created by ${creatorName}`}>
-          <User className="w-3 h-3 shrink-0 text-emerald-500" />
-          <span className="truncate">
-            <span className="font-semibold text-emerald-700">Created by</span>
-            {' · '}
-            {creatorName}
-          </span>
-        </p>
+        <Chip icon={User} label="Created by" value={creatorName} tone="emerald" />
       ) : null}
-      {created ? (
-        <p className="flex items-center gap-1 min-w-0" title={`Created ${created}`}>
-          <Clock className="w-3 h-3 shrink-0 text-slate-400" />
-          <span className="truncate">
-            <span className="font-semibold text-slate-600">Created</span>
-            {' · '}
-            {created}
-          </span>
-        </p>
-      ) : null}
-      {assigned ? (
-        <p className="flex items-center gap-1 min-w-0" title={`Assigned ${assigned}`}>
-          <User className="w-3 h-3 shrink-0 text-slate-400" />
-          <span className="truncate">
-            <span className="font-semibold text-slate-600">Assigned</span>
-            {' · '}
-            {assigned}
-          </span>
-        </p>
-      ) : null}
+      {created ? <Chip icon={Clock} label="Created" value={created} /> : null}
+      {assigned ? <Chip icon={User} label="Assigned" value={assigned} /> : null}
       {hasOpenedData ? (
         openedAt ? (
-          <p
-            className="flex items-center gap-1 min-w-0"
-            title={`Opened ${openedAt}${openedByName ? ` · ${openedByName}` : ''}`}
-          >
-            <Eye className="w-3 h-3 shrink-0 text-slate-400" />
-            <span className="truncate">
-              <span className="font-semibold text-slate-600">Opened</span>
-              {' · '}
-              {openedAt}
-              {openedByName ? ` · ${openedByName}` : ''}
-            </span>
-          </p>
+          <Chip
+            icon={Eye}
+            label="Opened"
+            value={openedByName ? `${openedAt} · ${openedByName}` : openedAt}
+          />
         ) : (
-          <p className="flex items-center gap-1 min-w-0 text-rose-600" title="Not opened yet">
-            <Eye className="w-3 h-3 shrink-0 text-rose-500" />
-            <span className="truncate">
-              <span className="font-semibold text-rose-600">Opened</span>
-              {' · '}
-              Not opened yet
-            </span>
-          </p>
+          <Chip icon={Eye} label="Opened" value="Not opened yet" tone="rose" />
         )
       ) : null}
       {hasFirstCallData ? (
         firstCall && firstCallAt ? (
-          <p
-            className="flex items-center gap-1 min-w-0"
-            title={`First call ${firstCallAt} · ${formatCallDuration(firstCall.durationSeconds)}`}
-          >
-            <Phone className="w-3 h-3 shrink-0 text-slate-400" />
-            <span className="truncate">
-              <span className="font-semibold text-slate-600">First Call</span>
-              {' · '}
-              {firstCallAt}
-              {' · '}
-              {formatCallDuration(firstCall.durationSeconds)}
-            </span>
-          </p>
+          <Chip
+            icon={Phone}
+            label="First Call"
+            value={`${firstCallAt} · ${formatCallDuration(firstCall.durationSeconds)}`}
+          />
         ) : (
-          <p className="flex items-center gap-1 min-w-0 text-rose-600" title="No calls logged yet">
-            <Phone className="w-3 h-3 shrink-0 text-rose-500" />
-            <span className="truncate">
-              <span className="font-semibold text-rose-600">First Call</span>
-              {' · '}
-              Not called yet
-            </span>
-          </p>
+          <Chip icon={Phone} label="First Call" value="Not called yet" tone="rose" />
         )
       ) : null}
     </div>
@@ -233,8 +201,8 @@ export function LeadListStatusIcon({ lead, className }) {
 
 export function LeadIdPill({ id, lead }) {
   return (
-    <div className="flex min-w-0 flex-col items-start gap-1">
-      <span className="text-sm font-semibold text-blue-600 whitespace-nowrap">
+    <div className="flex min-w-0 flex-col items-start gap-1.5">
+      <span className="inline-flex items-center rounded-lg bg-sky-50 px-2 py-0.5 font-mono text-[11px] font-bold tracking-wide text-sky-700 ring-1 ring-sky-100">
         {id}
       </span>
       {lead ? <LeadListStatusIcon lead={lead} /> : null}
@@ -269,10 +237,10 @@ export function SourceBadge({ source, label, sourceShort }) {
 }
 
 export function DestinationChip({ name }) {
-  if (!name) return <span className="text-sm text-content-muted">—</span>;
+  if (!name) return <span className="text-sm text-slate-400">—</span>;
   return (
-    <span className={cn('inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ring-1 ring-inset bg-gradient-to-r max-w-[220px] whitespace-normal break-words', destStyle(name))}>
-      <MapPin className="w-3 h-3 shrink-0 opacity-70" />
+    <span className={cn('inline-flex items-center gap-1 rounded-full bg-gradient-to-r px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset max-w-[220px] whitespace-normal break-words shadow-sm', destStyle(name))}>
+      <MapPin className="h-3 w-3 shrink-0 opacity-80" />
       {name}
     </span>
   );
@@ -281,22 +249,22 @@ export function DestinationChip({ name }) {
 export function TravelersBadge({ travelers, adults, children }) {
   const count = travelers ?? adults ?? null;
   if (count == null || count === '') {
-    return <span className="text-sm text-content-muted">—</span>;
+    return <span className="text-sm text-slate-400">—</span>;
   }
   const childCount = children ?? 0;
   const detail = childCount > 0 ? `${count} (${childCount} child${childCount > 1 ? 'ren' : ''})` : String(count);
   return (
-    <span className="inline-flex items-center gap-1.5 text-sm text-content-secondary whitespace-nowrap">
-      <Users className="w-3.5 h-3.5 text-content-muted shrink-0" />
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-100">
+      <Users className="h-3.5 w-3.5 shrink-0 text-violet-500" />
       {detail}
     </span>
   );
 }
 
 export function BudgetBadge({ amount }) {
-  if (!amount) return <span className="text-sm text-content-muted">—</span>;
+  if (!amount) return <span className="text-sm text-slate-400">—</span>;
   return (
-    <span className="text-sm font-semibold text-blue-600 tabular-nums whitespace-nowrap">
+    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-[12px] font-bold tabular-nums text-emerald-700 ring-1 ring-emerald-100 whitespace-nowrap">
       {formatBudget(amount)}
     </span>
   );
@@ -315,18 +283,18 @@ export function MealPlanBadge({ mealPlan, mealPreference }) {
 export function ExecutiveBadge({ name, unassigned }) {
   if (unassigned || !name) {
     return (
-      <span className="inline-flex items-center gap-1.5 text-sm text-content-muted">
-        <span className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-          <User className="w-3.5 h-3.5" />
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-100">
+        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-100">
+          <User className="h-3 w-3" />
         </span>
         Unassigned
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-2 max-w-[150px]">
-      <Avatar name={name} size="sm" className="!w-7 !h-7 !text-[10px] shrink-0" />
-      <span className="text-sm text-content-primary truncate">{name}</span>
+    <span className="inline-flex max-w-[160px] items-center gap-2 rounded-full bg-violet-50/80 py-0.5 pl-0.5 pr-2.5 ring-1 ring-violet-100">
+      <Avatar name={name} size="sm" className="!h-7 !w-7 !text-[10px] shrink-0 ring-2 ring-white" />
+      <span className="truncate text-[12px] font-semibold text-slate-800">{name}</span>
     </span>
   );
 }
@@ -377,30 +345,28 @@ export function NextFollowUpLine({ lead, className }) {
   const raw = lead?.nextFollowUp;
   if (!raw) {
     return (
-      <p className={cn('mt-0.5 flex items-center gap-1 min-w-0 text-[11px] leading-tight text-slate-400', className)}>
-        <Calendar className="w-3 h-3 shrink-0" />
-        <span className="truncate">No next follow-up</span>
-      </p>
+      <span className={cn('mt-1 inline-flex items-center gap-1 rounded-full bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-400 ring-1 ring-slate-100', className)}>
+        <Calendar className="h-2.5 w-2.5" />
+        No next follow-up
+      </span>
     );
   }
   const when = formatFollowUpDate(raw);
   const overdue = new Date(raw).getTime() < Date.now();
   return (
-    <p
+    <span
       className={cn(
-        'mt-0.5 flex items-center gap-1 min-w-0 text-[11px] leading-tight',
-        overdue ? 'text-rose-600' : 'text-slate-500',
+        'mt-1 inline-flex max-w-full items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ring-1',
+        overdue
+          ? 'bg-rose-50 text-rose-600 ring-rose-100'
+          : 'bg-violet-50 text-violet-700 ring-violet-100',
         className
       )}
       title={`Next follow-up ${when}`}
     >
-      <Calendar className="w-3 h-3 shrink-0" />
-      <span className="truncate">
-        <span className="font-semibold text-slate-600">Next F/U</span>
-        {' · '}
-        {when}
-      </span>
-    </p>
+      <Calendar className="h-2.5 w-2.5 shrink-0" />
+      <span className="truncate">Next F/U · {when}</span>
+    </span>
   );
 }
 
@@ -411,14 +377,18 @@ export function CustomerCell({ name, lead, showPhone = false }) {
   const isConverted = lead?.status === 'converted';
   return (
     <div className="flex min-w-0 items-start gap-2.5">
-      <Avatar name={name} size="sm" className="!w-8 !h-8 !text-[11px] shrink-0 mt-0.5" />
+      <Avatar
+        name={name}
+        size="sm"
+        className="mt-0.5 !h-9 !w-9 shrink-0 !text-[11px] shadow-sm ring-2 ring-white"
+      />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           <p
             className={cn(
-              'font-semibold text-sm break-words text-content-primary',
-              isLost && 'rounded-md bg-red-100 px-2 py-0.5 ring-1 ring-inset ring-red-300',
-              isConverted && 'rounded-md bg-emerald-100 px-2 py-0.5 ring-1 ring-inset ring-emerald-300'
+              'text-[13px] font-semibold tracking-tight text-slate-900 break-words',
+              isLost && 'rounded-md bg-red-50 px-1.5 py-0.5 text-red-700 ring-1 ring-inset ring-red-200',
+              isConverted && 'rounded-md bg-emerald-50 px-1.5 py-0.5 text-emerald-800 ring-1 ring-inset ring-emerald-200'
             )}
           >
             {name}
@@ -426,17 +396,18 @@ export function CustomerCell({ name, lead, showPhone = false }) {
           {isRepeated ? (
             <RepeatedLeadBadge size="sm" />
           ) : (
-            <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-[#5D5FEF]/10 text-[10px] font-semibold text-[#5D5FEF]">
+            <span className="shrink-0 rounded-full bg-orange-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-orange-600 ring-1 ring-orange-100">
               New
             </span>
           )}
         </div>
-        <NextFollowUpLine lead={lead} />
+        <div className="mt-0.5 flex flex-wrap items-center gap-1">
+          <NextFollowUpLine lead={lead} className="mt-0" />
+        </div>
         <LeadTimingLines lead={lead} />
-        {/* Same call chips as executive / converted lists — under the name */}
         <LeadCallStats lead={lead} compact className="mt-1.5" />
         {showPhone && lead?.phone && (
-          <p className="text-xs text-content-muted font-mono mt-0.5 truncate">{lead.phone}</p>
+          <p className="mt-0.5 truncate font-mono text-xs text-slate-400">{lead.phone}</p>
         )}
       </div>
     </div>
@@ -469,18 +440,20 @@ export function PhoneCell({ phone, leadId, lead }) {
   };
 
   return (
-    <div className="flex items-center gap-2 whitespace-nowrap">
-      <span className="text-sm text-content-secondary">{phone}</span>
+    <div className="flex items-center gap-1.5 whitespace-nowrap">
+      <span className="rounded-lg bg-slate-50 px-2 py-1 font-mono text-[12px] font-medium text-slate-700 ring-1 ring-slate-100">
+        {phone}
+      </span>
       {id ? (
         <button
           type="button"
           onClick={openWa}
           disabled={opening}
-          className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-green-500/10 text-green-600 hover:bg-green-500/20 transition-colors disabled:opacity-60"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-green-500 text-white shadow-sm shadow-green-500/30 transition hover:bg-green-600 disabled:opacity-60"
           aria-label="Open CRM WhatsApp"
           title="Open CRM WhatsApp"
         >
-          <MessageCircle className="w-3.5 h-3.5" />
+          <MessageCircle className="h-3.5 w-3.5" />
         </button>
       ) : null}
     </div>
@@ -488,15 +461,15 @@ export function PhoneCell({ phone, leadId, lead }) {
 }
 
 export function TravelDateCell({ date }) {
-  if (!date) return <span className="text-sm text-content-muted">—</span>;
+  if (!date) return <span className="text-sm text-slate-400">—</span>;
   const formatted = new Date(date).toLocaleDateString('en-IN', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
   });
   return (
-    <span className="inline-flex items-center gap-1.5 text-sm text-content-secondary whitespace-nowrap">
-      <Calendar className="w-3.5 h-3.5 text-content-muted shrink-0" />
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-sky-50 px-2 py-1 text-[11px] font-semibold text-sky-700 ring-1 ring-sky-100">
+      <Calendar className="h-3.5 w-3.5 shrink-0" />
       {formatted}
     </span>
   );

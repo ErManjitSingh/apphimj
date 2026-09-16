@@ -327,11 +327,24 @@ export default function MobileLeadList({
               const isLost = statusDisplay.bucket === 'lost';
               const cardTone =
                 lead.status === 'converted'
-                  ? 'border-emerald-200 bg-emerald-50'
-                  : 'border-slate-100 bg-white';
+                  ? 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-white'
+                  : isLost
+                    ? 'border-red-100 bg-gradient-to-br from-red-50/70 to-white'
+                    : 'border-slate-100 bg-white';
+              const accent =
+                lead.status === 'converted'
+                  ? 'bg-emerald-500'
+                  : isLost
+                    ? 'bg-red-500'
+                    : lead.isHot
+                      ? 'bg-rose-500'
+                      : lead.status === 'new'
+                        ? 'bg-sky-400'
+                        : 'bg-violet-400';
               return (
-                <article key={lead._id} className={cn('overflow-hidden rounded-2xl border shadow-sm', cardTone)}>
-                  <button type="button" onClick={() => onOpenLead(lead)} className="w-full p-3 text-left">
+                <article key={lead._id} className={cn('relative overflow-hidden rounded-2xl border shadow-sm', cardTone)}>
+                  <span className={cn('absolute inset-y-0 left-0 w-[3px]', accent)} />
+                  <button type="button" onClick={() => onOpenLead(lead)} className="w-full p-3 pl-4 text-left">
                     <div className="flex items-start gap-3">
                       <span className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-[11px] font-bold text-white ${AVATAR_TONES[index % AVATAR_TONES.length]}`}>
                         {initials(lead.name)}
@@ -368,10 +381,22 @@ export default function MobileLeadList({
                         <LeadTimingLines lead={lead} className="!text-[9px] mt-1" />
                         <LeadCallStats lead={lead} compact className="mt-1.5" />
                         <div className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1.5">
-                          <p className="flex min-w-0 items-center gap-1 text-[8px] text-slate-500"><Phone className="h-3 w-3 shrink-0 text-blue-500" /><span className="truncate">{lead.phone || 'No phone'}</span></p>
-                          <p className="flex min-w-0 items-center gap-1 text-[8px] text-slate-500"><MapPin className="h-3 w-3 shrink-0 text-orange-500" /><span className="truncate">{lead.destination || 'No destination'}</span></p>
-                          <p className="flex min-w-0 items-center gap-1 text-[8px] text-slate-500"><UtensilsCrossed className="h-3 w-3 shrink-0 text-amber-500" /><span className="truncate">{String(lead.mealPlan || lead.mealPreference || 'map').toUpperCase()}</span></p>
-                          <p className="flex min-w-0 items-center gap-1 text-[8px] text-slate-500"><UserCheck className="h-3 w-3 shrink-0 text-violet-500" /><span className="truncate">{lead.assignedTo?.name || 'Unassigned'}</span></p>
+                          <p className="flex min-w-0 items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-[8px] font-medium text-slate-600">
+                            <Phone className="h-3 w-3 shrink-0 text-blue-500" />
+                            <span className="truncate">{lead.phone || 'No phone'}</span>
+                          </p>
+                          <p className="flex min-w-0 items-center gap-1 rounded-full bg-orange-50 px-2 py-1 text-[8px] font-medium text-orange-700">
+                            <MapPin className="h-3 w-3 shrink-0 text-orange-500" />
+                            <span className="truncate">{lead.destination || 'No destination'}</span>
+                          </p>
+                          <p className="flex min-w-0 items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-[8px] font-medium text-amber-700">
+                            <UtensilsCrossed className="h-3 w-3 shrink-0 text-amber-500" />
+                            <span className="truncate">{String(lead.mealPlan || lead.mealPreference || 'map').toUpperCase()}</span>
+                          </p>
+                          <p className="flex min-w-0 items-center gap-1 rounded-full bg-violet-50 px-2 py-1 text-[8px] font-medium text-violet-700">
+                            <UserCheck className="h-3 w-3 shrink-0 text-violet-500" />
+                            <span className="truncate">{lead.assignedTo?.name || 'Unassigned'}</span>
+                          </p>
                         </div>
                       </div>
                       <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-slate-300" />

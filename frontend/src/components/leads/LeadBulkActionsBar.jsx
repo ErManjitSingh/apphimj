@@ -10,7 +10,7 @@ export default function LeadBulkActionsBar({ count, onClear, onAssign, onDelete,
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
-          className="mb-4 flex flex-wrap items-center gap-3 px-4 py-3 rounded-xl border border-brand-500/25 bg-brand-500/5"
+          className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-white px-4 py-3 shadow-sm"
         >
           <span className="text-sm font-semibold text-brand-600">{count} selected</span>
           <div className="flex flex-wrap gap-2 flex-1">
