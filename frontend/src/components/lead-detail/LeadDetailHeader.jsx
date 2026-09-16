@@ -1,416 +1,281 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Pencil,
+  Trash2,
   Phone,
   Mail,
   MapPin,
-  Flame,
-  ChevronRight,
-  Eye,
+  MessageCircle,
+  LayoutDashboard,
+  History,
+  CalendarClock,
+  FileText,
+  Briefcase,
   Wallet,
-  ArrowDownCircle,
-  CreditCard,
-  CalendarDays,
-  Users,
-  Sparkles,
+  StickyNote,
+  FolderOpen,
 } from 'lucide-react';
 import { formatLeadId } from '../leads/constants';
-import LeadStatusBadge from '../leads/LeadStatusBadge';
-import Avatar from '../ui/Avatar';
-import API from '../../api/axios';
-import { Button } from '../ui/button';
-import PaymentVoucherModal from './PaymentVoucherModal';
-import { normalizeLeadStatus } from '../../utils/leadUtils';
+import RepeatedLeadBadge from '../leads/RepeatedLeadBadge';
 import { getLeadListStatusDisplay } from '../../lib/executiveStatusDisplay';
 import {
   getInitials,
-  formatSource,
   computeLeadScores,
+  DETAIL_TABS,
+  formatCreatedOn,
+  scoreIntentLabel,
 } from './leadDetailUtils';
-import { toast } from '../../context/ToastContext';
-import { beginLeadCall } from '../../lib/callSession';
 import { cn } from '../../lib/utils';
-import RepeatedLeadBadge from '../leads/RepeatedLeadBadge';
+import { beginLeadCall } from '../../lib/callSession';
+import { openCrmWhatsApp } from '../../lib/openCrmWhatsApp';
+import { toast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 
-function formatTravelRange(lead) {
-  const start = lead?.travelDate || lead?.travelStartDate;
-  const end = lead?.returnDate || lead?.travelEndDate;
-  const fmt = (d) =>
-    new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-  if (start && end) return `${fmt(start)} – ${fmt(end)}`;
-  if (start) return fmt(start);
-  return '—';
-}
+const TAB_ICONS = {
+  overview: LayoutDashboard,
+  activity: History,
+  followups: CalendarClock,
+  quotations: FileText,
+  bookings: Briefcase,
+  payments: Wallet,
+  notes: StickyNote,
+  documents: FolderOpen,
+};
 
-function formatBudget(lead) {
-  if (lead?.budgetRange && lead.budgetRange !== 'custom') {
-    const map = {
-      under_20000: 'Under ₹20k',
-      '20000_40000': '₹20k – ₹40k',
-      '40000_60000': '₹40k – ₹60k',
-      '60000_100000': '₹60k – ₹1L',
-      above_100000: 'Above ₹1L',
-    };
-    return map[lead.budgetRange] || String(lead.budgetRange).replace(/_/g, ' ');
+function useLeadNeighbors(leadId, relatedBasePath = '/leads') {
+  const queryClient = useQueryClient();
+  const caches = queryClient.getQueriesData({ queryKey: ['leads'] });
+  let items = [];
+  for (const [, data] of caches) {
+    const list = data?.data || data?.leads || data?.items || [];
+    if (Array.isArray(list) && list.length) {
+      items = list;
+      break;
+    }
   }
-  if (lead?.budget) return `₹${Number(lead.budget).toLocaleString('en-IN')}`;
-  return '—';
-}
-
-function formatTravelers(lead) {
-  const adults = lead.adults ?? Math.max(1, (lead.travelers || 2) - (lead.children || 0));
-  const children = lead.children ?? 0;
-  const a = `${adults} Adult${adults === 1 ? '' : 's'}`;
-  const c = children > 0 ? ` · ${children} Child${children === 1 ? '' : 'ren'}` : '';
-  return `${a}${c}`;
-}
-
-function formatRelativeActivity(lead) {
-  const raw = lead.lastContactedAt || lead.updatedAt || lead.lastActivityAt;
-  if (!raw) return '—';
-  const ms = Date.now() - new Date(raw).getTime();
-  const mins = Math.floor(ms / 60000);
-  if (mins < 60) return `${Math.max(1, mins)}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 48) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
-}
-
-function formatINR(n) {
-  const num = Number(n || 0);
-  return `₹${num.toLocaleString('en-IN', { maximumFractionDigits: 1 })}`;
-}
-
-function MetaPill({ label, value, children }) {
-  return (
-    <div className="min-w-0 rounded-xl border border-white/50 bg-white/70 px-2.5 py-1.5 shadow-sm backdrop-blur-sm dark:border-slate-700 dark:bg-slate-900/60">
-      <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
-      {children || (
-        <p className="mt-0.5 truncate text-[12px] font-semibold text-slate-800 dark:text-slate-100">{value}</p>
-      )}
-    </div>
-  );
-}
-
-function TravelChip({ icon: Icon, label, value, tone = 'violet' }) {
-  const tones = {
-    violet: 'border-violet-100 bg-violet-50/80 text-violet-800',
-    amber: 'border-amber-100 bg-amber-50/80 text-amber-800',
-    sky: 'border-sky-100 bg-sky-50/80 text-sky-800',
-    rose: 'border-rose-100 bg-rose-50/80 text-rose-800',
+  const idx = items.findIndex((row) => String(row._id) === String(leadId));
+  if (idx < 0) return { prevId: null, nextId: null, base: relatedBasePath };
+  return {
+    prevId: idx > 0 ? items[idx - 1]._id : null,
+    nextId: idx < items.length - 1 ? items[idx + 1]._id : null,
+    base: relatedBasePath,
   };
-  return (
-    <div className={cn('flex min-w-0 items-center gap-2 rounded-xl border px-2.5 py-1.5', tones[tone])}>
-      <Icon className="h-3.5 w-3.5 shrink-0 opacity-80" />
-      <div className="min-w-0">
-        <p className="text-[9px] font-bold uppercase tracking-wide opacity-70">{label}</p>
-        <p className="truncate text-[11px] font-bold leading-tight">{value}</p>
-      </div>
-    </div>
-  );
 }
 
-function PaymentMetric({ icon: Icon, label, value, tone }) {
-  const tones = {
-    violet: {
-      card: 'bg-violet-50 border-violet-100',
-      icon: 'bg-violet-100 text-violet-600',
-      value: 'text-violet-950',
-    },
-    emerald: {
-      card: 'bg-emerald-50 border-emerald-100',
-      icon: 'bg-emerald-100 text-emerald-600',
-      value: 'text-emerald-950',
-    },
-    amber: {
-      card: 'bg-amber-50 border-amber-100',
-      icon: 'bg-amber-100 text-amber-600',
-      value: 'text-amber-950',
-    },
-  };
-  const t = tones[tone] || tones.violet;
-
+function ScoreGauge({ value }) {
+  const pct = Math.max(0, Math.min(100, Number(value) || 0));
+  const r = 28;
+  const c = 2 * Math.PI * r;
+  const offset = c - (pct / 100) * c;
   return (
-    <div className={cn('rounded-xl border px-2.5 py-2', t.card)}>
-      <div className="mb-1 flex items-center gap-1.5">
-        <span className={cn('inline-flex h-6 w-6 items-center justify-center rounded-lg', t.icon)}>
-          <Icon className="h-3 w-3" />
-        </span>
-        <p className="text-[9px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
+    <div className="relative h-[72px] w-[72px] shrink-0">
+      <svg className="h-full w-full -rotate-90" viewBox="0 0 72 72">
+        <circle cx="36" cy="36" r={r} fill="none" stroke="#e2e8f0" strokeWidth="7" />
+        <circle
+          cx="36"
+          cy="36"
+          r={r}
+          fill="none"
+          stroke="#f97316"
+          strokeWidth="7"
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={offset}
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="text-[18px] font-bold tabular-nums text-slate-800">{value}</span>
       </div>
-      <p className={cn('text-base font-black tracking-tight metric-tabular leading-none', t.value)}>
-        {formatINR(value)}
-      </p>
     </div>
   );
 }
 
 export default function LeadDetailHeader({
   lead,
+  leadId,
   backHref = '/leads',
   backLabel = 'Back to Leads',
   editHref,
-  paymentSummary: summaryProp,
-  receiptEndpoint,
+  relatedBasePath = '/leads',
+  tab,
+  onTabChange,
+  onMarkLost,
+  canEditLead = true,
 }) {
+  const navigate = useNavigate();
   const { user } = useAuth();
-  // Lead Source is hidden from Sales Executive and Team Leader only — Admin/Sales Manager
-  // still see it. The underlying lead.source data/API is untouched; this only skips
-  // rendering the pill.
-  const canSeeSource = !['sales_executive', 'team_leader'].includes(user?.role);
-  const status = normalizeLeadStatus(lead.status);
   const scores = computeLeadScores(lead);
   const listDisplay = getLeadListStatusDisplay(lead);
-  // Show the option the user selected (e.g. Ready to Book), not just Warm/Hot/Cold
-  const tempCapitalized = listDisplay.label || 'No status';
-  const isHot = listDisplay.bucket === 'hot';
-  const isConverted = listDisplay.bucket === 'converted';
-  const scorePct = Math.max(0, Math.min(100, Number(scores.overall) || 0));
-  const summary = summaryProp || lead?.paymentSummary;
-  const showPayment = Boolean(summary);
-  const location = [lead.city, lead.state].filter(Boolean).join(', ') || lead.destination || 'India';
+  const neighbors = useLeadNeighbors(leadId || lead?._id, relatedBasePath);
+  const location = [lead.city, lead.state].filter(Boolean).join(', ') || lead.destination || '—';
+  const isLost = ['lost', 'booked_from_another_company'].includes(lead?.status);
+  const badgeLabel = listDisplay.bucket === 'new' ? 'No Status' : listDisplay.label || 'No Status';
 
-  const [voucherOpen, setVoucherOpen] = useState(false);
-  const [voucherHtml, setVoucherHtml] = useState('');
-  const [voucherData, setVoucherData] = useState(null);
-  const [voucherLoading, setVoucherLoading] = useState(false);
-
-  const endpoint =
-    receiptEndpoint ||
-    (lead?._id ? `/leads/${lead._id}/payment-receipt` : null);
-
-  const sendEndpoint = endpoint ? `${endpoint}/send` : null;
-
-  const voucherLabel = summary?.receiptNumber
-    ? `Voucher ${summary.receiptNumber}`
-    : summary?.invoiceNumber
-      ? `Invoice ${summary.invoiceNumber}`
-      : 'Payment voucher';
-
-  const openVoucher = async () => {
-    if (!endpoint) return;
-    setVoucherLoading(true);
-    try {
-      const { data } = await API.get(endpoint, { skipSuccessToast: true });
-      setVoucherHtml(data.html || '');
-      setVoucherData(data.voucher || null);
-      setVoucherOpen(true);
-    } catch {
-      toast.error('Unable to load payment voucher');
-    } finally {
-      setVoucherLoading(false);
-    }
+  const goNeighbor = (id) => {
+    if (!id) return;
+    navigate(`${relatedBasePath}/${id}`);
   };
 
   return (
-    <div className="mb-4">
-      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+    <div className="mb-4 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <Link
           to={backHref}
-          className="inline-flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-500"
+          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-slate-500 hover:text-orange-600"
         >
-          ← {backLabel}
+          <ArrowLeft className="h-4 w-4" />
+          {backLabel}
         </Link>
-        {editHref ? (
-          <Link
-            to={editHref}
-            className="inline-flex h-8 items-center gap-1 rounded-lg bg-violet-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-violet-500"
-          >
-            Edit Lead
-            <ChevronRight className="h-3.5 w-3.5 opacity-80" />
-          </Link>
-        ) : null}
-      </div>
-
-      <div
-        id="payment-advance"
-        className="scroll-mt-24 overflow-hidden rounded-2xl border border-violet-100/80 bg-gradient-to-br from-violet-50 via-white to-sky-50 shadow-sm shadow-violet-500/5 dark:border-slate-800 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950"
-      >
-        <div className="h-1 w-full bg-gradient-to-r from-violet-600 via-fuchsia-500 to-sky-400" />
-
-        <div className="p-3.5 sm:p-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
-            {/* Identity */}
-            <div className="flex min-w-0 flex-1 gap-3">
-              <div className="relative shrink-0">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-lg font-bold text-white shadow-md shadow-violet-500/30 sm:h-14 sm:w-14 sm:text-xl">
-                  {getInitials(lead.name)}
-                </div>
-                {isHot && (
-                  <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-white ring-2 ring-white shadow-sm">
-                    <Flame className="h-3 w-3" />
-                  </span>
-                )}
-              </div>
-
-              <div className="min-w-0 flex-1">
-                {(lead.isRepeatCustomer || lead.isVip) && (
-                  <div className="mb-1">
-                    <RepeatedLeadBadge size="sm" />
-                  </div>
-                )}
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <h1 className="truncate text-lg font-bold tracking-tight text-slate-900 dark:text-white sm:text-xl">
-                    {lead.name}
-                  </h1>
-                  <LeadStatusBadge status={status} reason={lead.statusReason} lead={lead} pulse={status === 'new'} size="sm" listMode={false} />
-                </div>
-                <p className="mt-0.5 truncate text-[11px] text-slate-500">
-                  <span className="font-semibold text-violet-600">{formatLeadId(lead._id || lead.leadId)}</span>
-                  {' · '}Lead 360 · {lead.destination || '—'}
-                </p>
-
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {lead.phone ? (
-                    <a
-                      href={`tel:${lead.phone}`}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        beginLeadCall({ leadId: lead._id, leadName: lead.name, phone: lead.phone });
-                      }}
-                      className="inline-flex h-7 items-center gap-1 rounded-lg border border-slate-200/80 bg-white/80 px-2 text-[11px] font-semibold text-slate-700 hover:border-violet-300 hover:text-violet-700"
-                    >
-                      <Phone className="h-3 w-3 text-violet-500" />
-                      {lead.phone}
-                    </a>
-                  ) : null}
-                  {lead.email ? (
-                    <a
-                      href={`mailto:${lead.email}`}
-                      className="inline-flex h-7 max-w-[180px] items-center gap-1 rounded-lg border border-slate-200/80 bg-white/80 px-2 text-[11px] font-semibold text-slate-700 hover:border-violet-300 hover:text-violet-700"
-                    >
-                      <Mail className="h-3 w-3 shrink-0 text-violet-500" />
-                      <span className="truncate">{lead.email}</span>
-                    </a>
-                  ) : null}
-                  <span className="inline-flex h-7 max-w-[200px] items-center gap-1 rounded-lg border border-slate-200/80 bg-white/80 px-2 text-[11px] font-semibold text-slate-700">
-                    <MapPin className="h-3 w-3 shrink-0 text-violet-500" />
-                    <span className="truncate">{location}</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Score + temp strip */}
-            <div className="flex shrink-0 items-center gap-2 rounded-xl border border-white/60 bg-white/70 px-3 py-2 shadow-sm backdrop-blur-sm dark:border-slate-700 dark:bg-slate-900/50 lg:min-w-[200px]">
-              <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
-                style={{ background: `conic-gradient(#10b981 ${scorePct * 3.6}deg, #e2e8f0 0deg)` }}
-              >
-                <div className="flex h-8 w-8 flex-col items-center justify-center rounded-full bg-white text-[10px] font-bold text-emerald-600">
-                  {scores.overall}
-                </div>
-              </div>
-              <div className="min-w-0">
-                <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Lead Score</p>
-                <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{scores.overall}/100</p>
-                <p className={cn(
-                  'mt-0.5 inline-flex max-w-[140px] items-center gap-0.5 truncate text-[10px] font-bold',
-                  isConverted
-                    ? 'text-emerald-600'
-                    : isHot
-                      ? 'text-orange-600'
-                      : listDisplay.bucket === 'warm'
-                        ? 'text-amber-600'
-                        : listDisplay.bucket === 'cold'
-                          ? 'text-slate-600'
-                          : 'text-sky-600'
-                )}
-                title={tempCapitalized}
-                >
-                  <Flame className="h-3 w-3 shrink-0" /> {tempCapitalized}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Meta pills */}
-          <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-            {canSeeSource && <MetaPill label="Source" value={formatSource(lead)} />}
-            <MetaPill
-              label="Created"
-              value={
-                lead.createdAt
-                  ? new Date(lead.createdAt).toLocaleDateString('en-IN', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                    })
-                  : '—'
-              }
-            />
-            <MetaPill label="Last Activity" value={formatRelativeActivity(lead)} />
-            <MetaPill label="Assigned To">
-              <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
-                {lead.assignedTo?.name ? (
-                  <>
-                    <Avatar name={lead.assignedTo.name} size="sm" className="!h-5 !w-5 ring-1 ring-violet-200" />
-                    <span className="truncate text-[12px] font-semibold text-slate-800 dark:text-slate-100">
-                      {lead.assignedTo.name}
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-[12px] text-slate-400">Unassigned</span>
-                )}
-              </div>
-            </MetaPill>
-          </div>
-
-          {/* Travel chips */}
-          <div className="mt-2.5 grid grid-cols-1 gap-1.5 sm:grid-cols-3">
-            <TravelChip icon={CalendarDays} label="Travel Date" value={formatTravelRange(lead)} tone="violet" />
-            <TravelChip icon={Users} label="Travelers" value={formatTravelers(lead)} tone="sky" />
-            <TravelChip icon={Sparkles} label="Meal Plan" value={(lead?.mealPlan || lead?.mealPreference || 'map').toString().toUpperCase()} tone="rose" />
-          </div>
-
-          {showPayment ? (
-            <div className="mt-3 rounded-xl border border-emerald-100/80 bg-white/60 p-2.5 dark:border-emerald-900 dark:bg-slate-900/40">
-              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-xs font-bold text-slate-900 dark:text-white">Payment &amp; Advance</p>
-                  <p className="text-[10px] text-slate-500">{voucherLabel}</p>
-                </div>
-                <Button
-                  type="button"
-                  variant="emerald"
-                  onClick={openVoucher}
-                  disabled={voucherLoading}
-                  className="h-8 rounded-lg px-3 text-xs font-bold shadow-sm"
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                  {voucherLoading ? 'Loading…' : 'View Voucher'}
-                </Button>
-              </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                <PaymentMetric icon={Wallet} label="Package" value={summary.totalAmount} tone="violet" />
-                <PaymentMetric icon={ArrowDownCircle} label="Advance" value={summary.advanceReceived} tone="emerald" />
-                <PaymentMetric icon={CreditCard} label="Balance" value={summary.balanceDue} tone="amber" />
-              </div>
-            </div>
-          ) : null}
-
-          <div className="mt-2.5 flex justify-end">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex overflow-hidden rounded-xl border border-slate-200 bg-white">
             <button
               type="button"
-              onClick={() => document.getElementById('lead-customer-panel')?.scrollIntoView({ behavior: 'smooth' })}
-              className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-600 hover:text-violet-500"
+              disabled={!neighbors.prevId}
+              onClick={() => goNeighbor(neighbors.prevId)}
+              className="inline-flex h-9 items-center gap-1 px-3 text-[13px] font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
             >
-              View full details
-              <ChevronRight className="h-3.5 w-3.5" />
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </button>
+            <span className="w-px bg-slate-200" />
+            <button
+              type="button"
+              disabled={!neighbors.nextId}
+              onClick={() => goNeighbor(neighbors.nextId)}
+              className="inline-flex h-9 items-center gap-1 px-3 text-[13px] font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
             </button>
           </div>
+          {canEditLead && editHref ? (
+            <Link
+              to={editHref}
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-orange-500 px-3.5 text-[13px] font-semibold text-white shadow-sm shadow-orange-500/20 hover:bg-orange-600"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Edit Lead
+            </Link>
+          ) : null}
+          {canEditLead && !isLost && onMarkLost ? (
+            <button
+              type="button"
+              onClick={onMarkLost}
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3.5 text-[13px] font-semibold text-rose-500 hover:bg-rose-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Move to Lost
+            </button>
+          ) : null}
         </div>
       </div>
 
-      <PaymentVoucherModal
-        open={voucherOpen}
-        onClose={() => setVoucherOpen(false)}
-        voucher={voucherData}
-        html={voucherHtml}
-        lead={lead}
-        sendEndpoint={sendEndpoint}
-      />
+      <div className="overflow-hidden rounded-[20px] border border-slate-100 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.05)]">
+        <div className="flex flex-col gap-4 px-5 pb-4 pt-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex min-w-0 items-start gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-500 text-[18px] font-bold text-white shadow-sm">
+              {getInitials(lead.name)}
+            </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-[22px] font-bold leading-tight tracking-tight text-slate-900">
+                  {lead.name}
+                </h1>
+                <span className="inline-flex items-center rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-500 ring-1 ring-sky-100">
+                  {badgeLabel}
+                </span>
+                {(lead.isRepeatCustomer || lead.isVip) && <RepeatedLeadBadge size="sm" />}
+              </div>
+              <p className="mt-1 text-[12px] text-slate-400">
+                {lead.leadId || formatLeadId(lead._id)}
+                <span className="mx-1.5 text-slate-300">|</span>
+                Lead 360
+                <span className="mx-1.5 text-slate-300">|</span>
+                Created on {formatCreatedOn(lead)}
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px] text-slate-500">
+                {lead.phone ? (
+                  <button
+                    type="button"
+                    onClick={() => beginLeadCall({ leadId: lead._id, leadName: lead.name, phone: lead.phone })}
+                    className="inline-flex items-center gap-1.5 hover:text-slate-800"
+                  >
+                    <Phone className="h-3.5 w-3.5 text-slate-400" />
+                    {lead.phone}
+                  </button>
+                ) : null}
+                {lead.email ? (
+                  <a href={`mailto:${lead.email}`} className="inline-flex items-center gap-1.5 hover:text-slate-800">
+                    <Mail className="h-3.5 w-3.5 text-slate-400" />
+                    {lead.email}
+                  </a>
+                ) : null}
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                  {location}
+                </span>
+                {lead.phone ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openCrmWhatsApp({
+                        leadId: lead._id,
+                        phone: lead.phone,
+                        navigate,
+                        role: user?.role,
+                        toast,
+                      })
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[12px] font-semibold text-emerald-600 hover:bg-emerald-100"
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    Chat on WhatsApp
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-3 rounded-2xl bg-slate-50/80 px-4 py-3">
+            <ScoreGauge value={scores.overall} />
+            <div>
+              <p className="text-[11px] text-slate-400">Lead Score</p>
+              <p className="text-[15px] font-bold text-slate-800">{scores.overall}/100</p>
+              <p className="text-[12px] font-semibold text-orange-500">{scoreIntentLabel(scores.overall)}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto border-t border-slate-100 px-3">
+          <div className="flex min-w-max gap-0.5">
+            {DETAIL_TABS.map((item) => {
+              const Icon = TAB_ICONS[item.id];
+              const active = tab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onTabChange?.(item.id)}
+                  className={cn(
+                    'relative inline-flex items-center gap-1.5 px-3.5 py-3 text-[13px] font-semibold',
+                    active ? 'text-orange-500' : 'text-slate-400 hover:text-slate-600'
+                  )}
+                >
+                  {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
+                  {item.label}
+                  {active ? (
+                    <span className="absolute inset-x-2 bottom-0 h-[2px] rounded-full bg-orange-500" />
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

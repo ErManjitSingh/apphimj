@@ -1,10 +1,10 @@
-import { Check, Trophy } from 'lucide-react';
 import { getLeadListStatusDisplay } from '../../lib/executiveStatusDisplay';
 import { PIPELINE_STAGES } from './leadDetailData';
 import { DETAIL_CARD } from './leadDetailUtils';
 import { cn } from '../../lib/utils';
+import { RefreshCw } from 'lucide-react';
 
-export default function LeadStatusPipeline({ status, lead }) {
+export default function LeadStatusPipeline({ status, lead, onUpdateStatus }) {
   const resolved = lead || { status };
   const display = getLeadListStatusDisplay(resolved);
   const current =
@@ -16,69 +16,75 @@ export default function LeadStatusPipeline({ status, lead }) {
           ? 'cold'
           : display.bucket === 'warm'
             ? 'warm'
-            : '';
-  const currentIdx = PIPELINE_STAGES.findIndex((s) => s.value === current);
+            : 'new';
+  const stageDate =
+    lead?.createdAt && current === 'new'
+      ? new Date(lead.createdAt).toLocaleString('en-IN', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+        })
+      : '';
+  const [dateLine, timeLine] = stageDate ? stageDate.split(',').map((part) => part.trim()) : [];
 
   return (
-    <div className={cn(DETAIL_CARD, 'p-4 sm:p-5 mb-5')}>
-      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-4">Lead Status</p>
-      <div className="flex items-start overflow-x-auto gap-0 pb-1 scrollbar-thin">
-        {PIPELINE_STAGES.map((stage, i) => {
-          const done = currentIdx >= 0 && i < currentIdx;
-          const active = stage.value === current;
-          const isConverted = stage.value === 'converted' && active;
+    <div className={cn(DETAIL_CARD, 'px-5 py-4')}>
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <h3 className="text-[14px] font-bold text-slate-800">Lead Status</h3>
+        {onUpdateStatus ? (
+          <button
+            type="button"
+            onClick={onUpdateStatus}
+            className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-[12px] font-semibold text-slate-600 hover:bg-slate-50"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Update Status
+          </button>
+        ) : null}
+      </div>
 
-          return (
-            <div key={stage.value} className="flex items-start flex-1 min-w-[76px]">
-              <div className="flex flex-col items-center flex-1 px-1">
-                <div
-                  className={cn(
-                    'w-9 h-9 rounded-full flex items-center justify-center border-2 transition-all shrink-0',
-                    isConverted && 'bg-violet-600 border-violet-600 text-white shadow-md shadow-violet-500/35 ring-4 ring-violet-100',
-                    active && !isConverted && stage.value === 'hot' && 'bg-rose-600 border-rose-600 text-white shadow-md shadow-rose-500/30',
-                    active && !isConverted && stage.value === 'warm' && 'bg-amber-500 border-amber-500 text-white shadow-md shadow-amber-500/30',
-                    active && !isConverted && stage.value === 'cold' && 'bg-slate-600 border-slate-600 text-white shadow-md shadow-slate-500/30',
-                    done && !active && 'bg-emerald-500 border-emerald-500 text-white',
-                    !done && !active && 'bg-white border-slate-200 dark:bg-slate-900 dark:border-slate-700'
-                  )}
-                >
-                  {isConverted ? (
-                    <Trophy className="w-4 h-4" />
-                  ) : done ? (
-                    <Check className="w-4 h-4" strokeWidth={2.5} />
-                  ) : (
-                    <span className="w-2 h-2 rounded-full bg-slate-300" />
-                  )}
-                </div>
+      <div className="relative px-2 pt-1">
+        <div className="absolute left-[28px] right-[28px] top-[7px] h-px bg-slate-200" />
+        <div className="relative flex justify-between">
+          {PIPELINE_STAGES.map((stage) => {
+            const active = stage.value === current;
+            return (
+              <div key={stage.value} className="flex w-16 flex-col items-center">
                 <span
                   className={cn(
-                    'text-[9px] sm:text-[10px] mt-2 font-semibold text-center leading-tight',
-                    active ? 'text-violet-700 dark:text-violet-300' : done ? 'text-emerald-700' : 'text-slate-400'
+                    'relative z-[1] flex h-[14px] w-[14px] items-center justify-center rounded-full',
+                    active ? 'bg-orange-500 ring-[6px] ring-orange-100' : 'border-2 border-slate-200 bg-white'
+                  )}
+                >
+                  {active ? <span className="h-1.5 w-1.5 rounded-full bg-white" /> : null}
+                </span>
+                <span
+                  className={cn(
+                    'mt-2.5 text-center text-[12px] font-semibold',
+                    active ? 'text-orange-500' : 'text-slate-400'
                   )}
                 >
                   {stage.shortLabel || stage.label}
                 </span>
+                {active && dateLine ? (
+                  <span className="mt-0.5 text-center text-[10px] leading-tight text-slate-400">
+                    {dateLine}
+                    {timeLine ? (
+                      <>
+                        <br />
+                        {timeLine}
+                      </>
+                    ) : null}
+                  </span>
+                ) : null}
               </div>
-              {i < PIPELINE_STAGES.length - 1 && (
-                <div
-                  className={cn(
-                    'h-0.5 flex-1 mt-[18px] min-w-[8px] max-w-[24px]',
-                    currentIdx >= 0 && i < currentIdx ? 'bg-emerald-400' : 'bg-slate-200 dark:bg-slate-700'
-                  )}
-                />
-              )}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
-      {display.label && display.bucket !== 'new' ? (
-        <p className="mt-3 text-xs font-medium text-slate-600">
-          Status: <span className="text-content-primary">{display.label}</span>
-          {display.categoryLabel && display.categoryLabel !== display.label ? (
-            <span className="text-slate-400"> · {display.categoryLabel}</span>
-          ) : null}
-        </p>
-      ) : null}
     </div>
   );
 }
