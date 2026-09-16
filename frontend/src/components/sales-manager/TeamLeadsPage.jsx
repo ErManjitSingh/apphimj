@@ -28,6 +28,7 @@ import {
   SourceBadge,
   DestinationChip,
   MealPlanBadge,
+  BudgetBadge,
   ExecutiveBadge,
   ManagerStatusBadge,
   CustomerCell,
@@ -231,6 +232,13 @@ export default function TeamLeadsPage() {
         cell: ({ row }) => (
           <MealPlanBadge mealPlan={row.original.mealPlan} mealPreference={row.original.mealPreference} />
         ),
+      }),
+      // Same field, same formatter, same masked-when-empty display as the Admin Leads List
+      // (LeadDataTable.jsx's Budget column) — both read row.original.budget straight off the
+      // lead document via BudgetBadge, no separate calculation.
+      columnHelper.accessor('budget', {
+        header: 'Budget',
+        cell: ({ getValue }) => <BudgetBadge amount={getValue()} />,
       }),
       columnHelper.accessor('sourceLabel', {
         header: 'Source',

@@ -184,27 +184,48 @@ describe('Lead "Opened" state — direct call must count as opening the lead', (
   });
 });
 
-describe('Admin phone-number visibility', () => {
-  test('Admin always sees the real phone in the lead list (masking disabled)', async () => {
+// NOTE: phone visibility is no longer gated on "Opened" (firstOpenedAt) at all — see
+// tests/integration/leadPhoneVisibility.test.js for the current call-gated rule. The two tests
+// below only confirm that opening the lead / hitting the pre-dial call-access endpoint, on their
+// own with no CallNote ever recorded, do NOT unlock the phone — the "never" half of that rule.
+describe('Admin phone-number visibility follows the Opened state', () => {
+  test('Admin sees the phone masked in the lead list — merely being assigned is not enough', async () => {
     const { token: adminToken } = await makeAuthedUser('admin');
     const { user: exec } = await makeAuthedUser('sales_executive');
-    const lead = await makeLead({ assignedTo: exec._id, phone: '9123456789' });
+    const lead = await makeLead({ assignedTo: exec._id });
 
     const res = await getAsAdmin(adminToken, '/api/leads');
     expect(res.status).toBe(200);
     const row = res.body.data.find((l) => String(l._id) === String(lead._id));
-    expect(row.phone).toBe('9123456789');
-    expect(row.contactMasked).toBeUndefined();
+    expect(row.phone).toBe('XXXX');
+    expect(row.phoneMasked).toBe(true);
   });
 
-  test('Admin lead-detail always shows the real phone', async () => {
+  test('opening the lead via the pre-dial call-access endpoint alone (no call recorded) does NOT unlock the phone for Admin', async () => {
     const { token: adminToken } = await makeAuthedUser('admin');
-    const { user: exec } = await makeAuthedUser('sales_executive');
+    const { user: exec, token: execToken } = await makeAuthedUser('sales_executive');
+    const lead = await makeLead({ assignedTo: exec._id, phone: '9123456780' });
+
+    await postCallAccess(execToken, lead._id);
+
+    const res = await getAsAdmin(adminToken, '/api/leads');
+    const row = res.body.data.find((l) => String(l._id) === String(lead._id));
+    expect(row.phone).toBe('XXXX');
+    expect(row.phoneMasked).toBe(true);
+  });
+
+  test('Admin lead-detail view is masked before opening and revealed after a direct call opens it', async () => {
+    const { token: adminToken } = await makeAuthedUser('admin');
+    const { user: exec, token: execToken } = await makeAuthedUser('sales_executive');
     const lead = await makeLead({ assignedTo: exec._id, phone: '9123456781' });
 
-    const res = await getAsAdmin(adminToken, `/api/leads/${lead._id}`);
-    expect(res.status).toBe(200);
-    expect(res.body.phone).toBe('9123456781');
+    const before = await getAsAdmin(adminToken, `/api/leads/${lead._id}`);
+    expect(before.body.phone).toBe('XXXX');
+
+    await postCallNote(execToken, lead._id, { category: 'warm', outcome: 'discussed_package' });
+
+    const after = await getAsAdmin(adminToken, `/api/leads/${lead._id}`);
+    expect(after.body.phone).toBe('9123456781');
   });
 
   test('non-admin roles are never phone-masked by this feature', async () => {

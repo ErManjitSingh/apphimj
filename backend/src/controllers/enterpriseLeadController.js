@@ -23,18 +23,29 @@ const { getSlaDashboard } = require('../services/slaService');
 const { listBranchAuditLogs } = require('../services/leadAuditService');
 const checkDuplicate = asyncHandler(async (req, res) => {
   const { phone, alternatePhone, excludeId } = req.query;
-  const duplicates = await findDuplicateLeads({
+  let duplicates = await findDuplicateLeads({
     phone,
     alternatePhone,
     branchId: req.branchId,
     excludeId,
   });
 
+  // Search results are an alternate way a lead's real phone can reach a viewer — a suffix/fuzzy
+  // duplicate match can surface a DIFFERENT lead than the one the caller is typing about, one
+  // they don't already know the number of. Same call-gated rule as the Leads List/Detail APIs
+  // (utils/leadPhoneVisibility.js); sales_manager/other roles are unaffected — see that module's
+  // own docs on which roles this rule currently covers.
+  if (req.user?.role === 'admin' || req.user?.role === 'sales_executive') {
+    const { applyPhoneVisibilityGate } = require('../utils/leadPhoneVisibility');
+    duplicates = await applyPhoneVisibilityGate(duplicates);
+  }
+
   const matches = duplicates.map((d) => ({
     _id: d._id,
     leadId: d.leadId,
     name: d.name,
     phone: d.phone,
+    phoneMasked: d.phoneMasked,
     email: d.email,
     assignedTo: d.assignedTo,
     createdAt: d.createdAt,
@@ -531,7 +542,14 @@ const bulkExportLeads = asyncHandler(async (req, res) => {
     ...viewerFilter,
   };
 
-  const leads = await Lead.find(filter).populate(LEAD_POPULATE).lean();
+  let leads = await Lead.find(filter).populate(LEAD_POPULATE).lean();
+  // Export is just another way a lead's real phone can leave the backend — same call-gated rule
+  // as everywhere else (utils/leadPhoneVisibility.js). See checkDuplicate above for why only
+  // admin/sales_executive are gated here.
+  if (req.user?.role === 'admin' || req.user?.role === 'sales_executive') {
+    const { applyPhoneVisibilityGate } = require('../utils/leadPhoneVisibility');
+    leads = await applyPhoneVisibilityGate(leads);
+  }
   const headers = [
     'Lead ID', 'Name', 'Phone', 'Email', 'Destination', 'Status',
     'Budget', 'Pax', 'Source', 'Assigned To', 'Smart Score', 'Temperature', 'Created',

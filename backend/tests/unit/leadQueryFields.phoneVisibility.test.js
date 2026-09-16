@@ -1,53 +1,21 @@
-const { maskLeadPhoneUntilOpened, applyAdminPhoneVisibility } = require('../../src/utils/leadQueryFields');
+/**
+ * Superseded by tests/integration/leadPhoneVisibility.test.js.
+ *
+ * Phone visibility is no longer gated on `firstOpenedAt` ("lead opened") — it's gated on the
+ * assigned executive's first recorded call (CallNote), and applies identically to Admin and the
+ * Sales Executive. See utils/leadPhoneVisibility.js. `leadQueryFields.applyAdminPhoneVisibility`
+ * is now a thin async delegate to that module (kept for its existing admin-only call sites), so
+ * it has no interesting behavior of its own left to unit test here.
+ */
+const { applyAdminPhoneVisibility } = require('../../src/utils/leadQueryFields');
 
-function makeLead(overrides = {}) {
-  return {
-    _id: 'lead1',
-    name: 'Jane Doe',
-    phone: '9998887777',
-    alternatePhone: '9998887778',
-    whatsapp: '9998887777',
-    firstOpenedAt: null,
-    ...overrides,
-  };
-}
-
-describe('maskLeadPhoneUntilOpened', () => {
-  test('is a no-op — phones stay visible even when never opened', () => {
-    const lead = makeLead();
-    const result = maskLeadPhoneUntilOpened(lead);
-
-    expect(result.phone).toBe('9998887777');
-    expect(result.alternatePhone).toBe('9998887778');
-    expect(result.whatsapp).toBe('9998887777');
-    expect(result.contactMasked).toBeUndefined();
-  });
-
-  test('is a no-op for a falsy input', () => {
-    expect(maskLeadPhoneUntilOpened(null)).toBeNull();
-    expect(maskLeadPhoneUntilOpened(undefined)).toBeUndefined();
-  });
-});
-
-describe('applyAdminPhoneVisibility', () => {
-  test('never masks for admin (phones always visible)', () => {
-    const result = applyAdminPhoneVisibility(makeLead(), 'admin');
-    expect(result.phone).toBe('9998887777');
-    expect(result.contactMasked).toBeUndefined();
-  });
-
-  test('never masks for any non-admin role', () => {
-    for (const role of ['sales_manager', 'sales_executive', 'team_leader']) {
-      const result = applyAdminPhoneVisibility(makeLead(), role);
-      expect(result.phone).toBe('9998887777');
-      expect(result.contactMasked).toBeUndefined();
+describe('leadQueryFields.applyAdminPhoneVisibility', () => {
+  test('is a no-op passthrough for any non-admin role (delegates only for admin)', async () => {
+    const lead = { _id: 'lead1', phone: '9998887777', assignedTo: 'exec1' };
+    for (const role of ['sales_executive', 'sales_manager', 'team_leader']) {
+      // eslint-disable-next-line no-await-in-loop
+      const result = await applyAdminPhoneVisibility(lead, role);
+      expect(result).toBe(lead);
     }
-  });
-
-  test('passes arrays through unchanged', () => {
-    const leads = [makeLead({ _id: 'a' }), makeLead({ _id: 'b', firstOpenedAt: new Date() })];
-    const result = applyAdminPhoneVisibility(leads, 'admin');
-    expect(result[0].phone).toBe('9998887777');
-    expect(result[1].phone).toBe('9998887777');
   });
 });

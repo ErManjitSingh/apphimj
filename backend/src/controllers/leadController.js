@@ -193,7 +193,7 @@ const listLeads = asyncHandler(async (req, res) => {
     branchId: req.branchId,
     includeManagementFields: canViewLeadOpenInfo(role),
   });
-  result.data = applyAdminPhoneVisibility(result.data, role);
+  result.data = await applyAdminPhoneVisibility(result.data, role);
   res.json(result);
 });
 
@@ -202,7 +202,7 @@ const getLead = asyncHandler(async (req, res) => {
   if (!lead) throw new ApiError(404, 'Lead not found');
 
   const paymentSummary = await getLeadPaymentSummary(lead._id);
-  const visibleLead = applyAdminPhoneVisibility(enrichLead(lead), req.user.role);
+  const visibleLead = await applyAdminPhoneVisibility(enrichLead(lead), req.user.role);
 
   const includeRelated = req.query.includeRelated === '1' || req.query.includeRelated === 'true';
   if (!includeRelated) {
@@ -310,7 +310,7 @@ const listLostLeads = asyncHandler(async (req, res) => {
       .lean(),
     Lead.countDocuments(filter),
   ]);
-  const enriched = applyAdminPhoneVisibility(rows.map(enrichLead), role);
+  const enriched = await applyAdminPhoneVisibility(rows.map(enrichLead), role);
   res.json(paginatedResponse(enriched, { page, limit, total }));
 });
 

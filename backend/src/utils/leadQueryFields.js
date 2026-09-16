@@ -81,16 +81,18 @@ function withManagementPopulate(basePopulate, includeManagementFields) {
 }
 
 /**
- * Previously masked admin phones until firstOpenedAt. Disabled — admin always sees full
- * phone/alternatePhone/whatsapp. Keep helpers as no-ops so existing call sites stay stable.
+ * Admin cannot see a lead's phone/alternatePhone/whatsapp until the assigned Sales Executive has
+ * logged an actual first call for it — see utils/leadPhoneVisibility (the same call-gated check
+ * used for the Sales Executive's own views). Deliberately NOT gated on `firstOpenedAt` ("lead
+ * opened") any more — opening a lead or clicking Call is not proof a call happened; only a
+ * recorded CallNote is. Only applies to role 'admin'; every other role's phone visibility is
+ * handled at its own call site (sales_manager/team_leader are unchanged/out of scope for now —
+ * see PR notes). Async because it queries CallNote; every call site must await it.
  */
-function maskLeadPhoneUntilOpened(lead) {
-  return lead;
-}
-
-/** No-op: admin (and all roles) receive full contact fields. */
-function applyAdminPhoneVisibility(leadOrList, _role) {
-  return leadOrList;
+async function applyAdminPhoneVisibility(leadOrList, role) {
+  if (role !== 'admin') return leadOrList;
+  const { applyPhoneVisibilityGate } = require('./leadPhoneVisibility');
+  return applyPhoneVisibilityGate(leadOrList);
 }
 
 const LEAD_DETAIL_POPULATE = [
@@ -127,6 +129,5 @@ module.exports = {
   canViewLeadOpenInfo,
   withManagementFields,
   withManagementPopulate,
-  maskLeadPhoneUntilOpened,
   applyAdminPhoneVisibility,
 };

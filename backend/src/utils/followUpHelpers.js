@@ -96,6 +96,19 @@ function buildFollowUpCategoryFilter(category) {
   return {};
 }
 
+/**
+ * A Converted lead is out of the follow-up lifecycle — any future/pending follow-up left over
+ * from before conversion (Warm/Hot/Cold scheduling) must stop counting as active. Historical
+ * completed/missed/cancelled follow-ups are left untouched.
+ */
+async function cancelPendingFollowUpsForLead(leadId, { exceptId = null } = {}) {
+  const filter = { lead: leadId, status: 'pending' };
+  if (exceptId) filter._id = { $ne: exceptId };
+  await FollowUp.updateMany(filter, {
+    $set: { status: 'cancelled', outcome: 'lead_converted' },
+  });
+}
+
 async function syncLeadFollowUpDates(leadId) {
   const lead = await Lead.findById(leadId);
   if (!lead) return;
@@ -138,6 +151,12 @@ async function applyCategoryToLead(lead, category, status, body = {}) {
     if (status === 'completed') {
       lead.status = 'converted';
       if (!lead.convertedAt) lead.convertedAt = new Date();
+      // Converted leaves the follow-up lifecycle — no active next-follow-up may remain.
+      await cancelPendingFollowUpsForLead(lead._id);
+      lead.nextFollowUp = undefined;
+      lead.coldCallPending = false;
+      lead.coldCallReminderAt = undefined;
+      lead.coldCallFollowUpId = undefined;
     }
   } else if (category === 'expected_conv') {
     if (['new', 'contacted', 'follow_up'].includes(lead.status)) {
@@ -217,6 +236,12 @@ function normalizeFollowUpPayload(body, user, lead) {
     scheduledAt = buildColdReminderAt();
   }
 
+  // Converted is no longer in the follow-up lifecycle — never require (or trust) a client-sent
+  // next-follow-up date/time for it. The record is logged as a completed historical entry now.
+  if (category === 'converted') {
+    scheduledAt = new Date();
+  }
+
   if (!scheduledAt || Number.isNaN(scheduledAt.getTime())) {
     const err = new Error('Valid scheduledAt is required');
     err.statusCode = 400;
@@ -277,6 +302,14 @@ function normalizeFollowUpPayload(body, user, lead) {
     notes = notes ? `${prefix}. ${notes}` : prefix;
   }
 
+  if (category === 'converted') {
+    outcome = outcomeKey || outcome || 'converted';
+    const prefix = 'Converted';
+    notes = notes ? `${prefix} — ${notes}` : prefix;
+  }
+
+  const isConverted = category === 'converted';
+
   return {
     lead: lead._id,
     type: body.type || 'call',
@@ -287,7 +320,9 @@ function normalizeFollowUpPayload(body, user, lead) {
     category,
     assignedTo: body.assignedTo || lead.assignedTo || user._id,
     createdBy: user._id,
-    status: 'pending',
+    // Converted is never an active/pending follow-up — it's logged as already-resolved history.
+    status: isConverted ? 'completed' : 'pending',
+    completedAt: isConverted ? new Date() : undefined,
   };
 }
 
@@ -303,4 +338,5 @@ module.exports = {
   syncLeadFollowUpDates,
   applyCategoryToLead,
   normalizeFollowUpPayload,
+  cancelPendingFollowUpsForLead,
 };

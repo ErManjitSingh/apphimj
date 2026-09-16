@@ -25,7 +25,14 @@ export default function LeadActionsMenu({
   const navigate = useNavigate();
   const { user } = useAuth();
   const phone = lead.phone?.replace(/\s/g, '');
-  const locked = contactLocked || lead?.contactMasked || lead?.returnedToPool || phone === 'XXXX';
+  // Fully locked = no access at all (returned to pool / reassigned away) — blocks everything.
+  const locked = contactLocked || lead?.contactMasked || lead?.returnedToPool;
+  // Phone-only masked = assigned lead, first qualifying call not made yet. The lead is otherwise
+  // fully usable (View/Edit/Follow-up/Quotation all work) and Call must stay enabled — it's the
+  // action that places that first call. beginLeadCall fetches the real number from the secure
+  // call-access endpoint regardless of what's in `phone` here (see lib/callSession.js). Only
+  // WhatsApp is blocked too, since it also needs the real number.
+  const phonePending = !locked && (lead?.phoneMasked || phone === 'XXXX');
 
   return (
     <DropdownMenuRoot modal={false}>
@@ -66,7 +73,7 @@ export default function LeadActionsMenu({
         >
           <Phone className="w-4 h-4" /> {locked ? 'Call locked' : 'Call Customer'}
         </DropdownMenuItem>
-        {!locked ? (
+        {!locked && !phonePending ? (
           <DropdownMenuItem
             className="flex items-center gap-2 cursor-pointer"
             onClick={() =>
@@ -83,7 +90,7 @@ export default function LeadActionsMenu({
           </DropdownMenuItem>
         ) : (
           <DropdownMenuItem disabled className="flex items-center gap-2 opacity-70">
-            <MessageCircle className="w-4 h-4" /> WhatsApp locked
+            <MessageCircle className="w-4 h-4" /> {locked ? 'WhatsApp locked' : 'Call first to unlock'}
           </DropdownMenuItem>
         )}
         {!locked && (
