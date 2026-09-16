@@ -132,19 +132,29 @@ export default function LeadPreviewDrawer({
       {lead && (
         <>
           <div className="shrink-0 border-b border-slate-100 px-5 pt-4 pb-3">
-            <div className="mb-4 flex items-start justify-between">
+            <div className="mb-4 flex items-start justify-between gap-2">
               <div>
                 <h2 className="text-lg font-bold text-slate-900">Lead Details</h2>
                 <p className="text-[12px] text-slate-400">Complete information and actions</p>
               </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-700"
-                aria-label="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => goFull()}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-orange-500 px-2.5 text-[11px] font-semibold text-white shadow-sm shadow-orange-500/20 hover:bg-orange-600"
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  View Full Lead
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+                  aria-label="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             <div className="flex items-start justify-between gap-3">
@@ -242,10 +252,11 @@ export default function LeadPreviewDrawer({
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52 p-1.5 rounded-xl">
-                  <DropdownMenuItem asChild>
-                    <Link to={`/leads/${lead._id}`} className="gap-2 rounded-lg cursor-pointer">
-                      <Eye className="w-4 h-4" /> View Full Profile
-                    </Link>
+                  <DropdownMenuItem
+                    onClick={() => goFull()}
+                    className="gap-2 rounded-lg cursor-pointer"
+                  >
+                    <Eye className="w-4 h-4" /> View Full Lead
                   </DropdownMenuItem>
                   {canEditLead && (
                     <DropdownMenuItem asChild>
