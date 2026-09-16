@@ -10,7 +10,6 @@ import { useLeadReactivate } from '../../hooks/useLeadReactivate';
 import AdminAssignLeadModal from '../leads/AdminAssignLeadModal';
 import ReactivationActionsModal from '../lead-detail/ReactivationActionsModal';
 import { LeadDetailLayout } from '../lead-detail';
-import { useLeadActivities } from '../../features/leads/hooks/useLeadActivities';
 import LeadEmailHistory from '../email/LeadEmailHistory';
 
 export default function LeaderLeadDetailPage() {
@@ -38,18 +37,18 @@ export default function LeaderLeadDetailPage() {
 
   useDataRefresh(['leads'], loadLead);
 
-  const { assignees, assigneesLoading, handleAssign, assignConfirmDialog } = useLeadAssign({
+  const { assignees, assigneesLoading, handleAssign, fetchAssignees, assignConfirmDialog } = useLeadAssign({
     onAssigned: async () => {
       setAssignOpen(false);
       await loadLead();
     },
   });
 
+  useEffect(() => {
+    if (assignOpen) fetchAssignees();
+  }, [assignOpen, fetchAssignees]);
+
   const reactivate = useLeadReactivate({ leadId: id, onSuccess: loadLead });
-  const { activities, timelineLoading } = useLeadActivities(
-    lead ? { ...lead, followUps: lead.followups || [], quotations: lead.quotations || [] } : null,
-    id
-  );
 
   if (loading) {
     return <div className="flex justify-center py-32"><div className="w-9 h-9 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" /></div>;
@@ -94,8 +93,6 @@ export default function LeaderLeadDetailPage() {
       <LeadDetailLayout
         lead={lead}
         leadId={id}
-        activities={activities}
-        timelineLoading={timelineLoading}
         relatedBasePath="/team-leader/leads"
         backHref="/team-leader/leads"
         backLabel="Back to Team Leads"

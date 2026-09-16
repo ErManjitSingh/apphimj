@@ -1,25 +1,28 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import LeadDetailHeader from './LeadDetailHeader';
 import LeadConvertedBanner from './LeadConvertedBanner';
 import LeadOverviewSection from './LeadOverviewSection';
-import LeadActivityTimeline from './LeadActivityTimeline';
-import LeadFollowUpSection from './LeadFollowUpSection';
-import LeadQuotationSection from './LeadQuotationSection';
-import LeadOpsStatusPanel from './LeadOpsStatusPanel';
-import LeadPaymentVoucherPanel from './LeadPaymentVoucherPanel';
-import LeadNotesPanel from './LeadNotesPanel';
-import LeadScoreBreakdown from './LeadScoreBreakdown';
-import LeadTagsPanel from './LeadTagsPanel';
-import LeadCustomerPanel from './LeadCustomerPanel';
 import { useLeadQuotationsQuery, useLeadNotesQuery } from '../../features/leads/hooks/useLeadRelatedQueries';
-import { getLeadDetailData } from './leadDetailData';
+import { useLeadActivities } from '../../features/leads/hooks/useLeadActivities';
+import { fetchLeadTimeline } from '../../services/leadEnterpriseApi';
 import { DETAIL_TABS } from './leadDetailUtils';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import API from '../../api/axios';
 import { toast } from '../../context/ToastContext';
 import { invalidateLeadDetail } from '../../lib/queryInvalidation';
+import { DETAIL_STALE_MS, GC_TIME_MS } from '../../lib/queryConfig';
+
+const LeadActivityTimeline = lazy(() => import('./LeadActivityTimeline'));
+const LeadFollowUpSection = lazy(() => import('./LeadFollowUpSection'));
+const LeadQuotationSection = lazy(() => import('./LeadQuotationSection'));
+const LeadOpsStatusPanel = lazy(() => import('./LeadOpsStatusPanel'));
+const LeadPaymentVoucherPanel = lazy(() => import('./LeadPaymentVoucherPanel'));
+const LeadNotesPanel = lazy(() => import('./LeadNotesPanel'));
+const LeadScoreBreakdown = lazy(() => import('./LeadScoreBreakdown'));
+const LeadTagsPanel = lazy(() => import('./LeadTagsPanel'));
+const LeadCustomerPanel = lazy(() => import('./LeadCustomerPanel'));
 
 function tabFromHash(hash) {
   const id = String(hash || '').replace('#', '').trim().toLowerCase();
@@ -27,11 +30,13 @@ function tabFromHash(hash) {
   return DETAIL_TABS.some((t) => t.id === id) ? id : 'overview';
 }
 
+function TabFallback() {
+  return <div className="h-40 animate-pulse rounded-[20px] bg-slate-100" />;
+}
+
 export default function LeadDetailLayout({
   lead,
   leadId,
-  activities,
-  timelineLoading,
   relatedBasePath = '/leads',
   backHref,
   backLabel,
@@ -69,27 +74,86 @@ export default function LeadDetailLayout({
     navigate(next, { replace: true });
   };
 
-  const detail = getLeadDetailData(lead);
-  const followups = lead.followups || lead.followUps || detail.followUps || [];
-  const embeddedQuotations = lead.quotations || detail.quotations || [];
-  const embeddedNotes = detail.notes?.length ? detail.notes : null;
+  const followups = lead.followups || lead.followUps || [];
+  const embeddedQuotations = lead.quotations || [];
+
+  const needQuotes = tab === 'quotations' || tab === 'activity';
+  const needNotes = tab === 'notes';
+  const needActivity = tab === 'activity';
 
   const { data: quotationsData, isLoading: quotationsLoading } = useLeadQuotationsQuery(leadId, {
     basePath: relatedBasePath,
-    enabled: !embeddedQuotations.length,
+    enabled: needQuotes && !embeddedQuotations.length,
   });
   const { data: notesData, isLoading: notesLoading, refetch: refetchNotes } = useLeadNotesQuery(leadId, {
     basePath: relatedBasePath,
+    enabled: needNotes,
   });
+  const { activities, timelineLoading } = useLeadActivities(lead, leadId, { enabled: needActivity });
 
   const quotations = embeddedQuotations.length ? embeddedQuotations : (quotationsData?.items || []);
-  const notes = notesData?.items?.length ? notesData.items : (embeddedNotes || []);
+  const notes = notesData?.items || [];
 
-  const paymentReceiptEndpoint =
-    receiptEndpoint ||
-    (relatedBasePath ? `${relatedBasePath}/${leadId}/payment-receipt` : `/leads/${leadId}/payment-receipt`);
+  const paymentReceiptEndpoint = useMemo(
+    () =>
+      receiptEndpoint ||
+      (relatedBasePath ? `${relatedBasePath}/${leadId}/payment-receipt` : `/leads/${leadId}/payment-receipt`),
+    [receiptEndpoint, relatedBasePath, leadId]
+  );
 
-  const canMarkLost = Boolean(canEditLead && (relatedBasePath === '/leads' || relatedBasePath === '/sales-executive/leads'));
+  const canMarkLost = Boolean(
+    canEditLead && (relatedBasePath === '/leads' || relatedBasePath === '/sales-executive/leads')
+  );
+
+  const prefetchTab = useCallback(
+    (id) => {
+      if (id === 'activity' && leadId) {
+        queryClient.prefetchQuery({
+          queryKey: ['lead-timeline', leadId],
+          queryFn: () => fetchLeadTimeline(leadId, { limit: 30 }),
+          staleTime: DETAIL_STALE_MS,
+          gcTime: GC_TIME_MS,
+        });
+      }
+      if (id === 'quotations' && leadId && !embeddedQuotations.length) {
+        queryClient.prefetchQuery({
+          queryKey: ['lead-quotations', relatedBasePath, leadId],
+          queryFn: async () => {
+            const { data } = await API.get(`${relatedBasePath}/${leadId}/quotations`, {
+              params: { page: 1, limit: 20 },
+              skipSuccessToast: true,
+            });
+            return {
+              items: data?.quotations || data?.data || [],
+              total: data?.quotationTotal ?? data?.pagination?.total ?? 0,
+              pagination: data?.pagination,
+            };
+          },
+          staleTime: DETAIL_STALE_MS,
+          gcTime: GC_TIME_MS,
+        });
+      }
+      if (id === 'notes' && leadId) {
+        queryClient.prefetchQuery({
+          queryKey: ['lead-notes', relatedBasePath, leadId],
+          queryFn: async () => {
+            const { data } = await API.get(`${relatedBasePath}/${leadId}/notes-list`, {
+              params: { page: 1, limit: 20 },
+              skipSuccessToast: true,
+            });
+            return {
+              items: data?.notes || data?.data || [],
+              total: data?.notesTotal ?? data?.pagination?.total ?? 0,
+              pagination: data?.pagination,
+            };
+          },
+          staleTime: DETAIL_STALE_MS,
+          gcTime: GC_TIME_MS,
+        });
+      }
+    },
+    [embeddedQuotations.length, leadId, queryClient, relatedBasePath]
+  );
 
   const handleMarkLost = async () => {
     const ok = await confirm({
@@ -131,6 +195,7 @@ export default function LeadDetailLayout({
         relatedBasePath={relatedBasePath}
         tab={tab}
         onTabChange={setTabAndHash}
+        onPrefetchTab={prefetchTab}
         onMarkLost={canMarkLost ? handleMarkLost : undefined}
         canEditLead={canEditLead}
       />
@@ -169,69 +234,71 @@ export default function LeadDetailLayout({
         />
       ) : null}
 
-      {tab === 'activity' ? (
-        <LeadActivityTimeline
-          activities={activities}
-          loading={timelineLoading}
-          quotations={quotations}
-          highlightQuotationId={highlightQuotationId}
-          lead={lead}
-          leadId={leadId}
-          contactEndpoint={contactEndpoint || relatedBasePath || '/leads'}
-          onQuotationSent={onContactLogged}
-        />
-      ) : null}
-
-      {tab === 'followups' ? (
-        <LeadFollowUpSection
-          followUps={followups}
-          lead={lead}
-          canCreate={canCreateFollowUp}
-          onRefresh={onContactLogged}
-        />
-      ) : null}
-
-      {tab === 'quotations' ? (
-        <LeadQuotationSection quotations={quotations} loading={quotationsLoading} />
-      ) : null}
-
-      {tab === 'bookings' ? (
-        lead.status === 'converted' ? (
-          <LeadOpsStatusPanel lead={lead} paymentSummary={lead.paymentSummary} />
-        ) : (
-          <div className="rounded-[20px] border border-slate-100 bg-white p-10 text-center text-sm text-slate-400">
-            No bookings yet. Convert this lead to start hotel, cab and installment tracking.
-          </div>
-        )
-      ) : null}
-
-      {tab === 'payments' ? (
-        lead.paymentSummary ? (
-          <LeadPaymentVoucherPanel
+      <Suspense fallback={<TabFallback />}>
+        {tab === 'activity' ? (
+          <LeadActivityTimeline
+            activities={activities}
+            loading={timelineLoading}
+            quotations={quotations}
+            highlightQuotationId={highlightQuotationId}
             lead={lead}
-            paymentSummary={lead.paymentSummary}
-            receiptEndpoint={paymentReceiptEndpoint}
+            leadId={leadId}
+            contactEndpoint={contactEndpoint || relatedBasePath || '/leads'}
+            onQuotationSent={onContactLogged}
           />
-        ) : (
-          <div className="rounded-[20px] border border-slate-100 bg-white p-10 text-center text-sm text-slate-400">
-            No payment recorded yet. Package cost on overview uses the lead budget.
+        ) : null}
+
+        {tab === 'followups' ? (
+          <LeadFollowUpSection
+            followUps={followups}
+            lead={lead}
+            canCreate={canCreateFollowUp}
+            onRefresh={onContactLogged}
+          />
+        ) : null}
+
+        {tab === 'quotations' ? (
+          <LeadQuotationSection quotations={quotations} loading={quotationsLoading} />
+        ) : null}
+
+        {tab === 'bookings' ? (
+          lead.status === 'converted' ? (
+            <LeadOpsStatusPanel lead={lead} paymentSummary={lead.paymentSummary} />
+          ) : (
+            <div className="rounded-[20px] border border-slate-100 bg-white p-8 text-center text-sm text-slate-400">
+              No bookings yet. Convert this lead to start hotel, cab and installment tracking.
+            </div>
+          )
+        ) : null}
+
+        {tab === 'payments' ? (
+          lead.paymentSummary ? (
+            <LeadPaymentVoucherPanel
+              lead={lead}
+              paymentSummary={lead.paymentSummary}
+              receiptEndpoint={paymentReceiptEndpoint}
+            />
+          ) : (
+            <div className="rounded-[20px] border border-slate-100 bg-white p-8 text-center text-sm text-slate-400">
+              No payment recorded yet. Package cost on overview uses the lead budget.
+            </div>
+          )
+        ) : null}
+
+        {tab === 'notes' ? (
+          <LeadNotesPanel notes={notes} legacyNote={lead.notes} loading={notesLoading} />
+        ) : null}
+
+        {tab === 'documents' ? (
+          <div className="space-y-4">
+            <LeadCustomerPanel lead={lead} />
+            <LeadScoreBreakdown lead={lead} />
+            <LeadTagsPanel lead={lead} />
+            {sidebarExtra}
+            {bottomExtra}
           </div>
-        )
-      ) : null}
-
-      {tab === 'notes' ? (
-        <LeadNotesPanel notes={notes} legacyNote={lead.notes} loading={notesLoading} />
-      ) : null}
-
-      {tab === 'documents' ? (
-        <div className="space-y-4">
-          <LeadCustomerPanel lead={lead} />
-          <LeadScoreBreakdown lead={lead} />
-          <LeadTagsPanel lead={lead} />
-          {sidebarExtra}
-          {bottomExtra}
-        </div>
-      ) : null}
+        ) : null}
+      </Suspense>
 
       {dialogNode}
     </>

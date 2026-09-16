@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Briefcase,
@@ -29,8 +29,6 @@ import { useAuth } from '../../context/AuthContext';
 import { toast } from '../../context/ToastContext';
 import { beginLeadCall } from '../../lib/callSession';
 import { openCrmWhatsApp } from '../../lib/openCrmWhatsApp';
-import EmailComposerModal from '../email/EmailComposerModal';
-import PaymentVoucherModal from './PaymentVoucherModal';
 import LeadStatusPipeline from './LeadStatusPipeline';
 import API from '../../api/axios';
 import { CHANNELS } from '../../config/channels';
@@ -54,6 +52,8 @@ import {
 } from '../ui/dropdown-menu';
 
 const SOURCE_HIDDEN_ROLES = ['sales_executive', 'team_leader'];
+const EmailComposerModal = lazy(() => import('../email/EmailComposerModal'));
+const PaymentVoucherModal = lazy(() => import('./PaymentVoucherModal'));
 
 function CardTitle({ icon: Icon, title, action }) {
   return (
@@ -538,28 +538,31 @@ export default function LeadOverviewSection({
         {sidebarExtra}
       </aside>
 
-      {canSendEmail ? (
-        <EmailComposerModal
-          open={emailOpen}
-          onClose={() => setEmailOpen(false)}
-          lead={lead}
-          leadId={leadId}
-          emailEndpoint={contactEndpoint}
-          onSent={() => {
-            setEmailOpen(false);
-            (onEmailSent || onContactLogged)?.();
-          }}
-        />
-      ) : null}
-
-      <PaymentVoucherModal
-        open={voucherOpen}
-        onClose={() => setVoucherOpen(false)}
-        voucher={voucherData}
-        html={voucherHtml}
-        lead={lead}
-        sendEndpoint={endpoint ? `${endpoint}/send` : null}
-      />
+      <Suspense fallback={null}>
+        {emailOpen && canSendEmail ? (
+          <EmailComposerModal
+            open={emailOpen}
+            onClose={() => setEmailOpen(false)}
+            lead={lead}
+            leadId={leadId}
+            emailEndpoint={contactEndpoint}
+            onSent={() => {
+              setEmailOpen(false);
+              (onEmailSent || onContactLogged)?.();
+            }}
+          />
+        ) : null}
+        {voucherOpen ? (
+          <PaymentVoucherModal
+            open={voucherOpen}
+            onClose={() => setVoucherOpen(false)}
+            voucher={voucherData}
+            html={voucherHtml}
+            lead={lead}
+            sendEndpoint={endpoint ? `${endpoint}/send` : null}
+          />
+        ) : null}
+      </Suspense>
     </div>
   );
 }

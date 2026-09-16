@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
 import API from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -18,7 +17,6 @@ import {
   ReactivationActionsModal,
 } from '../components/lead-detail';
 import { useLeadQuery } from '../features/leads/hooks/useLeadDetailQuery';
-import { useLeadActivities } from '../features/leads/hooks/useLeadActivities';
 import { invalidateLeadDetail } from '../lib/queryInvalidation';
 import CallNoteModal from '../components/leads/CallNoteModal';
 import MergeLeadModal from '../components/leads/MergeLeadModal';
@@ -51,11 +49,12 @@ export default function LeadDetail() {
   const refreshLead = () => invalidateLeadDetail(queryClient, id);
 
   useEffect(() => {
+    if (!reactivationMode) return;
     if (!['admin', 'sales_manager', 'team_leader'].includes(user?.role)) return;
     API.get('/leads/assignees', { skipSuccessToast: true, skipErrorToast: true })
       .then((res) => setReactivationExecs(res.data?.salesExecutives || []))
       .catch(() => setReactivationExecs([]));
-  }, [user?.role]);
+  }, [reactivationMode, user?.role]);
 
   useDataRefresh([`lead:${id}`, 'leads'], refreshLead);
 
@@ -63,15 +62,18 @@ export default function LeadDetail() {
     const currentLead = leadQuery.data;
     if (!currentLead || !['admin', 'sales_manager'].includes(user?.role)) {
       setHasDuplicates(false);
-      return;
+      return undefined;
     }
-    checkLeadDuplicate({
-      phone: currentLead.phone,
-      alternatePhone: currentLead.alternatePhone,
-      excludeId: currentLead._id,
-    })
-      .then((res) => setHasDuplicates((res.matches || []).length > 0))
-      .catch(() => setHasDuplicates(false));
+    const timer = window.setTimeout(() => {
+      checkLeadDuplicate({
+        phone: currentLead.phone,
+        alternatePhone: currentLead.alternatePhone,
+        excludeId: currentLead._id,
+      })
+        .then((res) => setHasDuplicates((res.matches || []).length > 0))
+        .catch(() => setHasDuplicates(false));
+    }, 1800);
+    return () => window.clearTimeout(timer);
   }, [leadQuery.data, user?.role]);
 
   const {
@@ -89,7 +91,6 @@ export default function LeadDetail() {
   const lead = leadQuery.data;
   const loading = leadQuery.isLoading && !lead;
   const showFullProfile = searchParams.get('view') === 'full';
-  const { activities, timelineLoading } = useLeadActivities(lead, id);
 
   if (loading) {
     return (
@@ -156,7 +157,7 @@ export default function LeadDetail() {
   ) : null;
 
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="pb-8">
+    <div className="pb-8">
       {!showFullProfile && (
         <MobileLeadDetailSummary
           lead={lead}
@@ -168,8 +169,6 @@ export default function LeadDetail() {
         <LeadDetailLayout
         lead={lead}
         leadId={id}
-        activities={activities}
-        timelineLoading={timelineLoading}
         backHref="/leads"
         backLabel="Back to Leads"
         contactEndpoint="/leads"
@@ -197,7 +196,7 @@ export default function LeadDetail() {
         />
       </div>
 
-      {userCanAssignLeads && (
+      {userCanAssignLeads && assignModal ? (
         <AdminAssignLeadModal
           open={!!assignModal}
           lead={assignModal}
@@ -207,10 +206,10 @@ export default function LeadDetail() {
           onAssign={handleAssign}
           allowedRoles={assignAllowedRoles(user?.role)}
         />
-      )}
+      ) : null}
       {assignConfirmDialog}
 
-      {canCreateFollowUp && (
+      {canCreateFollowUp && followUpModalOpen ? (
         <AddFollowUpModal
           open={followUpModalOpen}
           onClose={() => setFollowUpModalOpen(false)}
@@ -222,30 +221,36 @@ export default function LeadDetail() {
             refreshLead();
           }}
         />
-      )}
+      ) : null}
 
-      <CallNoteModal
-        open={callNoteOpen}
-        onClose={() => setCallNoteOpen(false)}
-        leadId={id}
-        onSaved={refreshLead}
-      />
+      {callNoteOpen ? (
+        <CallNoteModal
+          open={callNoteOpen}
+          onClose={() => setCallNoteOpen(false)}
+          leadId={id}
+          onSaved={refreshLead}
+        />
+      ) : null}
 
-      <MergeLeadModal
-        open={mergeOpen}
-        onClose={() => setMergeOpen(false)}
-        targetLead={lead}
-        onMerged={refreshLead}
-      />
+      {mergeOpen ? (
+        <MergeLeadModal
+          open={mergeOpen}
+          onClose={() => setMergeOpen(false)}
+          targetLead={lead}
+          onMerged={refreshLead}
+        />
+      ) : null}
 
-      <ReactivationActionsModal
-        open={!!reactivationMode}
-        mode={reactivationMode || 'reactivate'}
-        lead={lead}
-        executives={reactivationExecs}
-        onClose={() => setReactivationMode('')}
-        onSubmit={handleReactivationAction}
-      />
-    </motion.div>
+      {reactivationMode ? (
+        <ReactivationActionsModal
+          open={!!reactivationMode}
+          mode={reactivationMode || 'reactivate'}
+          lead={lead}
+          executives={reactivationExecs}
+          onClose={() => setReactivationMode('')}
+          onSubmit={handleReactivationAction}
+        />
+      ) : null}
+    </div>
   );
 }

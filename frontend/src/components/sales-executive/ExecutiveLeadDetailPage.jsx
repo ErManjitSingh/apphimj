@@ -8,7 +8,6 @@ import { Button } from '../ui/button';
 import { LeadDetailLayout } from '../lead-detail';
 import AddFollowUpModal from '../followups/AddFollowUpModal';
 import { createExecutiveFollowUp, buildFollowUpPayload } from '../followups/followupApi';
-import { useLeadActivities } from '../../features/leads/hooks/useLeadActivities';
 import { isLeadStatusLocked } from '../../utils/leadUtils';
 import PostConvertCommercialModal from '../leads/PostConvertCommercialModal';
 
@@ -60,17 +59,6 @@ export default function ExecutiveLeadDetailPage() {
   }, [location.state, location.pathname, navigate]);
 
   useDataRefresh(['leads'], loadLead);
-
-  const { activities, timelineLoading } = useLeadActivities(
-    lead
-      ? {
-          ...lead,
-          followUps: lead.followups || [],
-          quotations: lead.quotations || [],
-        }
-      : null,
-    id
-  );
 
   if (loading) {
     return (
@@ -182,8 +170,6 @@ export default function ExecutiveLeadDetailPage() {
       <LeadDetailLayout
         lead={lead}
         leadId={id}
-        activities={activities}
-        timelineLoading={timelineLoading}
         relatedBasePath="/sales-executive/leads"
         backHref="/sales-executive/leads/all"
         backLabel="Back to Leads"
@@ -198,21 +184,25 @@ export default function ExecutiveLeadDetailPage() {
         editHref={`/sales-executive/leads/${id}/edit`}
       />
 
-      <AddFollowUpModal
-        open={followUpModalOpen}
-        onClose={() => setFollowUpModalOpen(false)}
-        fixedLeadId={lead._id}
-        fixedLeadName={lead.name}
-        lead={lead}
-        showLeadOutcome={!isLeadStatusLocked(lead.status)}
-        onSubmit={saveFollowUp}
-      />
+      {followUpModalOpen ? (
+        <AddFollowUpModal
+          open={followUpModalOpen}
+          onClose={() => setFollowUpModalOpen(false)}
+          fixedLeadId={lead._id}
+          fixedLeadName={lead.name}
+          lead={lead}
+          showLeadOutcome={!isLeadStatusLocked(lead.status)}
+          onSubmit={saveFollowUp}
+        />
+      ) : null}
 
-      <PostConvertCommercialModal
-        open={commercialOpen}
-        leadId={id}
-        onClose={() => setCommercialOpen(false)}
-      />
+      {commercialOpen ? (
+        <PostConvertCommercialModal
+          open={commercialOpen}
+          leadId={id}
+          onClose={() => setCommercialOpen(false)}
+        />
+      ) : null}
     </motion.div>
   );
 }

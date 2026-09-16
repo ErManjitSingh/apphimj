@@ -17,10 +17,6 @@ export function useLeadAssign({ onAssigned } = {}) {
       .finally(() => setAssigneesLoading(false));
   }, []);
 
-  useEffect(() => {
-    fetchAssignees();
-  }, [fetchAssignees]);
-
   const openAssign = useCallback((lead) => {
     setAssignModal(lead);
   }, []);
@@ -28,6 +24,11 @@ export function useLeadAssign({ onAssigned } = {}) {
   const openBulkAssign = useCallback((leadIds) => {
     setAssignModal({ bulk: true, count: leadIds.length, leadIds });
   }, []);
+
+  useEffect(() => {
+    if (!assignModal || assignees) return;
+    fetchAssignees();
+  }, [assignModal, assignees, fetchAssignees]);
 
   const closeAssign = useCallback(() => {
     setAssignModal(null);

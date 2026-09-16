@@ -103,6 +103,7 @@ export default function LeadDetailHeader({
   relatedBasePath = '/leads',
   tab,
   onTabChange,
+  onPrefetchTab,
   onMarkLost,
   canEditLead = true,
 }) {
@@ -260,6 +261,8 @@ export default function LeadDetailHeader({
                   key={item.id}
                   type="button"
                   onClick={() => onTabChange?.(item.id)}
+                  onMouseEnter={() => onPrefetchTab?.(item.id)}
+                  onFocus={() => onPrefetchTab?.(item.id)}
                   className={cn(
                     'relative inline-flex items-center gap-1.5 px-3.5 py-3 text-[13px] font-semibold',
                     active ? 'text-orange-500' : 'text-slate-400 hover:text-slate-600'

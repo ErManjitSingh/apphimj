@@ -10,7 +10,6 @@ import { useLeadAssign } from '../../hooks/useLeadAssign';
 import { useLeadReactivate } from '../../hooks/useLeadReactivate';
 import ReactivationActionsModal from '../lead-detail/ReactivationActionsModal';
 import { LeadDetailLayout } from '../lead-detail';
-import { useLeadActivities } from '../../features/leads/hooks/useLeadActivities';
 import LeadEmailHistory from '../email/LeadEmailHistory';
 
 export default function ManagerLeadDetailPage() {
@@ -38,15 +37,18 @@ export default function ManagerLeadDetailPage() {
 
   useDataRefresh(['leads'], loadLead);
 
-  const { assignees, assigneesLoading, handleAssign, assignConfirmDialog } = useLeadAssign({
+  const { assignees, assigneesLoading, handleAssign, fetchAssignees, assignConfirmDialog } = useLeadAssign({
     onAssigned: async () => {
       setAssignOpen(false);
       await loadLead();
     },
   });
 
+  useEffect(() => {
+    if (assignOpen) fetchAssignees();
+  }, [assignOpen, fetchAssignees]);
+
   const reactivate = useLeadReactivate({ leadId: id, onSuccess: loadLead });
-  const { activities, timelineLoading } = useLeadActivities(lead, id);
 
   if (loading) {
     return (
@@ -95,8 +97,6 @@ export default function ManagerLeadDetailPage() {
       <LeadDetailLayout
         lead={lead}
         leadId={id}
-        activities={activities}
-        timelineLoading={timelineLoading}
         relatedBasePath="/sales-manager/leads"
         backHref="/sales-manager/leads/all"
         backLabel="Back to Leads"
