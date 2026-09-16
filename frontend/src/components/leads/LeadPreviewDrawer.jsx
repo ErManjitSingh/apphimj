@@ -1,4 +1,4 @@
-import { forwardRef } from 'react';
+import { useState } from 'react';
 import {
   X,
   Phone,
@@ -8,28 +8,29 @@ import {
   IndianRupee,
   Users,
   Pencil,
-  UserPlus,
-  ExternalLink,
   MessageCircle,
   Clock,
-  Sparkles,
   MoreHorizontal,
   Eye,
   UserCheck,
   RefreshCw,
   Trash2,
-  Luggage,
+  Plane,
+  Contact,
+  ListChecks,
+  StickyNote,
+  ChevronDown,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from '../../context/ToastContext';
 import { openCrmWhatsApp } from '../../lib/openCrmWhatsApp';
 import { beginLeadCall } from '../../lib/callSession';
-import LeadStatusBadge from './LeadStatusBadge';
 import Avatar from '../ui/Avatar';
 import AppDrawer from '../ui/AppDrawer';
 import { formatLeadId } from './constants';
 import { cn } from '../../lib/utils';
+import { getLeadSourceShortLabel } from '../../lib/leadSourceLabels';
 import RepeatedLeadBadge from './RepeatedLeadBadge';
 import {
   DropdownMenuRoot,
@@ -39,102 +40,70 @@ import {
   DropdownMenuSeparator,
 } from '../ui/dropdown-menu';
 
-function assigneeLabel(lead) {
-  if (lead?.assigneeRole === 'sales_manager') return 'Sales Manager';
-  if (lead?.assigneeRole === 'team_leader') return 'Team Leader';
-  if (lead?.assignedManager?.name && lead.assignedTo?.name === lead.assignedManager.name) return 'Sales Manager';
-  if (lead?.assignedTeamLeader?.name && lead.assignedTo?.name === lead.assignedTeamLeader.name) return 'Team Leader';
-  return 'Travel Consultant';
+const TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'activity', label: 'Activity' },
+  { id: 'followups', label: 'Follow-ups' },
+  { id: 'quotations', label: 'Quotations' },
+  { id: 'bookings', label: 'Bookings' },
+  { id: 'notes', label: 'Notes' },
+];
+
+function initials(name) {
+  return String(name || 'LD')
+    .split(/\s+/)
+    .map((n) => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 }
 
-function formatBudget(amount) {
+function formatMoney(amount) {
   if (!amount) return '—';
   return `₹${Number(amount).toLocaleString('en-IN')}`;
 }
 
 function formatTravelers(lead) {
-  const count = lead?.travelers ?? lead?.adults;
-  if (!count) return '—';
+  const adults = lead?.adults ?? lead?.travelers ?? 0;
   const children = lead?.children ?? 0;
-  if (children > 0) return `${count} (${children} child${children > 1 ? 'ren' : ''})`;
-  return String(count);
+  const pax = lead?.travelers || adults + children;
+  if (!pax) return '—';
+  const bits = [];
+  if (adults) bits.push(`${adults} Adult${adults === 1 ? '' : 's'}`);
+  if (children) bits.push(`${children} Child${children === 1 ? '' : 'ren'}`);
+  return `${pax} Pax${bits.length ? ` (${bits.join(', ')})` : ''}`;
 }
 
-function splitDateTime(value) {
-  if (!value) return { date: '—', time: '' };
-  const d = new Date(value);
-  return {
-    date: d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-    time: d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
-  };
+function packageType(lead) {
+  if (lead?.packageName) return lead.packageName;
+  const dest = lead?.destination || 'Himachal';
+  const kids = Number(lead?.children || 0);
+  const adults = Number(lead?.adults || lead?.travelers || 0);
+  if (kids > 0 || adults >= 3) return `${dest} Family Trip`;
+  if (adults === 2) return `${dest} Couple Trip`;
+  return `${dest} Trip`;
 }
 
-function OverviewCard({ icon: Icon, label, value, tone }) {
-  const tones = {
-    blue: 'bg-blue-50 border-blue-100',
-    orange: 'bg-orange-50 border-orange-100',
-    green: 'bg-emerald-50 border-emerald-100',
-    purple: 'bg-violet-50 border-violet-100',
-  };
-  const iconTones = {
-    blue: 'text-blue-500',
-    orange: 'text-orange-500',
-    green: 'text-emerald-500',
-    purple: 'text-violet-500',
-  };
-  return (
-    <div className={cn('rounded-xl border p-3.5', tones[tone])}>
-      <Icon className={cn('w-5 h-5 mb-2', iconTones[tone])} strokeWidth={2} />
-      <p className="text-[11px] text-slate-500 font-medium">{label}</p>
-      <p className="text-sm font-bold text-slate-900 mt-0.5 break-words">{value || '—'}</p>
-    </div>
-  );
+function requirementItems(lead) {
+  const raw = String(lead?.specialRequirements || '').trim();
+  if (!raw) return [];
+  return raw
+    .split(/\n|,|;/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 6);
 }
 
-const ContactBtn = forwardRef(function ContactBtn(
-  { href, icon: Icon, label, tone, target, rel, onClick, type = 'button', ...props },
-  ref
-) {
-  const tones = {
-    blue: 'border-blue-100 bg-blue-50 text-blue-600 hover:bg-blue-100/80',
-    green: 'border-green-100 bg-green-50 text-green-600 hover:bg-green-100/80',
-    purple: 'border-violet-100 bg-violet-50 text-violet-600 hover:bg-violet-100/80',
-    grey: 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
-  };
-  const cls = cn(
-    'flex flex-1 items-center justify-center gap-1.5 rounded-xl border py-2.5 transition-colors min-w-0',
-    tones[tone]
-  );
-  const inner = (
-    <>
-      <Icon className="w-4 h-4 shrink-0" strokeWidth={2} />
-      <span className="text-xs font-semibold">{label}</span>
-    </>
-  );
-  if (href) {
-    return (
-      <a ref={ref} href={href} target={target} rel={rel} className={cls} onClick={onClick} {...props}>
-        {inner}
-      </a>
-    );
-  }
-  return (
-    <button ref={ref} type={type} className={cls} onClick={onClick} {...props}>
-      {inner}
-    </button>
-  );
-});
-
-function SectionTitle({ icon: Icon, children, action }) {
-  return (
-    <div className="flex items-center justify-between gap-2 mb-3">
-      <h3 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-800">
-        {Icon && <Icon className="w-3.5 h-3.5 text-slate-500" strokeWidth={2.25} />}
-        {children}
-      </h3>
-      {action}
-    </div>
-  );
+function createdLabel(lead) {
+  if (!lead?.createdAt) return '';
+  return new Date(lead.createdAt).toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
 }
 
 export default function LeadPreviewDrawer({
@@ -147,74 +116,92 @@ export default function LeadPreviewDrawer({
 }) {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const nextFu = splitDateTime(lead?.nextFollowUp);
-  const lastFu = splitDateTime(lead?.lastFollowUp);
+  const [tab, setTab] = useState('overview');
   const assignedName = lead?.assignedTo?.name;
+  const reqs = requirementItems(lead);
+  const isNew = lead?.status === 'new';
+
+  const goFull = (hash) => {
+    if (!lead?._id) return;
+    navigate(hash ? `/leads/${lead._id}#${hash}` : `/leads/${lead._id}`);
+    onClose?.();
+  };
 
   return (
-    <AppDrawer open={!!lead} onClose={onClose} className="max-w-[400px] border-l border-slate-200 bg-white shadow-2xl">
+    <AppDrawer open={!!lead} onClose={onClose} className="max-w-[480px] border-l border-slate-200 bg-white shadow-2xl">
       {lead && (
         <>
-          {/* Header */}
-          <div className="shrink-0 border-b border-slate-100 p-5">
-            <div className="flex items-start justify-between gap-3 mb-4">
-              <div className="flex min-w-0 items-start gap-3.5">
-                <div className="relative shrink-0">
-                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-lg font-bold shadow-md">
-                    {lead.name?.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() || 'LD'}
-                  </div>
-                  <span className="absolute -bottom-0.5 -right-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-white ring-2 ring-white shadow-sm">
-                    <Sparkles className="w-3 h-3" />
-                  </span>
-                </div>
-                <div className="min-w-0 pt-0.5">
-                  <p className="text-xs font-semibold text-blue-600">{formatLeadId(lead._id)}</p>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    <LeadStatusBadge
-                      status={lead.status}
-                      reason={lead.statusReason}
-                      lead={lead}
-                      pulse={lead.status === 'new'}
-                      size="sm"
-                      listMode={false}
-                    />
-                  </div>
-                  <h2 className="mt-2 text-xl font-bold text-slate-900 leading-tight break-words">{lead.name}</h2>
-                  {(lead.isRepeatCustomer || lead.isVip) && (
-                    <div className="mt-2">
-                      <RepeatedLeadBadge size="md" />
-                    </div>
-                  )}
-                </div>
+          <div className="shrink-0 border-b border-slate-100 px-5 pt-4 pb-3">
+            <div className="mb-4 flex items-start justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Lead Details</h2>
+                <p className="text-[12px] text-slate-400">Complete information and actions</p>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="shrink-0 flex items-center justify-center w-9 h-9 rounded-lg border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-700"
                 aria-label="Close"
               >
-                <X className="w-4 h-4" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="flex gap-2">
-              {lead.phone && (
-                <ContactBtn
-                  href={`tel:${lead.phone}`}
-                  icon={Phone}
-                  label="Call"
-                  tone="blue"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    beginLeadCall({ leadId: lead._id, leadName: lead.name, phone: lead.phone });
-                  }}
-                />
-              )}
-              {lead.phone && (
-                <ContactBtn
-                  icon={MessageCircle}
-                  label="WhatsApp"
-                  tone="green"
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-orange-600 text-[15px] font-bold text-white shadow-sm">
+                  {initials(lead.name)}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <h3 className="text-[16px] font-bold text-slate-900">{lead.name}</h3>
+                    {isNew ? (
+                      <span className="rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-bold text-sky-600 ring-1 ring-sky-100">
+                        New
+                      </span>
+                    ) : null}
+                    {(lead.isRepeatCustomer || lead.isVip) && <RepeatedLeadBadge size="sm" />}
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-slate-400">
+                    Lead ID: {lead.leadId || formatLeadId(lead._id)}
+                  </p>
+                  <p className="text-[11px] text-slate-400">Created: {createdLabel(lead)}</p>
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-1.5">
+                {onAssign ? (
+                  <button
+                    type="button"
+                    onClick={() => onAssign(lead)}
+                    className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    Assign
+                    <ChevronDown className="h-3 w-3" />
+                  </button>
+                ) : null}
+                {assignedName ? (
+                  <span className="inline-flex max-w-[140px] items-center gap-1.5 rounded-full bg-slate-50 py-0.5 pl-0.5 pr-2 ring-1 ring-slate-100">
+                    <Avatar name={assignedName} size="sm" className="!h-5 !w-5 !text-[8px]" />
+                    <span className="truncate text-[10px] font-semibold text-slate-700">{assignedName}</span>
+                  </span>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-4 gap-2">
+              {lead.phone ? (
+                <button
+                  type="button"
+                  onClick={() => beginLeadCall({ leadId: lead._id, leadName: lead.name, phone: lead.phone })}
+                  className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-orange-500 text-[12px] font-semibold text-white shadow-sm shadow-orange-500/25 hover:bg-orange-600"
+                >
+                  <Phone className="h-3.5 w-3.5" />
+                  Call
+                </button>
+              ) : null}
+              {lead.phone ? (
+                <button
+                  type="button"
                   onClick={() =>
                     openCrmWhatsApp({
                       leadId: lead._id,
@@ -224,14 +211,35 @@ export default function LeadPreviewDrawer({
                       toast,
                     })
                   }
-                />
-              )}
-              {lead.email && (
-                <ContactBtn href={`mailto:${lead.email}`} icon={Mail} label="Email" tone="purple" />
+                  className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-emerald-500 text-[12px] font-semibold text-white hover:bg-emerald-600"
+                >
+                  <MessageCircle className="h-3.5 w-3.5" />
+                  WhatsApp
+                </button>
+              ) : null}
+              {lead.email ? (
+                <a
+                  href={`mailto:${lead.email}`}
+                  className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-sky-50 text-[12px] font-semibold text-sky-600 hover:bg-sky-100"
+                >
+                  <Mail className="h-3.5 w-3.5" />
+                  Email
+                </a>
+              ) : (
+                <span className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-sky-50 text-[12px] font-semibold text-sky-300">
+                  <Mail className="h-3.5 w-3.5" />
+                  Email
+                </span>
               )}
               <DropdownMenuRoot>
                 <DropdownMenuTrigger asChild>
-                  <ContactBtn icon={MoreHorizontal} label="More" tone="grey" />
+                  <button
+                    type="button"
+                    className="inline-flex h-10 items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white text-[12px] font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    <MoreHorizontal className="h-3.5 w-3.5" />
+                    More
+                  </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52 p-1.5 rounded-xl">
                   <DropdownMenuItem asChild>
@@ -273,132 +281,228 @@ export default function LeadPreviewDrawer({
             </div>
           </div>
 
-          {/* Body */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-6">
-            <section>
-              <SectionTitle icon={Luggage}>Travel Overview</SectionTitle>
-              <div className="grid grid-cols-2 gap-3">
-                <OverviewCard icon={MapPin} label="Destination" value={lead.destination} tone="blue" />
-                <OverviewCard
-                  icon={Calendar}
-                  label="Travel Date"
-                  value={
-                    lead.travelDate
-                      ? new Date(lead.travelDate).toLocaleDateString('en-IN', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })
-                      : null
-                  }
-                  tone="orange"
-                />
-                <OverviewCard icon={IndianRupee} label="Budget" value={formatBudget(lead.budget)} tone="green" />
-                <OverviewCard icon={Users} label="Travelers" value={formatTravelers(lead)} tone="purple" />
-              </div>
-            </section>
-
-            <section>
-              <SectionTitle
-                action={
-                  onAssign ? (
-                    <button
-                      type="button"
-                      onClick={() => onAssign(lead)}
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-600 hover:text-violet-700"
-                    >
-                      <UserPlus className="w-3.5 h-3.5" />
-                      Assign
-                    </button>
-                  ) : null
-                }
-              >
-                Assigned To
-              </SectionTitle>
-              <div
-                className={cn(
-                  'flex items-center gap-3 rounded-xl border p-4',
-                  assignedName
-                    ? 'border-emerald-100 bg-emerald-50/60'
-                    : 'border-orange-100 bg-orange-50/50'
-                )}
-              >
-                <Avatar
-                  name={assignedName || 'Unassigned'}
-                  size="md"
-                  className={cn('!w-10 !h-10 shrink-0', assignedName ? 'ring-2 ring-blue-200' : 'ring-2 ring-orange-200')}
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-slate-900">{assignedName || 'Unassigned'}</p>
-                  <p className="text-xs text-slate-500">{assigneeLabel(lead)}</p>
-                </div>
-                {!assignedName && onAssign && (
-                  <button
-                    type="button"
-                    onClick={() => onAssign(lead)}
-                    className="shrink-0 rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-violet-500/25 hover:brightness-110 transition-all"
-                  >
-                    Assign now
-                  </button>
-                )}
-              </div>
-            </section>
-
-            <section>
-              <SectionTitle>Follow Ups</SectionTitle>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-3.5">
-                  <div className="flex items-center gap-1.5 text-blue-600 mb-2">
-                    <Calendar className="w-4 h-4" />
-                    <span className="text-[11px] font-semibold">Next Follow-up</span>
-                  </div>
-                  <p className="text-sm font-bold text-slate-900">{nextFu.date}</p>
-                  {nextFu.time && <p className="text-xs text-slate-500 mt-0.5">{nextFu.time}</p>}
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3.5">
-                  <div className="flex items-center gap-1.5 text-red-500 mb-2">
-                    <Clock className="w-4 h-4" />
-                    <span className="text-[11px] font-semibold">Last Follow-up</span>
-                  </div>
-                  <p className="text-sm font-bold text-slate-900">{lastFu.date}</p>
-                  {lastFu.time && <p className="text-xs text-slate-500 mt-0.5">{lastFu.time}</p>}
-                </div>
-              </div>
-            </section>
-
-            <section>
-              <SectionTitle>Quick Actions</SectionTitle>
-              <div className="space-y-2.5">
-                {onAssign && (
-                  <button
-                    type="button"
-                    onClick={() => onAssign(lead)}
-                    className="flex w-full items-center justify-center gap-2 h-11 rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 text-sm font-semibold text-white shadow-md shadow-violet-500/20 hover:brightness-110 transition-all"
-                  >
-                    <UserPlus className="w-4 h-4" />
-                    {assignedName ? 'Reassign Lead' : 'Assign Lead'}
-                  </button>
-                )}
-                <div className={cn('grid gap-2.5', canEditLead ? 'grid-cols-2' : 'grid-cols-1')}>
-                  <Link
-                    to={`/leads/${lead._id}`}
-                    className="flex items-center justify-center gap-2 h-11 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    Full Profile
-                  </Link>
-                  {canEditLead && (
-                    <Link
-                      to={`/leads/${lead._id}/edit`}
-                      className="flex items-center justify-center gap-2 h-11 rounded-xl bg-blue-500 hover:bg-blue-600 text-sm font-semibold text-white transition-colors"
-                    >
-                      <Pencil className="w-4 h-4" />
-                      Edit Lead
-                    </Link>
+          <div className="shrink-0 overflow-x-auto border-b border-slate-100 px-3">
+            <div className="flex min-w-max gap-1">
+              {TABS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    if (item.id === 'overview') setTab('overview');
+                    else goFull(item.id);
+                  }}
+                  className={cn(
+                    'relative px-3 py-2.5 text-[12px] font-semibold',
+                    tab === item.id && item.id === 'overview'
+                      ? 'text-orange-500'
+                      : 'text-slate-400 hover:text-slate-600'
                   )}
+                >
+                  {item.label}
+                  {tab === item.id && item.id === 'overview' ? (
+                    <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-orange-500" />
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex-1 space-y-3 overflow-y-auto p-4">
+            <div className="grid grid-cols-2 gap-3">
+              <section className="rounded-2xl border border-slate-100 bg-white p-3.5">
+                <div className="mb-3 flex items-center justify-between">
+                  <h4 className="inline-flex items-center gap-1.5 text-[12px] font-bold text-slate-800">
+                    <Plane className="h-3.5 w-3.5 text-orange-500" />
+                    Trip Information
+                  </h4>
+                  {canEditLead ? (
+                    <Link to={`/leads/${lead._id}/edit`} className="text-[11px] font-semibold text-orange-500">
+                      Edit
+                    </Link>
+                  ) : null}
                 </div>
+                <dl className="space-y-2.5 text-[12px]">
+                  <div className="flex items-start gap-2 text-slate-500">
+                    <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-slate-400">Destination</p>
+                      <p className="font-semibold text-slate-800">
+                        {[lead.destination, lead.state].filter(Boolean).join(', ') || '—'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2 text-slate-500">
+                    <Calendar className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-slate-400">Travel Date</p>
+                      <p className="font-semibold text-slate-800">
+                        {lead.travelDate
+                          ? new Date(lead.travelDate).toLocaleDateString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })
+                          : '—'}
+                        {lead.flexibleDates ? ' (Flexible)' : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2 text-slate-500">
+                    <Plane className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-slate-400">Package Type</p>
+                      <p className="font-semibold text-slate-800">{packageType(lead)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2 text-slate-500">
+                    <Users className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-slate-400">No. of Travelers</p>
+                      <p className="font-semibold text-slate-800">{formatTravelers(lead)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2 text-slate-500">
+                    <IndianRupee className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-slate-400">Budget</p>
+                      <p className="font-semibold text-slate-800">
+                        {lead.budget ? `${formatMoney(lead.budget)} (Approx)` : '—'}
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-slate-400">Source</p>
+                    <p className="font-semibold text-slate-800">
+                      {getLeadSourceShortLabel(lead.source, lead.sourceLabel) || lead.sourceLabel || '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-slate-400">Status</p>
+                    <span
+                      className={cn(
+                        'mt-0.5 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ring-1',
+                        isNew ? 'bg-sky-50 text-sky-600 ring-sky-100' : 'bg-slate-50 text-slate-600 ring-slate-100'
+                      )}
+                    >
+                      {isNew ? 'New' : String(lead.status || '—').replaceAll('_', ' ')}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-slate-400">Priority</p>
+                    <p className="font-semibold capitalize text-slate-800">{lead.priority || 'Medium'}</p>
+                  </div>
+                </dl>
+              </section>
+
+              <div className="space-y-3">
+                <section className="rounded-2xl border border-slate-100 bg-white p-3.5">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h4 className="inline-flex items-center gap-1.5 text-[12px] font-bold text-slate-800">
+                      <Contact className="h-3.5 w-3.5 text-orange-500" />
+                      Contact Information
+                    </h4>
+                    {canEditLead ? (
+                      <Link to={`/leads/${lead._id}/edit`} className="text-[11px] font-semibold text-orange-500">
+                        Edit
+                      </Link>
+                    ) : null}
+                  </div>
+                  <div className="space-y-2.5 text-[12px]">
+                    <p className="flex items-center gap-2 font-semibold text-slate-800">
+                      <Phone className="h-3.5 w-3.5 text-slate-400" />
+                      {lead.phone || '—'}
+                    </p>
+                    <p className="flex items-center gap-2 text-slate-600">
+                      <Mail className="h-3.5 w-3.5 text-slate-400" />
+                      {lead.email || '—'}
+                    </p>
+                    <p className="flex items-center gap-2 text-slate-600">
+                      <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                      {[lead.city, lead.state].filter(Boolean).join(', ') || '—'}
+                    </p>
+                    <p className="flex items-center gap-2 text-slate-600">
+                      <Clock className="h-3.5 w-3.5 text-slate-400" />
+                      {lead.preferredCallTime || 'Preferred time not set'}
+                    </p>
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border border-orange-100 bg-orange-50/60 p-3.5">
+                  <div className="mb-2 flex items-center justify-between">
+                    <h4 className="inline-flex items-center gap-1.5 text-[12px] font-bold text-slate-800">
+                      <ListChecks className="h-3.5 w-3.5 text-orange-500" />
+                      Requirements
+                    </h4>
+                    {canEditLead ? (
+                      <Link to={`/leads/${lead._id}/edit`} className="text-[11px] font-semibold text-orange-500">
+                        Edit
+                      </Link>
+                    ) : null}
+                  </div>
+                  {reqs.length ? (
+                    <ul className="space-y-1 text-[12px] text-slate-700">
+                      {reqs.map((item) => (
+                        <li key={item} className="flex gap-1.5">
+                          <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-orange-400" />
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-[12px] text-slate-400">No specific requirements added yet.</p>
+                  )}
+                </section>
               </div>
+            </div>
+
+            <section className="rounded-2xl border border-slate-100 bg-white p-3.5">
+              <div className="mb-2 flex items-center justify-between">
+                <h4 className="inline-flex items-center gap-1.5 text-[12px] font-bold text-slate-800">
+                  <StickyNote className="h-3.5 w-3.5 text-sky-500" />
+                  Notes
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => goFull('notes')}
+                  className="text-[11px] font-semibold text-orange-500"
+                >
+                  + Add Note
+                </button>
+              </div>
+              <p className="text-[12px] text-slate-400">
+                {lead.notes || 'No notes added yet. Add notes to keep track of conversation.'}
+              </p>
             </section>
+          </div>
+
+          <div className="shrink-0 border-t border-slate-100 bg-white p-3">
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-3.5 py-3">
+              <div>
+                <p className="inline-flex items-center gap-1.5 text-[12px] font-bold text-emerald-800">
+                  <Calendar className="h-3.5 w-3.5" />
+                  Next Follow-up
+                </p>
+                <p className="mt-0.5 text-[12px] text-rose-500">
+                  {lead.nextFollowUp
+                    ? new Date(lead.nextFollowUp).toLocaleString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true,
+                      })
+                    : 'Not scheduled'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => goFull('followups')}
+                className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-emerald-600 px-3 text-[12px] font-semibold text-white hover:bg-emerald-700"
+              >
+                <Calendar className="h-3.5 w-3.5" />
+                Set Follow-up
+              </button>
+            </div>
           </div>
         </>
       )}

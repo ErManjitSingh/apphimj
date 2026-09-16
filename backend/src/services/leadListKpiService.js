@@ -117,6 +117,9 @@ async function buildLeadListKpis(branchId) {
             { $count: 'n' },
           ],
           statusNew: [{ $match: { status: 'new' } }, { $count: 'n' }],
+          followUpStatus: [{ $match: { status: { $in: ['follow_up', 'contacted', 'working_progress'] } } }, { $count: 'n' }],
+          interested: [{ $match: { status: { $in: ['qualified', 'hot', 'negotiation'] } } }, { $count: 'n' }],
+          quotation: [{ $match: { status: 'quotation_sent' } }, { $count: 'n' }],
           unassigned: [{ $match: { assignedTo: null } }, { $count: 'n' }],
           assigned: [{ $match: { assignedTo: { $ne: null } } }, { $count: 'n' }],
           lost: [
@@ -140,8 +143,11 @@ async function buildLeadListKpis(branchId) {
   return {
     totalLeads: n('total'),
     todayLeads: n('today'),
-    newLeads: n('today'),
+    newLeads: n('statusNew'),
     statusNewLeads: n('statusNew'),
+    followUpLeads: n('followUpStatus'),
+    interestedLeads: n('interested'),
+    quotationLeads: n('quotation'),
     unassignedLeads: n('unassigned'),
     assignedLeads: n('assigned'),
     followUpPending,
@@ -152,7 +158,7 @@ async function buildLeadListKpis(branchId) {
 }
 
 async function getLeadListKpis(branchId) {
-  const key = cacheKey('lead-list-kpis-v2', branchId || 'global');
+  const key = cacheKey('lead-list-kpis-v3', branchId || 'global');
   return getOrSet(key, () => buildLeadListKpis(branchId), LIST_KPI_TTL_MS);
 }
 

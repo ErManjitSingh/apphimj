@@ -58,7 +58,7 @@ export const TRAVEL_MONTHS = [
 ];
 
 export const pageConfig = {
-  '/leads': { title: 'Lead Management', subtitle: 'All travel inquiries', status: '', assignee: '' },
+  '/leads': { title: 'Leads', subtitle: 'Manage and track all your travel enquiries in one place.', status: '', assignee: '' },
   '/leads/inbox/new': {
     title: 'New Leads',
     subtitle: 'Fresh inquiries awaiting first contact',

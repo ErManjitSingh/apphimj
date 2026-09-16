@@ -384,8 +384,8 @@ export default function Leads() {
       <div className={isAdmin ? (isMobileViewport ? 'hidden' : 'block') : ''}>
         <LeadPageHeader
           title={config.title}
+          subtitle={config.subtitle}
           total={isAllLeadsPage ? undefined : totalLeads ?? undefined}
-          compact={isAllLeadsPage}
         />
 
         {isAllLeadsPage && <LeadKpiStrip />}
