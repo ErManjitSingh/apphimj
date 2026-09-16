@@ -70,6 +70,15 @@ export default function LeadDataTable({
   const isServer = Boolean(serverPagination);
   const [clientPagination, setClientPagination] = useState({ pageIndex: 0, pageSize: DEFAULT_PAGE_SIZE });
   const scrollRef = useRef(null);
+  const [openHint, setOpenHint] = useState(null);
+
+  const moveOpenHint = (e) => {
+    if (e.target.closest?.('button, a, input, [role="menuitem"], [role="menu"]')) {
+      setOpenHint(null);
+      return;
+    }
+    setOpenHint({ x: e.clientX, y: e.clientY });
+  };
 
   const pagination = isServer
     ? { pageIndex: serverPagination.pageIndex, pageSize: serverPagination.pageSize }
@@ -284,7 +293,11 @@ export default function LeadDataTable({
           )}
         </div>
       </div>
-      <div ref={scrollRef} className="overflow-auto max-h-[min(70vh,680px)]">
+      <div
+        ref={scrollRef}
+        className="overflow-auto max-h-[min(70vh,680px)]"
+        onScroll={() => setOpenHint(null)}
+      >
         <table className="w-full text-sm table-auto border-collapse min-w-[1100px]">
           <thead className="sticky top-0 z-20">
             {table.getHeaderGroups().map((hg) => (
@@ -325,6 +338,8 @@ export default function LeadDataTable({
                   data-index={virtualRow.index}
                   ref={rowVirtualizer.measureElement}
                   onClick={() => onRowClick(row.original)}
+                  onMouseMove={moveOpenHint}
+                  onMouseLeave={() => setOpenHint(null)}
                   className={cn('group cursor-pointer', rowBg, LEAD_LIST_ROW_HOVER)}
                 >
                   {row.getVisibleCells().map((cell) => {
@@ -381,6 +396,15 @@ export default function LeadDataTable({
         />
       )}
     </div>
+    {openHint ? (
+      <div
+        className="pointer-events-none fixed z-[400] -translate-x-1/2 -translate-y-[130%] rounded-md bg-slate-900 px-2 py-1 text-[11px] font-semibold text-white shadow-lg"
+        style={{ left: openHint.x, top: openHint.y }}
+      >
+        Open lead
+        <span className="absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 border-x-4 border-t-4 border-x-transparent border-t-slate-900" />
+      </div>
+    ) : null}
     </TooltipProvider>
   );
 }
