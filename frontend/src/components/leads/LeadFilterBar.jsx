@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Search, RotateCcw, Filter, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useQuery } from '@tanstack/react-query';
 import {
   DESTINATIONS,
   LEAD_STATUSES,
@@ -16,7 +15,6 @@ import { cn } from '../../lib/utils';
 import PeriodPresetChips from '../ui/PeriodPresetChips';
 import { LIST_STATUS_FILTERS } from '../../lib/executiveStatusDisplay';
 import { applyPeriodPreset } from '../../lib/periodFilters';
-import { LIST_STALE_MS, GC_TIME_MS } from '../../lib/queryConfig';
 import API from '../../api/axios';
 
 const fieldClass =
@@ -127,97 +125,135 @@ export default function LeadFilterBar({
     else onChange(next);
   };
 
-  const { data: stats } = useQuery({
-    queryKey: ['leads', 'list-kpis'],
-    queryFn: async () => {
-      const { data } = await API.get('/leads/list-kpis', { skipSuccessToast: true });
-      return data;
-    },
-    staleTime: LIST_STALE_MS,
-    gcTime: GC_TIME_MS,
-  });
-
-  const fmt = (n) => Number(n || 0).toLocaleString('en-IN');
-  const isAll =
-    !filters.status && !filters.filter && !filters.listStatus && filters.connected !== 'true';
-  const statusChips = [
-    {
-      key: 'all',
-      label: `All Leads (${fmt(stats?.totalLeads)})`,
-      active: isAll,
-      activeClass: 'bg-orange-500 text-white shadow-sm shadow-orange-500/25',
-      idleClass: 'bg-orange-50 text-orange-600 hover:bg-orange-100',
-      patch: { status: '', filter: '', listStatus: '', connected: '' },
-    },
-    {
-      key: 'new',
-      label: `New (${fmt(stats?.statusNewLeads ?? stats?.newLeads)})`,
-      active: filters.status === 'new',
-      activeClass: 'bg-sky-500 text-white shadow-sm shadow-sky-500/25',
-      idleClass: 'bg-sky-50 text-sky-600 hover:bg-sky-100',
-      patch: { status: 'new', filter: '', listStatus: '', connected: '' },
-    },
-    {
-      key: 'follow_up',
-      label: `Follow-up (${fmt(stats?.followUpLeads ?? stats?.followUpPending)})`,
-      active: filters.status === 'follow_up',
-      activeClass: 'bg-violet-500 text-white shadow-sm shadow-violet-500/25',
-      idleClass: 'bg-violet-50 text-violet-600 hover:bg-violet-100',
-      patch: { status: 'follow_up', filter: '', listStatus: '', connected: '' },
-    },
-    {
-      key: 'interested',
-      label: `Interested (${fmt(stats?.interestedLeads)})`,
-      active: filters.listStatus === 'hot',
-      activeClass: 'bg-amber-500 text-white shadow-sm shadow-amber-500/25',
-      idleClass: 'bg-amber-50 text-amber-700 hover:bg-amber-100',
-      patch: { status: '', filter: '', listStatus: 'hot', connected: '' },
-    },
-    {
-      key: 'quotation',
-      label: `Quotation (${fmt(stats?.quotationLeads)})`,
-      active: filters.status === 'quotation_sent',
-      activeClass: 'bg-teal-500 text-white shadow-sm shadow-teal-500/25',
-      idleClass: 'bg-teal-50 text-teal-700 hover:bg-teal-100',
-      patch: { status: 'quotation_sent', filter: '', listStatus: '', connected: '' },
-    },
-    {
-      key: 'converted',
-      label: `Converted (${fmt(stats?.convertedLeads)})`,
-      active: filters.status === 'converted' && filters.filter !== 'arrivals',
-      activeClass: 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/25',
-      idleClass: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
-      patch: { status: 'converted', filter: '', listStatus: '', connected: '' },
-    },
-  ];
-
   return (
-    <div className="mb-4 overflow-hidden rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-      <div className="mb-4 flex items-center gap-2">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-50 text-orange-500">
-          <Filter className="h-4 w-4" />
-        </span>
-        <h3 className="text-base font-bold text-slate-900">Filters</h3>
-        {activeCount > 0 && (
-          <span className="rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-bold text-white">
-            {activeCount} active
-          </span>
-        )}
+    <div className="mb-5 overflow-hidden rounded-[24px] border border-slate-100 bg-white p-5 shadow-sm ring-1 ring-slate-100/80">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+        <div className="flex items-center gap-2">
+          <h3 className="text-base font-bold text-slate-900">Filters</h3>
+          {activeCount > 0 && (
+            <span className="rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-bold text-white">
+              {activeCount} active
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1 rounded-xl bg-slate-100/80 p-1 ring-1 ring-slate-200/80">
+          <button
+            type="button"
+            onClick={() => setMode('basic')}
+            className={cn(
+              'rounded-lg px-3 py-1.5 text-xs font-semibold transition',
+              mode === 'basic'
+                ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/30'
+                : 'text-slate-500 hover:bg-blue-50 hover:text-blue-700'
+            )}
+          >
+            Basic Search
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('advanced')}
+            className={cn(
+              'rounded-lg px-3 py-1.5 text-xs font-semibold transition',
+              mode === 'advanced'
+                ? 'bg-violet-600 text-white shadow-sm shadow-violet-500/30'
+                : 'text-slate-500 hover:bg-violet-50 hover:text-violet-700'
+            )}
+          >
+            Advanced Search
+          </button>
+        </div>
       </div>
 
-      <div className="mb-4 grid grid-cols-1 items-end gap-3 lg:grid-cols-[1fr_160px_160px]">
-        <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            value={filters.search}
-            onChange={(e) => set('search', e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') onApply?.();
+      <div className="relative mb-4">
+        <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <input
+          value={filters.search}
+          onChange={(e) => set('search', e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') onApply?.();
+          }}
+          placeholder="Search customer, phone, email, lead ID..."
+          className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-violet-500/25 focus:border-violet-400"
+        />
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <FieldLabel>Period</FieldLabel>
+          <PeriodPresetChips
+            colorful
+            accent="violet"
+            dateFrom={filters.dateFrom}
+            dateTo={filters.dateTo}
+            onSelect={(key) => {
+              if (onPeriodSelect) onPeriodSelect(key);
+              else onChange({ ...filters, ...applyPeriodPreset(key) });
             }}
-            placeholder="Search by name, phone, email, lead ID..."
-            className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-500/15"
           />
         </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">Results</span>
+          <ChipButton
+            active={filters.status === 'converted' && filters.filter !== 'arrivals' && !filters.listStatus}
+            activeClass="bg-emerald-600 text-white shadow-sm shadow-emerald-500/30 ring-emerald-700/20"
+            idleClass="bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100"
+            onClick={() =>
+              applyQuick(
+                filters.status === 'converted' && filters.filter !== 'arrivals' && !filters.listStatus
+                  ? { status: '', filter: '', listStatus: '' }
+                  : { status: 'converted', filter: '', listStatus: '' }
+              )
+            }
+          >
+            Converted
+          </ChipButton>
+          <ChipButton
+            active={filters.filter === 'arrivals'}
+            activeClass="bg-amber-500 text-white shadow-sm shadow-amber-500/30 ring-amber-600/20"
+            idleClass="bg-amber-50 text-amber-700 ring-amber-200 hover:bg-amber-100"
+            onClick={() =>
+              applyQuick(
+                filters.filter === 'arrivals'
+                  ? { status: '', filter: '', listStatus: '' }
+                  : { status: 'converted', filter: 'arrivals', listStatus: '' }
+              )
+            }
+          >
+            Arrivals
+          </ChipButton>
+          {LIST_STATUS_FILTERS.map((chip) => (
+            <ChipButton
+              key={chip.value}
+              active={filters.listStatus === chip.value}
+              activeClass={chip.activeClass}
+              idleClass={chip.idleClass}
+              onClick={() =>
+                applyQuick(
+                  filters.listStatus === chip.value
+                    ? { listStatus: '' }
+                    : { listStatus: chip.value, status: '', filter: '' }
+                )
+              }
+            >
+              {chip.label}
+            </ChipButton>
+          ))}
+          <ChipButton
+            active={filters.connected === 'true'}
+            activeClass="bg-blue-600 text-white shadow-sm shadow-blue-500/30 ring-blue-700/20"
+            idleClass="bg-blue-50 text-blue-700 ring-blue-200 hover:bg-blue-100"
+            onClick={() =>
+              applyQuick(
+                filters.connected === 'true' ? { connected: '' } : { connected: 'true' }
+              )
+            }
+          >
+            Connected
+          </ChipButton>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <div>
           <FieldLabel>Date From</FieldLabel>
           <input
@@ -236,57 +272,49 @@ export default function LeadFilterBar({
             className={fieldClass}
           />
         </div>
-      </div>
-
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={onApply}
-          className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-orange-500 px-4 text-sm font-semibold text-white shadow-sm shadow-orange-500/25 transition hover:bg-orange-600"
-        >
-          <Filter className="h-3.5 w-3.5" />
-          Apply Filters
-        </button>
-        <button
-          type="button"
-          onClick={onReset}
-          className="inline-flex h-10 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold text-rose-500 hover:bg-rose-50"
-        >
-          <RotateCcw className="h-4 w-4" />
-          Reset
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setMode('advanced');
-            openMoreFilters();
-          }}
-          className={cn(
-            'inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-sm font-semibold',
-            showMore || mode === 'advanced'
-              ? 'border-orange-300 bg-orange-50 text-orange-700'
-              : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-          )}
-        >
-          More
-          <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', (showMore || mode === 'advanced') && 'rotate-180')} />
-        </button>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        {statusChips.map((chip) => (
-          <button
-            key={chip.key}
-            type="button"
-            onClick={() => applyQuick(chip.patch)}
-            className={cn(
-              'rounded-full px-3 py-1.5 text-[12px] font-semibold transition',
-              chip.active ? chip.activeClass : chip.idleClass
-            )}
+        <div>
+          <FieldLabel>Source</FieldLabel>
+          <select value={filters.source} onChange={(e) => set('source', e.target.value)} className={fieldClass}>
+            <option value="">All Sources</option>
+            {LEAD_SOURCE_FILTER_OPTIONS.filter((s) => s.value).map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <FieldLabel>Destination</FieldLabel>
+          <select
+            value={filters.destination}
+            onChange={(e) => set('destination', e.target.value)}
+            className={fieldClass}
           >
-            {chip.label}
-          </button>
-        ))}
+            <option value="">All Destinations</option>
+            {DESTINATIONS.map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <FieldLabel>Package Cost</FieldLabel>
+          <select
+            value={filters.budgetRange || ''}
+            onChange={(e) => setBudgetRange(e.target.value)}
+            className={fieldClass}
+          >
+            {BUDGET_FILTER_OPTIONS.map((b) => (
+              <option key={b.value || 'all'} value={b.value}>{b.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <FieldLabel>Executive</FieldLabel>
+          <select value={filters.agent} onChange={(e) => set('agent', e.target.value)} className={fieldClass}>
+            <option value="">All Executives</option>
+            {executives.map((ex) => (
+              <option key={ex._id} value={ex._id}>{ex.name}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {(mode === 'advanced' || showMore) && (
@@ -299,192 +327,124 @@ export default function LeadFilterBar({
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="mt-4 space-y-3 rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-              <div className="min-w-0">
-                <FieldLabel>Period</FieldLabel>
-                <PeriodPresetChips
-                  colorful
-                  accent="violet"
-                  dateFrom={filters.dateFrom}
-                  dateTo={filters.dateTo}
-                  onSelect={(key) => {
-                    if (onPeriodSelect) onPeriodSelect(key);
-                    else onChange({ ...filters, ...applyPeriodPreset(key) });
-                  }}
-                />
+            <div className="mt-3 grid grid-cols-1 gap-3 rounded-xl border border-violet-100 bg-violet-50/40 p-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {canFilterBranch && (
+                <div>
+                  <FieldLabel>Branch</FieldLabel>
+                  <select
+                    value={filters.branchId || ''}
+                    onChange={(e) => set('branchId', e.target.value)}
+                    className={fieldClass}
+                  >
+                    <option value="">All Branches</option>
+                    {branches.map((b) => (
+                      <option key={b._id} value={b._id}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div>
+                <FieldLabel>Team</FieldLabel>
+                <select value={filters.teamId || ''} onChange={(e) => set('teamId', e.target.value)} className={fieldClass}>
+                  <option value="">All Teams</option>
+                  {teams.map((t) => (
+                    <option key={t._id} value={t._id}>{t.name}</option>
+                  ))}
+                </select>
               </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <ChipButton
-                  active={filters.filter === 'arrivals'}
-                  activeClass="bg-amber-500 text-white shadow-sm shadow-amber-500/30 ring-amber-600/20"
-                  idleClass="bg-amber-50 text-amber-700 ring-amber-200 hover:bg-amber-100"
-                  onClick={() =>
-                    applyQuick(
-                      filters.filter === 'arrivals'
-                        ? { status: '', filter: '', listStatus: '' }
-                        : { status: 'converted', filter: 'arrivals', listStatus: '' }
-                    )
-                  }
-                >
-                  Arrivals
-                </ChipButton>
-                {LIST_STATUS_FILTERS.map((chip) => (
-                  <ChipButton
-                    key={chip.value}
-                    active={filters.listStatus === chip.value}
-                    activeClass={chip.activeClass}
-                    idleClass={chip.idleClass}
-                    onClick={() =>
-                      applyQuick(
-                        filters.listStatus === chip.value
-                          ? { listStatus: '' }
-                          : { listStatus: chip.value, status: '', filter: '' }
-                      )
-                    }
-                  >
-                    {chip.label}
-                  </ChipButton>
-                ))}
-                <ChipButton
-                  active={filters.connected === 'true'}
-                  activeClass="bg-blue-600 text-white shadow-sm shadow-blue-500/30 ring-blue-700/20"
-                  idleClass="bg-blue-50 text-blue-700 ring-blue-200 hover:bg-blue-100"
-                  onClick={() =>
-                    applyQuick(
-                      filters.connected === 'true' ? { connected: '' } : { connected: 'true' }
-                    )
-                  }
-                >
-                  Connected
-                </ChipButton>
+              <div>
+                <FieldLabel>State</FieldLabel>
+                <select value={filters.state || ''} onChange={(e) => set('state', e.target.value)} className={fieldClass}>
+                  <option value="">All States</option>
+                  {INDIAN_STATES.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
               </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-                <div>
-                  <FieldLabel>Source</FieldLabel>
-                  <select value={filters.source} onChange={(e) => set('source', e.target.value)} className={fieldClass}>
-                    <option value="">All Sources</option>
-                    {LEAD_SOURCE_FILTER_OPTIONS.filter((s) => s.value).map((s) => (
-                      <option key={s.value} value={s.value}>{s.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <FieldLabel>Destination</FieldLabel>
-                  <select
-                    value={filters.destination}
-                    onChange={(e) => set('destination', e.target.value)}
-                    className={fieldClass}
-                  >
-                    <option value="">All Destinations</option>
-                    {DESTINATIONS.map((d) => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <FieldLabel>Package Cost</FieldLabel>
-                  <select
-                    value={filters.budgetRange || ''}
-                    onChange={(e) => setBudgetRange(e.target.value)}
-                    className={fieldClass}
-                  >
-                    {BUDGET_FILTER_OPTIONS.map((b) => (
-                      <option key={b.value || 'all'} value={b.value}>{b.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <FieldLabel>Executive</FieldLabel>
-                  <select value={filters.agent} onChange={(e) => set('agent', e.target.value)} className={fieldClass}>
-                    <option value="">All Executives</option>
-                    {executives.map((ex) => (
-                      <option key={ex._id} value={ex._id}>{ex.name}</option>
-                    ))}
-                  </select>
-                </div>
-                {canFilterBranch && (
-                  <div>
-                    <FieldLabel>Branch</FieldLabel>
-                    <select
-                      value={filters.branchId || ''}
-                      onChange={(e) => set('branchId', e.target.value)}
-                      className={fieldClass}
-                    >
-                      <option value="">All Branches</option>
-                      {branches.map((b) => (
-                        <option key={b._id} value={b._id}>{b.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                <div>
-                  <FieldLabel>Team</FieldLabel>
-                  <select value={filters.teamId || ''} onChange={(e) => set('teamId', e.target.value)} className={fieldClass}>
-                    <option value="">All Teams</option>
-                    {teams.map((t) => (
-                      <option key={t._id} value={t._id}>{t.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <FieldLabel>State</FieldLabel>
-                  <select value={filters.state || ''} onChange={(e) => set('state', e.target.value)} className={fieldClass}>
-                    <option value="">All States</option>
-                    {INDIAN_STATES.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <FieldLabel>Priority</FieldLabel>
-                  <select
-                    value={filters.priority || ''}
-                    onChange={(e) => set('priority', e.target.value)}
-                    className={fieldClass}
-                  >
-                    {PRIORITY_FILTER_OPTIONS.map((p) => (
-                      <option key={p.value || 'all'} value={p.value}>{p.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <FieldLabel>Travel Month</FieldLabel>
-                  <select
-                    value={filters.travelMonth}
-                    onChange={(e) => set('travelMonth', e.target.value)}
-                    className={fieldClass}
-                  >
-                    <option value="">All Months</option>
-                    {TRAVEL_MONTHS.map((m, i) => (
-                      <option key={m} value={i}>{m}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <FieldLabel>Lead Status</FieldLabel>
-                  <select
-                    value={filters.listStatus || ''}
-                    onChange={(e) =>
-                      onChange({
-                        ...filters,
-                        listStatus: e.target.value,
-                        status: '',
-                        filter: '',
-                      })
-                    }
-                    className={fieldClass}
-                  >
-                    <option value="">All Statuses</option>
-                    {LEAD_STATUSES.map((s) => (
-                      <option key={s.value} value={s.value}>{s.label}</option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <FieldLabel>Priority</FieldLabel>
+                <select
+                  value={filters.priority || ''}
+                  onChange={(e) => set('priority', e.target.value)}
+                  className={fieldClass}
+                >
+                  {PRIORITY_FILTER_OPTIONS.map((p) => (
+                    <option key={p.value || 'all'} value={p.value}>{p.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <FieldLabel>Travel Month</FieldLabel>
+                <select
+                  value={filters.travelMonth}
+                  onChange={(e) => set('travelMonth', e.target.value)}
+                  className={fieldClass}
+                >
+                  <option value="">All Months</option>
+                  {TRAVEL_MONTHS.map((m, i) => (
+                    <option key={m} value={i}>{m}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <FieldLabel>Lead Status</FieldLabel>
+                <select
+                  value={filters.listStatus || ''}
+                  onChange={(e) =>
+                    onChange({
+                      ...filters,
+                      listStatus: e.target.value,
+                      status: '',
+                      filter: '',
+                    })
+                  }
+                  className={fieldClass}
+                >
+                  <option value="">All Statuses</option>
+                  {LEAD_STATUSES.map((s) => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </motion.div>
         </AnimatePresence>
       )}
+
+      <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
+        <button
+          type="button"
+          onClick={onApply}
+          className="h-10 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 text-sm font-semibold text-white shadow-md shadow-violet-500/30 transition hover:from-violet-700 hover:to-indigo-700"
+        >
+          Apply Filters
+        </button>
+        <button
+          type="button"
+          onClick={onReset}
+          className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 shadow-sm transition-colors hover:bg-rose-100"
+        >
+          <RotateCcw className="h-4 w-4 text-rose-500" />
+          Reset
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setMode('advanced');
+            openMoreFilters();
+          }}
+          className={cn(
+            'inline-flex h-10 items-center gap-1.5 rounded-xl border px-4 text-sm font-semibold shadow-sm transition-colors',
+            showMore || mode === 'advanced'
+              ? 'border-orange-300 bg-orange-500 text-white shadow-orange-500/25 hover:bg-orange-600'
+              : 'border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100'
+          )}
+        >
+          <Filter className="h-4 w-4" />
+          More Filters
+          <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', (showMore || mode === 'advanced') && 'rotate-180')} />
+        </button>
+      </div>
     </div>
   );
 }

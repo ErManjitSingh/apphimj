@@ -7,17 +7,33 @@ import {
 } from '@tanstack/react-table';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Calendar, Inbox, MapPin, MessageCircle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import { toast } from '../../context/ToastContext';
-import { openCrmWhatsApp } from '../../lib/openCrmWhatsApp';
-import { getLeadListStatusDisplay } from '../../lib/executiveStatusDisplay';
-import Avatar from '../ui/Avatar';
+import { Columns3, Download, Inbox } from 'lucide-react';
+import LeadStatusBadge from './LeadStatusBadge';
+import LeadRowActions from './LeadRowActions';
+import { formatLeadId } from './constants';
+import {
+  SourceBadge,
+  DestinationChip,
+  BudgetBadge,
+  TravelersBadge,
+  LeadIdPill,
+  CustomerCell,
+  ExecutiveBadge,
+  PhoneCell,
+  TravelDateCell,
+} from '../sales-manager/LeadListBadges';
 import TablePagination, { DEFAULT_PAGE_SIZE } from '../ui/TablePagination';
 import { TooltipProvider } from '../ui/tooltip';
 import { cn } from '../../lib/utils';
-import { formatBudget } from '../sales-manager/managerUtils';
+import {
+  LEAD_LIST_CONTAINER,
+  LEAD_LIST_TH,
+  LEAD_LIST_TD,
+  LEAD_LIST_ROW_HOVER,
+  leadListRowBg,
+  leadListStickyBg,
+  leadRowAccentClass,
+} from './leadListStyles';
 
 const defaultMenuActions = {
   view: true,
@@ -27,104 +43,8 @@ const defaultMenuActions = {
   delete: true,
 };
 
-const DEST_PILL = {
-  Manali: 'bg-rose-50 text-rose-600 ring-rose-100',
-  Goa: 'bg-emerald-50 text-emerald-600 ring-emerald-100',
-  Ladakh: 'bg-sky-50 text-sky-600 ring-sky-100',
-  Dharamshala: 'bg-orange-50 text-orange-600 ring-orange-100',
-  Rajasthan: 'bg-violet-50 text-violet-600 ring-violet-100',
-};
-
-function statusPill(lead) {
-  const status = String(lead?.status || '');
-  const map = {
-    new: { label: 'New', className: 'bg-sky-50 text-sky-600 ring-sky-100' },
-    follow_up: { label: 'Follow-up', className: 'bg-orange-50 text-orange-600 ring-orange-100' },
-    contacted: { label: 'Follow-up', className: 'bg-orange-50 text-orange-600 ring-orange-100' },
-    working_progress: { label: 'Follow-up', className: 'bg-orange-50 text-orange-600 ring-orange-100' },
-    qualified: { label: 'Interested', className: 'bg-amber-50 text-amber-700 ring-amber-100' },
-    hot: { label: 'Interested', className: 'bg-amber-50 text-amber-700 ring-amber-100' },
-    negotiation: { label: 'Interested', className: 'bg-amber-50 text-amber-700 ring-amber-100' },
-    quotation_sent: { label: 'Quotation', className: 'bg-teal-50 text-teal-700 ring-teal-100' },
-    converted: { label: 'Converted', className: 'bg-emerald-50 text-emerald-600 ring-emerald-100' },
-    lost: { label: 'Lost', className: 'bg-rose-50 text-rose-600 ring-rose-100' },
-    booked_from_another_company: { label: 'Lost', className: 'bg-rose-50 text-rose-600 ring-rose-100' },
-  };
-  if (map[status]) return map[status];
-  const display = getLeadListStatusDisplay(lead);
-  return {
-    label: display.mainLabel || 'No status',
-    className: 'bg-slate-50 text-slate-600 ring-slate-100',
-  };
-}
-
-function NameCell({ lead }) {
-  const isNew = lead?.status === 'new';
-  return (
-    <div className="flex min-w-0 items-center gap-2.5">
-      <Avatar name={lead?.name} size="sm" className="!h-9 !w-9 !text-[11px]" />
-      <div className="min-w-0">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <p className="truncate text-[13px] font-semibold text-slate-900">{lead?.name || '—'}</p>
-          {isNew ? (
-            <span className="shrink-0 rounded-full bg-sky-50 px-1.5 py-0.5 text-[9px] font-bold text-sky-600 ring-1 ring-sky-100">
-              New
-            </span>
-          ) : null}
-        </div>
-        <p className="truncate text-[11px] text-slate-400">{lead?.email || 'No email'}</p>
-      </div>
-    </div>
-  );
-}
-
-function ContactCell({ lead }) {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const phone = lead?.phone;
-  if (!phone) return <span className="text-sm text-slate-400">—</span>;
-  return (
-    <div className="flex items-center gap-1.5 whitespace-nowrap">
-      <span className="text-[13px] text-slate-600">{phone}</span>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          openCrmWhatsApp({
-            leadId: lead?._id,
-            phone,
-            navigate,
-            role: user?.role,
-            toast,
-          });
-        }}
-        className="inline-flex h-6 w-6 items-center justify-center rounded-full text-emerald-500 hover:bg-emerald-50"
-        aria-label="Open CRM WhatsApp"
-      >
-        <MessageCircle className="h-3.5 w-3.5" fill="currentColor" />
-      </button>
-    </div>
-  );
-}
-
-function DestCell({ name }) {
-  if (!name) return <span className="text-sm text-slate-400">—</span>;
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1',
-        DEST_PILL[name] || 'bg-slate-50 text-slate-600 ring-slate-100'
-      )}
-    >
-      <MapPin className="h-3 w-3" />
-      {name}
-    </span>
-  );
-}
-
-const thClass =
-  'whitespace-nowrap border-b border-slate-100 bg-white px-3 py-3 text-left text-[11px] font-semibold text-slate-400';
-const tdClass = 'border-b border-slate-50 px-3 py-3 align-middle';
+const leadsTh = LEAD_LIST_TH;
+const leadsTd = LEAD_LIST_TD;
 
 export default function LeadDataTable({
   leads,
@@ -143,16 +63,10 @@ export default function LeadDataTable({
   listTitle = 'Leads List',
   onExport,
 }) {
-  void onDelete;
-  void onAssign;
-  void onTransferBranch;
-  void onAccepted;
-  void onAcceptExpired;
-  void canEditLead;
-  void menuActions;
-  void showAssignButton;
-  void onExport;
-
+  const actions = useMemo(
+    () => ({ ...defaultMenuActions, ...menuActions }),
+    [menuActions]
+  );
   const isServer = Boolean(serverPagination);
   const [clientPagination, setClientPagination] = useState({ pageIndex: 0, pageSize: DEFAULT_PAGE_SIZE });
   const scrollRef = useRef(null);
@@ -176,7 +90,7 @@ export default function LeadDataTable({
             type="checkbox"
             checked={table.getIsAllPageRowsSelected()}
             onChange={table.getToggleAllPageRowsSelectedHandler()}
-            className="h-4 w-4 rounded border-slate-300 accent-orange-500"
+            className="rounded border-slate-300 accent-blue-600 w-4 h-4"
           />
         ),
         cell: ({ row }) => (
@@ -185,77 +99,117 @@ export default function LeadDataTable({
             checked={row.getIsSelected()}
             onChange={row.getToggleSelectedHandler()}
             onClick={(e) => e.stopPropagation()}
-            className="h-4 w-4 rounded border-slate-300 accent-orange-500"
+            className="rounded border-slate-300 accent-blue-600 w-4 h-4"
           />
-        ),
-        size: 40,
-      },
-      {
-        id: 'index',
-        header: '#',
-        cell: ({ row }) => (
-          <span className="text-[13px] font-medium text-slate-500">
-            {pagination.pageIndex * pagination.pageSize + row.index + 1}
-          </span>
         ),
         size: 44,
       },
       {
+        accessorKey: 'id',
+        header: 'Lead ID',
+        cell: ({ row }) => <LeadIdPill id={formatLeadId(row.original._id)} lead={row.original} />,
+      },
+      {
         accessorKey: 'name',
-        header: 'Name',
-        cell: ({ row }) => <NameCell lead={row.original} />,
+        header: 'Customer',
+        cell: ({ row }) => <CustomerCell name={row.original.name} lead={row.original} />,
       },
       {
         accessorKey: 'phone',
-        header: 'Contact',
-        cell: ({ row }) => <ContactCell lead={row.original} />,
+        header: 'Phone',
+        cell: ({ row }) => (
+          <PhoneCell phone={row.original.phone} leadId={row.original._id} lead={row.original} />
+        ),
       },
       {
         accessorKey: 'destination',
         header: 'Destination',
-        cell: ({ getValue }) => <DestCell name={getValue()} />,
+        cell: ({ getValue }) => <DestinationChip name={getValue()} />,
       },
       {
         accessorKey: 'travelDate',
         header: 'Travel Date',
-        cell: ({ getValue }) => {
-          const date = getValue();
-          if (!date) return <span className="text-sm text-slate-400">—</span>;
-          return (
-            <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[13px] text-slate-600">
-              <Calendar className="h-3.5 w-3.5 text-slate-400" />
-              {new Date(date).toLocaleDateString('en-IN', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric',
-              })}
-            </span>
-          );
-        },
+        cell: ({ getValue }) => <TravelDateCell date={getValue()} />,
       },
       {
         accessorKey: 'budget',
         header: 'Budget',
-        cell: ({ getValue }) => (
-          <span className="whitespace-nowrap text-[13px] font-semibold text-slate-800">
-            {formatBudget(getValue())}
-          </span>
+        cell: ({ getValue }) => <BudgetBadge amount={getValue()} />,
+      },
+      {
+        accessorKey: 'travelers',
+        header: 'Pax',
+        cell: ({ row }) => (
+          <TravelersBadge
+            travelers={row.original.travelers}
+            adults={row.original.adults}
+            children={row.original.children}
+          />
+        ),
+      },
+      {
+        accessorKey: 'source',
+        header: 'Source',
+        cell: ({ row }) => (
+          <SourceBadge
+            source={row.original.source}
+            label={row.original.sourceLabel}
+            sourceShort={row.original.sourceShort}
+          />
         ),
       },
       {
         accessorKey: 'status',
         header: 'Status',
-        cell: ({ row }) => {
-          const pill = statusPill(row.original);
-          return (
-            <span className={cn('inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1', pill.className)}>
-              {pill.label}
-            </span>
-          );
-        },
+        cell: ({ row }) => (
+          <LeadStatusBadge
+            status={row.original.status}
+            reason={row.original.statusReason}
+            lead={row.original}
+            pulse={row.original.status === 'new'}
+            size="sm"
+            listMode
+          />
+        ),
+      },
+      {
+        id: 'assignedTo',
+        accessorKey: 'assignedTo',
+        header: 'Assigned To',
+        cell: ({ getValue }) => (
+          <ExecutiveBadge name={getValue()?.name} unassigned={!getValue()?.name} />
+        ),
+      },
+      {
+        id: 'rowActions',
+        header: 'Actions',
+        cell: ({ row }) => (
+          <LeadRowActions
+            lead={row.original}
+            onRowClick={onRowClick}
+            onDelete={onDelete}
+            onAssign={onAssign}
+            onTransferBranch={onTransferBranch}
+            onAccepted={onAccepted}
+            onAcceptExpired={onAcceptExpired}
+            canEditLead={canEditLead}
+            actions={actions}
+            showAssignButton={showAssignButton}
+          />
+        ),
       },
     ],
-    [pagination.pageIndex, pagination.pageSize]
+    [
+      onRowClick,
+      onDelete,
+      onAssign,
+      onTransferBranch,
+      onAccepted,
+      onAcceptExpired,
+      canEditLead,
+      actions,
+      showAssignButton,
+    ]
   );
 
   const table = useReactTable({
@@ -277,8 +231,8 @@ export default function LeadDataTable({
   const rowVirtualizer = useVirtualizer({
     count: tableRows.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 68,
-    overscan: 8,
+    estimateSize: () => 120,
+    overscan: 6,
   });
   const virtualRows = rowVirtualizer.getVirtualItems();
   const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
@@ -287,8 +241,8 @@ export default function LeadDataTable({
 
   if (leads.length === 0) {
     return (
-      <div className="rounded-2xl border border-slate-100 bg-white px-6 py-16 text-center shadow-sm">
-        <span className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-50 text-orange-500">
+      <div className="rounded-[24px] border border-slate-100 bg-white px-6 py-16 text-center shadow-sm ring-1 ring-slate-100/80">
+        <span className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50 text-violet-500 ring-1 ring-violet-100">
           <Inbox className="h-7 w-7" />
         </span>
         <p className="text-base font-bold text-slate-900">No leads match your filters</p>
@@ -299,72 +253,134 @@ export default function LeadDataTable({
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
-        <div ref={scrollRef} className="max-h-[min(70vh,680px)] overflow-auto">
-          <table className="w-full min-w-[920px] table-auto border-collapse text-sm">
-            <thead className="sticky top-0 z-20">
-              {table.getHeaderGroups().map((hg) => (
-                <tr key={hg.id}>
-                  {hg.headers.map((header) => (
-                    <th key={header.id} className={thClass}>
+    <div className={LEAD_LIST_CONTAINER}>
+      <div className="relative flex flex-wrap items-center justify-between gap-3 overflow-hidden border-b border-slate-100 bg-gradient-to-r from-violet-50/80 via-white to-orange-50/50 px-5 py-4">
+        <span className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-violet-500 via-fuchsia-400 to-orange-400" />
+        <div className="flex min-w-0 items-center gap-2.5">
+          <h3 className="text-[15px] font-bold tracking-tight text-slate-900">{listTitle}</h3>
+          {typeof (serverPagination?.total ?? leads.length) === 'number' && (
+            <span className="inline-flex items-center rounded-full bg-violet-600 px-2.5 py-0.5 text-[11px] font-bold text-white shadow-sm shadow-violet-500/30">
+              {Number(serverPagination?.total ?? leads.length).toLocaleString('en-IN')} found
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white/90 px-3 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white"
+          >
+            <Columns3 className="h-3.5 w-3.5" />
+            Columns
+          </button>
+          {onExport && (
+            <button
+              type="button"
+              onClick={onExport}
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white/90 px-3 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export
+            </button>
+          )}
+        </div>
+      </div>
+      <div ref={scrollRef} className="overflow-auto max-h-[min(70vh,680px)]">
+        <table className="w-full text-sm table-auto border-collapse min-w-[1100px]">
+          <thead className="sticky top-0 z-20">
+            {table.getHeaderGroups().map((hg) => (
+              <tr key={hg.id}>
+                {hg.headers.map((header) => {
+                  const colId = header.column.id;
+                  const thClass = cn(
+                    leadsTh,
+                    colId === 'rowActions' && 'text-right sticky right-0 z-30 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.06)]',
+                    colId !== 'rowActions' && 'cursor-pointer select-none hover:text-slate-700'
+                  );
+                  return (
+                    <th
+                      key={header.id}
+                      className={thClass}
+                      onClick={colId !== 'rowActions' && colId !== 'select' ? header.column.getToggleSortingHandler() : undefined}
+                    >
                       {flexRender(header.column.columnDef.header, header.getContext())}
                     </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {paddingTop > 0 && (
-                <tr aria-hidden>
-                  <td colSpan={columns.length} style={{ height: paddingTop, padding: 0, border: 0 }} />
-                </tr>
-              )}
-              {virtualRows.map((virtualRow) => {
-                const row = tableRows[virtualRow.index];
-                return (
-                  <tr
-                    key={row.id}
-                    data-index={virtualRow.index}
-                    ref={rowVirtualizer.measureElement}
-                    onClick={() => onRowClick(row.original)}
-                    className="cursor-pointer bg-white transition-colors hover:bg-orange-50/40"
-                  >
-                    {row.getVisibleCells().map((cell) => (
+                  );
+                })}
+              </tr>
+            ))}
+          </thead>
+          <tbody>
+            {paddingTop > 0 && (
+              <tr aria-hidden>
+                <td colSpan={columns.length} style={{ height: paddingTop, padding: 0, border: 0 }} />
+              </tr>
+            )}
+            {virtualRows.map((virtualRow) => {
+              const row = tableRows[virtualRow.index];
+              const rowBg = leadListRowBg(virtualRow.index);
+              const stickyBg = leadListStickyBg(virtualRow.index);
+              return (
+                <tr
+                  key={row.id}
+                  data-index={virtualRow.index}
+                  ref={rowVirtualizer.measureElement}
+                  onClick={() => onRowClick(row.original)}
+                  className={cn('group cursor-pointer', rowBg, LEAD_LIST_ROW_HOVER)}
+                >
+                  {row.getVisibleCells().map((cell) => {
+                    const colId = cell.column.id;
+                    const tdClass = cn(
+                      leadsTd,
+                      colId === 'select' && leadRowAccentClass(row.original),
+                      colId === 'rowActions' &&
+                        cn(
+                          'text-right sticky right-0 z-10 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.04)]',
+                          stickyBg
+                        )
+                    );
+                    return (
                       <td key={cell.id} className={tdClass}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
-                    ))}
-                  </tr>
-                );
-              })}
-              {paddingBottom > 0 && (
-                <tr aria-hidden>
-                  <td colSpan={columns.length} style={{ height: paddingBottom, padding: 0, border: 0 }} />
+                    );
+                  })}
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        {isServer ? (
-          <TablePagination
-            pageIndex={serverPagination.pageIndex}
-            pageSize={serverPagination.pageSize}
-            pageCount={serverPagination.pageCount}
-            total={serverPagination.total}
-            hasMore={serverPagination.hasMore}
-            onPageChange={(pageIndex) =>
-              serverPagination.onPaginationChange((prev) => ({ ...prev, pageIndex }))
-            }
-            onPageSizeChange={(pageSize) =>
-              serverPagination.onPaginationChange({ pageIndex: 0, pageSize })
-            }
-            totalLabel="leads"
-            className="border-t border-slate-100 bg-white"
-          />
-        ) : (
-          <TablePagination table={table} totalLabel="leads" className="border-t border-slate-100 bg-white" />
-        )}
+              );
+            })}
+            {paddingBottom > 0 && (
+              <tr aria-hidden>
+                <td colSpan={columns.length} style={{ height: paddingBottom, padding: 0, border: 0 }} />
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
+      {isServer ? (
+        <TablePagination
+          pageIndex={serverPagination.pageIndex}
+          pageSize={serverPagination.pageSize}
+          pageCount={serverPagination.pageCount}
+          total={serverPagination.total}
+          hasMore={serverPagination.hasMore}
+          onPageChange={(pageIndex) =>
+            serverPagination.onPaginationChange((prev) => ({ ...prev, pageIndex }))
+          }
+          onPageSizeChange={(pageSize) =>
+            serverPagination.onPaginationChange({ pageIndex: 0, pageSize })
+          }
+          totalLabel="leads"
+          showPageNumbers
+          className="border-t border-subtle bg-slate-50/50"
+        />
+      ) : (
+        <TablePagination
+          table={table}
+          totalLabel="leads"
+          showPageNumbers
+          className="border-t border-subtle bg-slate-50/50"
+        />
+      )}
+    </div>
     </TooltipProvider>
   );
 }
