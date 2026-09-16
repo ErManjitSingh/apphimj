@@ -389,6 +389,74 @@
       url('/sidebar-night.webp');
   }
 
+  .sidebar-light {
+    --sidebar-text: #0f172a;
+    --sidebar-muted: #64748b;
+    --sidebar-hover: rgba(15, 23, 42, 0.05);
+    --sidebar-active: #f97316;
+    --sidebar-border: #f1f5f9;
+    --sidebar-active-text: #ffffff;
+    background: #ffffff;
+  }
+
+  .sidebar-sparkles {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .sidebar-sparkle {
+    position: absolute;
+    display: block;
+    border-radius: 999px;
+    opacity: 0.2;
+    animation-name: sidebar-sparkle-twinkle;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+  }
+
+  .sidebar-sparkle--star {
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .sidebar-sparkle--star::before,
+  .sidebar-sparkle--star::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    background: currentColor;
+    border-radius: 99px;
+    box-shadow: 0 0 8px currentColor;
+  }
+
+  .sidebar-sparkle--star::before {
+    width: 2px;
+    height: 100%;
+    transform: translate(-50%, -50%);
+  }
+
+  .sidebar-sparkle--star::after {
+    width: 100%;
+    height: 2px;
+    transform: translate(-50%, -50%);
+  }
+
+  @keyframes sidebar-sparkle-twinkle {
+    0%,
+    100% {
+      opacity: 0.12;
+      transform: scale(0.55) translateY(0);
+    }
+    50% {
+      opacity: 0.95;
+      transform: scale(1.25) translateY(-5px);
+    }
+  }
+
   /* FullCalendar v6 — premium follow-up calendar */
   .followup-calendar .fc {
     --fc-border-color: var(--color-border-subtle);

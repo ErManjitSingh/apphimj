@@ -148,7 +148,7 @@ export function buildSelectedHotelsSnapshot(dayWiseHotels, { rooms = 1, mattress
         total,
         absolutePerNight: absolute,
         priceDelta: unitPerNight,
-        externalSource: entry.hotel.externalSource || 'uno_hotels',
+        externalSource: entry.hotel.externalSource || 'catalog',
       };
     });
 }

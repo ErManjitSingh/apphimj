@@ -30,7 +30,7 @@ function TypeBadge({ type }) {
   );
 }
 
-export default function UnoPackageListTable({ packages, onView, onEdit, editingId }) {
+export default function PackageListTable({ packages, onView, onEdit, editingId }) {
   const columns = useMemo(
     () => [
       {

@@ -1,4 +1,5 @@
 import API from '../api/axios';
+import { CHANNELS } from '../config/channels';
 
 /** Inbox path by role — all use the same company WhatsApp Cloud number. */
 export function getCrmWhatsAppInboxPath(role) {
@@ -11,6 +12,10 @@ export function getCrmWhatsAppInboxPath(role) {
  * Replaces wa.me / personal WhatsApp for day-to-day lead chat.
  */
 export async function openCrmWhatsApp({ leadId, phone, navigate, role, toast } = {}) {
+  if (!CHANNELS.whatsapp) {
+    toast?.error?.('WhatsApp is not connected on this CRM');
+    return null;
+  }
   if (!leadId) {
     toast?.error?.('Lead id missing');
     return null;

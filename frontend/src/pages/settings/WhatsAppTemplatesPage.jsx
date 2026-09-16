@@ -13,6 +13,8 @@ import {
 import { renderWhatsAppTemplate } from '../../lib/whatsappContact';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useAuth } from '../../context/AuthContext';
+import { CHANNELS } from '../../config/channels';
+import ChannelUnavailable from '../../components/channels/ChannelUnavailable';
 
 const EMPTY_FORM = { name: '', body: '', enabled: true, sortOrder: 0 };
 
@@ -24,6 +26,7 @@ const VARIABLE_CHIPS = [
 ];
 
 export default function WhatsAppTemplatesPage() {
+  if (!CHANNELS.whatsapp) return <ChannelUnavailable channel="whatsapp" />;
   const { can } = usePermissions();
   const { user } = useAuth();
   const canManage = can('whatsapp', 'manage');

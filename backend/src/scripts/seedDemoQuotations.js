@@ -60,7 +60,7 @@ const DEMO_QUOTES = [
         },
         {
           city: 'Kasol',
-          name: 'UNO Prime Kasol',
+          name: 'Kasol Valley Retreat',
           checkIn: new Date('2026-07-02'),
           checkOut: new Date('2026-07-03'),
           roomType: 'Deluxe',

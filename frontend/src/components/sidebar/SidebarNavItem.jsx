@@ -40,7 +40,7 @@ export default function SidebarNavItem({ item, isActive, nested = false }) {
   const { collapsed, setMobileOpen } = useSidebar();
   const { accent } = useSidebarTheme();
   const Icon = item.icon;
-  const accentStyle = item.accent ? ACCENT_STYLES[item.accent] : null;
+  const accentStyle = accent.hideIndicator ? null : item.accent ? ACCENT_STYLES[item.accent] : null;
 
   const linkContent = (
     <Link
@@ -52,13 +52,13 @@ export default function SidebarNavItem({ item, isActive, nested = false }) {
         window.setTimeout(() => setMobileOpen(false), 0);
       }}
       className={cn(
-        'group relative flex items-center gap-3 rounded-lg text-[13px] font-medium transition-all duration-200',
-        nested ? 'px-3 py-2 ml-0.5' : 'px-3 py-2.5',
-        collapsed ? 'justify-center px-0 py-2.5' : '',
+        'group relative flex items-center gap-3 rounded-xl text-[13px] font-medium transition-all duration-200',
+        nested ? 'px-3 py-2 ml-0.5' : 'px-3 py-3',
+        collapsed ? 'justify-center px-0 py-3' : '',
         isActive
           ? accentStyle
             ? accentStyle.active
-            : cn(accent.itemActive)
+            : cn(accent.itemActive, 'rounded-xl')
           : cn(
               accentStyle
                 ? accentStyle.idle
@@ -66,7 +66,7 @@ export default function SidebarNavItem({ item, isActive, nested = false }) {
             )
       )}
     >
-      {isActive && !collapsed && (
+      {isActive && !collapsed && !accent.hideIndicator && (
         <span
           className={cn(
             'absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[18px] rounded-r-full',

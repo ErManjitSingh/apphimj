@@ -5,15 +5,18 @@ import DashboardPanel from './DashboardPanel';
 function formatSource(name) {
   const key = String(name || 'other').toLowerCase().replace(/\s+/g, '_');
   const labels = {
-    dpw: 'DPW',
-    dpw_wa: 'DPW WA',
-    dpw_call: 'DPW CALL',
-    dpw2: 'DPW2',
-    dpw2_wa: 'DPW2 WA',
-    dpw2_call: 'DPW2 CALL',
+    website: 'Website',
+    website_2: 'Website 2',
     referral: 'Referral',
+    portal_lead: 'Portal Lead',
     call_lead: 'Call Lead',
-    organic: 'Organic',
+    dpw: 'Website',
+    dpw_wa: 'Website',
+    dpw_call: 'Call Lead',
+    dpw2: 'Website 2',
+    dpw2_wa: 'Website 2',
+    dpw2_call: 'Call Lead',
+    organic: 'Website',
   };
   return labels[key] || String(name || 'Other').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }

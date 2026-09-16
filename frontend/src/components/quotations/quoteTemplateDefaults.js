@@ -1,6 +1,8 @@
-/** PTW / Himachal Tour–style quotation template defaults (Travel CRM) */
+import { COMPANY_BANK_ACCOUNTS, COMPANY_NAME } from '../../config/branding';
 
-export const QUOTE_WELCOME_TEXT = `Greetings from Travel CRM. Your journey surely deserves warm hospitality, comfortable stay, hassle-free transportation and proper guidance which Travel CRM, a reliable and growing travel organization, promises to cater at the best possible rates.
+/** Himachal tour quotation template defaults */
+
+export const QUOTE_WELCOME_TEXT = `Greetings from ${COMPANY_NAME}. Your journey surely deserves warm hospitality, comfortable stay, hassle-free transportation and proper guidance which ${COMPANY_NAME}, a reliable and growing travel organization, promises to cater at the best possible rates.
 
 We are proud to offer packages that can't be more perfect and take you to such an enhanced experience that the only words you have for us are "True to their Commitment."
 
@@ -45,16 +47,7 @@ export const QUOTE_POLICIES = {
   ],
 };
 
-export const QUOTE_BANK_ACCOUNTS = [
-  {
-    bank: '',
-    accountName: '',
-    accountNo: '',
-    ifsc: '',
-    branch: '',
-    upi: '',
-  },
-];
+export const QUOTE_BANK_ACCOUNTS = COMPANY_BANK_ACCOUNTS;
 
 export const PACKAGE_CATEGORY_LABELS = {
   luxury: 'Deluxe',

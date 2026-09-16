@@ -4,3 +4,5 @@ backend/uploads/
 .env
 *.log
 .DS_Store
+deploy/.secrets*
+deploy/node_modules/

@@ -7,7 +7,7 @@ import { buildQuotationPrintDocument } from '../components/quotations/printQuota
 import { cloneWithEmbeddedImages, waitForImages } from '../components/quotations/embedPrintImages';
 
 function safePdfFilename(quoteNumber) {
-  return `Quotation-${String(quoteNumber || 'UNO').replace(/[^\w.\-]+/g, '_')}.pdf`;
+  return `Quotation-${String(quoteNumber || 'HJT').replace(/[^\w.\-]+/g, '_')}.pdf`;
 }
 
 function canvasToImageData(canvas) {
@@ -97,7 +97,7 @@ async function renderQuoteHtmlToCanvas(html) {
   }
 }
 
-export async function generateQuotationPdfBlob(contentEl, quoteNumber = 'UNO') {
+export async function generateQuotationPdfBlob(contentEl, quoteNumber = 'HJT') {
   if (!contentEl) throw new Error('Quotation preview is not ready yet');
 
   const [{ jsPDF }] = await Promise.all([import('jspdf')]);
@@ -212,7 +212,7 @@ export function buildQuotationWhatsAppMessage({ lead, quote, userName } = {}) {
   return [
     `Hello ${guest},`,
     '',
-    'Your travel quotation from Travel CRM is ready.',
+    'Your travel quotation from Him Journey Tours is ready.',
     '',
     pkg ? `📦 Package: ${pkg}` : null,
     destination ? `📍 Destination: ${destination}` : null,
@@ -222,7 +222,7 @@ export function buildQuotationWhatsAppMessage({ lead, quote, userName } = {}) {
     'I am sharing the quotation PDF with you.',
     'Please review and reply if you would like any changes.',
     '',
-    `Thank you — ${userName || 'Travel CRM'}`,
+    `Thank you — ${userName || 'Him Journey Tours'}`,
   ]
     .filter(Boolean)
     .join('\n');

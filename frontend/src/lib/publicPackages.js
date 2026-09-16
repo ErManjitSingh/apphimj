@@ -3,8 +3,8 @@ import { resolvePackageCabs } from './packageCabMapper';
 import { buildMergedItinerary, resolvePackageItinerary } from './packageItineraryMapper';
 import { expandDestinationMatchTerms, preferredDestinationSearch } from './destinationFamilies';
 
-/** Source of truth for UNO package catalog (proxied via CRM /api/uno-packages). */
-export const UNO_PACKAGES_API_URL = 'https://api.unohotelsandresorts.com/v1/packages';
+/** Local package catalog (proxied via CRM /api/public-packages). */
+export const PUBLIC_PACKAGES_API_PATH = '/public-packages';
 
 function toNumber(value, fallback = 0) {
   const num = Number(value);
@@ -174,7 +174,7 @@ export function matchesPackageNameSearch(pkg = {}, search = '') {
   });
 }
 
-export function mapUnoPackage(raw = {}, { includeDetail = false } = {}) {
+export function mapCatalogPackage(raw = {}, { includeDetail = false } = {}) {
   const duration = parseDurationDays(raw);
   const durationNights = parseDurationNights(raw);
   const destination =
@@ -219,7 +219,7 @@ export function mapUnoPackage(raw = {}, { includeDetail = false } = {}) {
     description: raw.description || '',
     inclusions: Array.isArray(raw.inclusions) ? raw.inclusions : [],
     exclusions: Array.isArray(raw.exclusions) ? raw.exclusions : [],
-    externalSource: 'uno_hotels',
+    externalSource: 'catalog',
     status: raw.status,
     bookingCount: toNumber(raw.booking_count ?? raw.bookingCount, 0),
     avgRating: toNumber(raw.avg_rating ?? raw.avgRating, 0),
@@ -257,18 +257,15 @@ export function mapUnoPackage(raw = {}, { includeDetail = false } = {}) {
   return mapped;
 }
 
-/** UNO API max page size (higher values return HTTP 422). */
-export const UNO_PACKAGES_MAX_LIMIT = 50;
+export const PUBLIC_PACKAGES_MAX_LIMIT = 50;
 
 /**
- * Fetch packages from UNO Hotels API (https://api.unohotelsandresorts.com/v1/packages)
- * via CRM backend proxy /api/uno-packages — never call UNO from the browser (CORS).
- *
- * When `destination` is set, UNO is queried by destination family (not the typed name).
+ * Fetch packages from the CRM catalog via /api/public-packages.
+ * When `destination` is set, search by destination family (not the typed name).
  * Typed `search` then filters locally so any keyword in the package name matches.
  */
-export async function fetchUnoPublicPackages({ page = 1, limit = 50, search = '', destination = '' } = {}) {
-  const safeLimit = Math.min(Number(limit) || UNO_PACKAGES_MAX_LIMIT, UNO_PACKAGES_MAX_LIMIT);
+export async function fetchPublicPackages({ page = 1, limit = 50, search = '', destination = '' } = {}) {
+  const safeLimit = Math.min(Number(limit) || PUBLIC_PACKAGES_MAX_LIMIT, PUBLIC_PACKAGES_MAX_LIMIT);
   const nameSearch = String(search || '').trim();
   const destApiSearch = destination
     ? String(preferredDestinationSearch(destination) || destination).trim().toLowerCase()
@@ -277,7 +274,7 @@ export async function fetchUnoPublicPackages({ page = 1, limit = 50, search = ''
   const apiSearch = (destApiSearch || nameSearch).trim().toLowerCase();
 
   const fetchPage = async (pageNum) => {
-    const { data } = await API.get('/uno-packages', {
+    const { data } = await API.get('/public-packages', {
       params: {
         page: pageNum,
         limit: safeLimit,
@@ -291,7 +288,7 @@ export async function fetchUnoPublicPackages({ page = 1, limit = 50, search = ''
 
   const startPage = Math.max(1, Number(page) || 1);
   const first = await fetchPage(startPage);
-  let items = Array.isArray(first.items) ? first.items.map((item) => mapUnoPackage(item)) : [];
+  let items = Array.isArray(first.items) ? first.items.map((item) => mapCatalogPackage(item)) : [];
 
   // Destination catalogs: pull extra pages in parallel (cap 3 = 150 pkgs)
   if (destination && startPage === 1) {
@@ -301,7 +298,7 @@ export async function fetchUnoPublicPackages({ page = 1, limit = 50, search = ''
         Array.from({ length: totalPages - 1 }, (_, i) => fetchPage(i + 2))
       );
       for (const next of extra) {
-        const batch = Array.isArray(next.items) ? next.items.map((item) => mapUnoPackage(item)) : [];
+        const batch = Array.isArray(next.items) ? next.items.map((item) => mapCatalogPackage(item)) : [];
         items = items.concat(batch);
       }
     }
@@ -329,15 +326,15 @@ export async function fetchUnoPublicPackages({ page = 1, limit = 50, search = ''
     total: destination || nameSearch ? filtered.length : toNumber(first.total, filtered.length),
     page: destination ? 1 : toNumber(first.page, page),
     totalPages: destination || nameSearch ? 1 : toNumber(first.totalPages, 1),
-    source: first.source || 'uno_hotels_public',
+    source: first.source || 'local_catalog',
   };
 }
 
-export async function fetchUnoPublicPackageDetail(idOrSlug, { travelDate, adults, rooms } = {}) {
+export async function fetchPublicPackageDetail(idOrSlug, { travelDate, adults, rooms } = {}) {
   const key = String(idOrSlug || '').trim();
   if (!key) throw new Error('Package id is required');
 
-  const { data } = await API.get(`/uno-packages/${encodeURIComponent(key)}`, {
+  const { data } = await API.get(`/public-packages/${encodeURIComponent(key)}`, {
     params: {
       travel_date: travelDate || undefined,
       adults: adults || undefined,
@@ -346,5 +343,5 @@ export async function fetchUnoPublicPackageDetail(idOrSlug, { travelDate, adults
     skipErrorToast: true,
   });
 
-  return mapUnoPackage(data, { includeDetail: true });
+  return mapCatalogPackage(data, { includeDetail: true });
 }

@@ -2,11 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Package, RefreshCw } from 'lucide-react';
 import API from '../../api/axios';
-import { fetchUnoPublicPackages, fetchUnoPublicPackageDetail } from '../../lib/unoPublicPackages';
+import { fetchPublicPackages, fetchPublicPackageDetail } from '../../lib/publicPackages';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useDataRefresh } from '../../hooks/useDataRefresh';
 import TablePagination, { PACKAGES_PAGE_SIZE } from '../ui/TablePagination';
-import UnoPackageListTable from './UnoPackageListTable';
+import PackageListTable from './PackageListTable';
 import PackageDetailModal from './PackageDetailModal';
 import PackageFormModal from './PackageFormModal';
 
@@ -38,7 +38,7 @@ export default function PackageManagementPage() {
     try {
       const res = await API.get('/packages', { skipErrorToast: true });
       const rows = Array.isArray(res.data) ? res.data : [];
-      setCustomCopies(rows.filter((p) => p.sourceType === 'uno_clone'));
+      setCustomCopies(rows.filter((p) => p.sourceType === 'custom' || p.sourceType === 'clone'));
     } catch {
       setCustomCopies([]);
     }
@@ -47,7 +47,7 @@ export default function PackageManagementPage() {
   const fetchPackages = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await fetchUnoPublicPackages({
+      const result = await fetchPublicPackages({
         page: pagination.pageIndex + 1,
         limit: pagination.pageSize,
         search: debouncedSearch || undefined,
@@ -91,7 +91,7 @@ export default function PackageManagementPage() {
     setDetail(pkg);
     setDetailLoading(true);
     try {
-      const data = await fetchUnoPublicPackageDetail(pkg.slug || pkg._id || pkg.id);
+      const data = await fetchPublicPackageDetail(pkg.slug || pkg._id || pkg.id);
       setDetail(data);
     } catch {
       setDetail(pkg);
@@ -111,7 +111,7 @@ export default function PackageManagementPage() {
     const id = pkg._id || pkg.id;
     setCloningId(id);
     try {
-      const res = await API.post(`/packages/clone-from-uno/${id}`);
+      const res = await API.post(`/packages/clone-from-catalog/${id}`);
       setEditPackage(res.data);
       setModalOpen(true);
       fetchCustomCopies();
@@ -145,7 +145,7 @@ export default function PackageManagementPage() {
             </span>
           </div>
           <p className="text-sm text-content-muted">
-            Uno Hotels catalog — Edit always creates a private copy; originals are never changed
+            Him Journey catalog — Edit always creates a private copy; originals are never changed
           </p>
         </div>
         <button
@@ -195,7 +195,7 @@ export default function PackageManagementPage() {
           <p className="text-content-muted">No packages found. Try a different search or filter.</p>
         </div>
       ) : (
-        <UnoPackageListTable
+        <PackageListTable
           packages={packages}
           onView={openDetail}
           onEdit={handleEdit}
@@ -222,9 +222,9 @@ export default function PackageManagementPage() {
         <div className="mt-8">
           <h2 className="text-lg font-bold text-content-primary mb-1">Your package copies</h2>
           <p className="text-sm text-content-muted mb-4">
-            Editable clones saved in CRM — safe to modify without touching the Uno catalog
+            Editable clones saved in CRM — safe to modify without touching the Him Journey catalog
           </p>
-          <UnoPackageListTable
+          <PackageListTable
             packages={customCopies.map((p) => ({
               ...p,
               durationLabel: p.durationLabel || `${p.duration}D`,
@@ -256,7 +256,7 @@ export default function PackageManagementPage() {
         }}
         onSubmit={handleSave}
         editPackage={editPackage}
-        isClone={editPackage?.sourceType === 'uno_clone'}
+        isClone={editPackage?.sourceType === 'custom' || editPackage?.sourceType === 'clone'}
       />
     </motion.div>
   );

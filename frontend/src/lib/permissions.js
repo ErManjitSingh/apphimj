@@ -1,4 +1,5 @@
 import { getPermissionsForRole } from './rolePermissions';
+import { isChannelPathBlocked } from '../config/channels';
 
 function mergePermissions(stored, defaults) {
   if (!defaults) return stored || null;
@@ -24,6 +25,7 @@ export function canAccess(user, module, action = 'view') {
 }
 function filterSectionItems(items, user) {
   return items.filter((child) => {
+    if (isChannelPathBlocked(child.path)) return false;
     if (child.roles?.length && !child.roles.includes(user?.role)) return false;
     if (child.permission && !canAccess(user, child.permission.module, child.permission.action)) return false;
     return true;
@@ -32,6 +34,7 @@ function filterSectionItems(items, user) {
 
 export function filterNavItems(items, user) {
   return items.reduce((acc, item) => {
+    if (isChannelPathBlocked(item.path)) return acc;
     if (item.roles?.length && !item.roles.includes(user?.role)) return acc;
     if (item.permission && !canAccess(user, item.permission.module, item.permission.action)) return acc;
 

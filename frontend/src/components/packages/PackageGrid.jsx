@@ -25,7 +25,7 @@ function TourTypeBadge({ type }) {
   );
 }
 
-export default function UnoPackageGrid({ packages, onView }) {
+export default function PackageGrid({ packages, onView }) {
   if (!packages.length) return null;
 
   return (

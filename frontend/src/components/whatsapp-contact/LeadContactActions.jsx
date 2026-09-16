@@ -15,6 +15,7 @@ import { DETAIL_CARD } from '../lead-detail/leadDetailUtils';
 import { toast } from '../../context/ToastContext';
 import { beginLeadCall } from '../../lib/callSession';
 import { openCrmWhatsApp } from '../../lib/openCrmWhatsApp';
+import { CHANNELS } from '../../config/channels';
 
 export default function LeadContactActions({
   lead,
@@ -31,8 +32,8 @@ export default function LeadContactActions({
   const navigate = useNavigate();
   const { user } = useAuth();
   const { can } = usePermissions();
-  const canUseWhatsApp = can('whatsapp', 'use');
-  const canSendEmail = can('email', 'send');
+  const canUseWhatsApp = CHANNELS.whatsapp && can('whatsapp', 'use');
+  const canSendEmail = CHANNELS.email && can('email', 'send');
   const [emailOpen, setEmailOpen] = useState(false);
   const [waOpening, setWaOpening] = useState(false);
 

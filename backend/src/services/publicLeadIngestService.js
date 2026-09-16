@@ -105,8 +105,8 @@ function resolvePublicLeadSource(raw = {}) {
 
   if (isFacebookForm) {
     return {
-      source: 'dpw2',
-      sourceLabel: 'DPW2',
+      source: 'portal_lead',
+      sourceLabel: 'Portal Lead',
       channel: 'facebook',
     };
   }
@@ -142,37 +142,30 @@ function resolvePublicLeadSource(raw = {}) {
     // Explicit Google → DPW WA; Meta CTWA → DPW2 WA; bare WhatsApp defaults to Google Ads WA (DPW WA)
     if (isFbWa && !isGoogleWa) {
       return {
-        source: 'dpw2_wa',
-        sourceLabel: 'DPW2 WA',
+        source: 'portal_lead',
+        sourceLabel: 'Portal Lead',
         channel: 'whatsapp',
       };
     }
 
     if (isGoogleWa) {
       return {
-        source: 'dpw_wa',
-        sourceLabel: 'DPW WA',
+        source: 'website',
+        sourceLabel: 'Website',
         channel: 'whatsapp',
       };
     }
 
-    const defaultWa =
-      String(process.env.WHATSAPP_DEFAULT_LEAD_SOURCE || 'dpw_wa')
-        .trim()
-        .toLowerCase() === 'dpw2_wa'
-        ? 'dpw2_wa'
-        : 'dpw_wa';
-
     return {
-      source: defaultWa,
-      sourceLabel: defaultWa === 'dpw_wa' ? 'DPW WA' : 'DPW2 WA',
+      source: 'website',
+      sourceLabel: 'Website',
       channel: 'whatsapp',
     };
   }
 
   return {
-    source: 'dpw',
-    sourceLabel: 'DPW',
+    source: 'website',
+    sourceLabel: 'Website',
     channel: 'website',
   };
 }
@@ -207,7 +200,7 @@ async function ingestPublicLead(raw = {}) {
   const rawSourceText = String(raw.landingPage || raw.page || raw.landing || raw.sourceLabel || raw.source || '').trim();
   const landingPage =
     rawSourceText &&
-    !['dpw', 'dpw wa', 'dpw call', 'dpw2', 'dpw2 wa', 'dpw2 call', 'website', 'facebook', 'facebook lead', 'facebook_ads', 'fb lead', 'meta', 'whatsapp', 'dpw_wa', 'dpw_call', 'dpw2_wa', 'dpw2_call'].includes(
+    !['website', 'website 2', 'website_2', 'portal lead', 'potal lead', 'portal_lead', 'call lead', 'call_lead', 'referral', 'dpw', 'dpw wa', 'dpw call', 'dpw2', 'dpw2 wa', 'dpw2 call', 'facebook', 'facebook lead', 'facebook_ads', 'fb lead', 'meta', 'whatsapp', 'dpw_wa', 'dpw_call', 'dpw2_wa', 'dpw2_call'].includes(
       rawSourceText.toLowerCase()
     )
       ? rawSourceText

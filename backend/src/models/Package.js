@@ -28,12 +28,31 @@ const packageSchema = new mongoose.Schema(
     inclusions: { type: [String], default: [] },
     exclusions: { type: [String], default: [] },
     itinerary: [itineraryDaySchema],
-    sourceType: { type: String, enum: ['local', 'uno_clone'], default: 'local' },
+    slug: { type: String, default: '' },
+    destinationName: { type: String, default: '' },
+    state: { type: String, default: '' },
+    country: { type: String, default: 'India' },
+    sourceType: {
+      type: String,
+      enum: ['local', 'uno_clone', 'uno_catalog'],
+      default: 'local',
+    },
     sourcePackageId: { type: String, default: null },
     sourceSlug: { type: String, default: null },
+    /** List-shaped snapshot used by /uno-packages (no heavy itinerary). */
+    listData: { type: mongoose.Schema.Types.Mixed, default: {} },
+    /** Full mapped package used by quotation builder (itinerary, hotels, cabs, gallery, raw). */
+    fullData: { type: mongoose.Schema.Types.Mixed, default: {} },
+    rawUno: { type: mongoose.Schema.Types.Mixed, default: {} },
+    syncedAt: { type: Date, default: null },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }
 );
+
+packageSchema.index({ sourceType: 1, sourceSlug: 1 });
+packageSchema.index({ sourceType: 1, sourcePackageId: 1 });
+packageSchema.index({ name: 1 });
+packageSchema.index({ destination: 1 });
 
 module.exports = mongoose.model('Package', packageSchema);

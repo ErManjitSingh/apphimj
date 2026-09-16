@@ -46,7 +46,7 @@ function cabKey(cab) {
 }
 
 function CabResultRow({ cab, selected, onSelect, priceLabel = 'total fare' }) {
-  const isPackageCab = cab.isPackageCab || cab.externalSource === 'uno_package';
+  const isPackageCab = cab.isPackageCab || String(cab.externalSource || '').includes('package');
 
   return (
     <button
@@ -109,7 +109,7 @@ function CabResultRow({ cab, selected, onSelect, priceLabel = 'total fare' }) {
   );
 }
 
-export default function UnoCabSelector({
+export default function CatalogCabSelector({
   lead,
   pkg,
   packageCabs = [],
@@ -174,7 +174,7 @@ export default function UnoCabSelector({
     setLoading(true);
     setError('');
     try {
-      const res = await API.get('/uno-cabs/search', {
+      const res = await API.get('/catalog-cabs/search', {
         params: {
           pickup_city: form.pickupCity,
           drop_city: form.dropCity,
@@ -193,7 +193,7 @@ export default function UnoCabSelector({
     } catch (err) {
       setResults([]);
       setSearched(true);
-      setError(err.response?.data?.message || 'Could not search cabs from Uno API.');
+      setError(err.response?.data?.message || 'Could not search cabs right now.');
     } finally {
       setLoading(false);
     }
@@ -218,7 +218,7 @@ export default function UnoCabSelector({
         <div>
           <h3 className="text-lg font-bold tracking-tight">Select Transport</h3>
           <p className="text-sm text-content-muted mt-1">
-            Use the cab attached to <strong>{pkg?.name || 'this package'}</strong>, or search manually from Uno API.
+            Use the cab attached to <strong>{pkg?.name || 'this package'}</strong>, or search manually.
           </p>
         </div>
 
@@ -277,7 +277,7 @@ export default function UnoCabSelector({
             <div className="text-center py-12 rounded-2xl border border-dashed border-subtle">
               <Package className="w-10 h-10 mx-auto text-content-muted/40 mb-3" />
               <p className="text-sm font-medium">No cab attached to this package</p>
-              <p className="text-xs text-content-muted mt-1">Switch to Manual Search to pick a cab from Uno API.</p>
+              <p className="text-xs text-content-muted mt-1">Switch to Manual Search to pick a cab.</p>
             </div>
           ) : (
             <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
@@ -298,7 +298,7 @@ export default function UnoCabSelector({
       {mode === 'manual' && (
         <>
           <div className="rounded-2xl border border-subtle bg-surface-base p-4 space-y-3">
-            <p className="text-sm font-semibold text-content-primary">Search route on Uno Cabs API</p>
+            <p className="text-sm font-semibold text-content-primary">Search cab route</p>
             <div className="grid sm:grid-cols-2 gap-3">
               <label className="block">
                 <span className="text-[11px] font-semibold uppercase text-content-muted">Pickup City</span>
@@ -448,7 +448,7 @@ export function buildSelectedCabSnapshot(cab, { vehicleCount = 1, travelers, ext
       priceDelta: upgrade,
       upgradePrice: upgrade,
       fare: cab.fare || {},
-      externalSource: cab.externalSource || (cab.isPackageCab ? 'uno_package' : 'uno_cabs'),
+      externalSource: cab.externalSource || (cab.isPackageCab ? 'catalog_package' : 'catalog_cabs'),
       role: 'primary',
     });
   }
@@ -485,7 +485,7 @@ export function buildSelectedCabSnapshot(cab, { vehicleCount = 1, travelers, ext
       priceDelta: upgrade,
       upgradePrice: upgrade,
       fare: extra.fare || {},
-      externalSource: extra.externalSource || (extra.isPackageCab ? 'uno_package' : 'uno_cabs'),
+      externalSource: extra.externalSource || (extra.isPackageCab ? 'catalog_package' : 'catalog_cabs'),
       role: 'companion',
     });
   }

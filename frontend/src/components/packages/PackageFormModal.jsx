@@ -62,7 +62,7 @@ export default function PackageFormModal({ open, onClose, onSubmit, editPackage,
           <h3 className="text-lg font-bold text-content-primary">Edit package copy</h3>
           {isClone && (
             <p className="text-xs text-amber-700 bg-amber-500/10 border border-amber-500/20 rounded-lg px-2.5 py-1 mt-2 inline-block">
-              This is your private copy — Uno catalog original stays unchanged
+              This is your private copy — Him Journey catalog original stays unchanged
             </p>
           )}
         </div>

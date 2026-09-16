@@ -56,10 +56,10 @@ export default function SidebarNavGroup({ group, defaultOpen = false }) {
             <button
               type="button"
               className={cn(
-                'w-full flex items-center justify-center py-2.5 rounded-xl transition-colors relative',
+                'w-full flex items-center justify-center py-3 rounded-xl transition-colors relative',
                 isChildActive
                   ? cn(accent.itemActive)
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.06]'
+                  : accent.itemIdle || 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.06]'
               )}
             >
               <Icon className="w-[18px] h-[18px]" />
@@ -87,18 +87,18 @@ export default function SidebarNavGroup({ group, defaultOpen = false }) {
   }
 
   return (
-    <div className="mb-0.5">
+    <div>
       <button
         type="button"
         onClick={() => setOpen(!open)}
         className={cn(
-          'relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200',
+          'relative w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[13px] font-semibold transition-all duration-200',
           isChildActive
-            ? cn(accent.groupActive, 'text-white')
-            : 'text-slate-300 hover:text-white hover:bg-white/[0.06]'
+            ? cn(accent.groupActive, accent.groupIdle ? '' : 'text-white')
+            : accent.groupIdle || 'text-slate-300 hover:text-white hover:bg-white/[0.06]'
         )}
       >
-        {isChildActive && (
+        {isChildActive && !accent.hideIndicator && (
           <span className={cn('absolute left-0 w-[3px] h-6 rounded-r-full', accent.indicator)} />
         )}
         <Icon className="w-[18px] h-[18px] shrink-0" strokeWidth={2} />

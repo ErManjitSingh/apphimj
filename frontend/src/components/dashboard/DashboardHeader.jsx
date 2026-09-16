@@ -12,15 +12,11 @@ import { cn } from "../../lib/utils";
 
 const SOURCE_OPTIONS = [
   { value: "", label: "All Sources" },
-  { value: "dpw", label: "DPW" },
-  { value: "dpw_wa", label: "DPW WA" },
-  { value: "dpw_call", label: "DPW CALL" },
-  { value: "dpw2", label: "DPW2" },
-  { value: "dpw2_wa", label: "DPW2 WA" },
-  { value: "dpw2_call", label: "DPW2 CALL" },
+  { value: "website", label: "Website" },
+  { value: "website_2", label: "Website 2" },
   { value: "referral", label: "Referral" },
+  { value: "portal_lead", label: "Portal Lead" },
   { value: "call_lead", label: "Call Lead" },
-  { value: "organic", label: "Organic" },
 ];
 
 function toInputDate(d) {
@@ -33,13 +29,9 @@ function toInputDate(d) {
 
 export function getDefaultDashboardFilters() {
   const now = new Date();
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const dd = String(now.getDate()).padStart(2, "0");
-  const today = `${yyyy}-${mm}-${dd}`;
   return {
-    dateFrom: today,
-    dateTo: today,
+    dateFrom: toInputDate(new Date(now.getFullYear(), now.getMonth(), 1)),
+    dateTo: toInputDate(now),
     source: "",
   };
 }

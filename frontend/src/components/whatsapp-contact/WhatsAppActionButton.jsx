@@ -6,6 +6,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { Button } from '../ui/button';
 import { openCrmWhatsApp } from '../../lib/openCrmWhatsApp';
 import { toast } from '../../context/ToastContext';
+import { CHANNELS } from '../../config/channels';
 
 /** Opens company CRM WhatsApp inbox for this lead. */
 export default function WhatsAppActionButton({
@@ -19,7 +20,7 @@ export default function WhatsAppActionButton({
   const navigate = useNavigate();
   const { user } = useAuth();
   const { can } = usePermissions();
-  const canUseWhatsApp = can('whatsapp', 'use');
+  const canUseWhatsApp = CHANNELS.whatsapp && can('whatsapp', 'use');
   const [submitting, setSubmitting] = useState(false);
 
   if (!canUseWhatsApp) return null;

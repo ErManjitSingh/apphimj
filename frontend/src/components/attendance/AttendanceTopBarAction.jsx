@@ -51,8 +51,8 @@ export default function AttendanceTopBarAction({ accent }) {
       onClick={handleCheckOut}
       disabled={acting}
       className={cn(
-        'hidden sm:inline-flex items-center gap-2 h-10 px-3 rounded-xl border border-subtle',
-        'bg-surface/90 text-sm font-medium text-content-secondary shadow-sm',
+        'hidden sm:inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-subtle',
+        'bg-surface/90 text-[12px] font-medium text-content-secondary shadow-sm',
         'hover:bg-surface-elevated transition-colors disabled:opacity-60',
         accent?.iconHover
       )}

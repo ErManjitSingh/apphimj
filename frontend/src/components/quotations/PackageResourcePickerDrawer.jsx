@@ -572,14 +572,14 @@ async function fetchHotelDetailForOption(option, destination, stayQuery = {}) {
   };
 
   if (city && slug) {
-    const res = await API.get('/uno-hotels/detail', {
+    const res = await API.get('/catalog-hotels/detail', {
       params: { city, slug, ...dateParams },
       skipErrorToast: true,
     });
     return res.data;
   }
 
-  const searchRes = await API.get('/uno-hotels', {
+  const searchRes = await API.get('/catalog-hotels', {
     params: {
       destination: city || destination || '',
       search: option.name,
@@ -595,7 +595,7 @@ async function fetchHotelDetailForOption(option, destination, stayQuery = {}) {
 
   if (!hit?.city || !hit?.slug) throw new Error('Hotel catalog detail unavailable');
 
-  const detailRes = await API.get('/uno-hotels/detail', {
+  const detailRes = await API.get('/catalog-hotels/detail', {
     params: { city: hit.city, slug: hit.slug, ...dateParams },
     skipErrorToast: true,
   });

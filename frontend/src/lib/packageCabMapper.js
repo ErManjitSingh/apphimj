@@ -10,13 +10,13 @@ function rawCabList(source = {}) {
 }
 
 /**
- * UNO day-options cabs:
+ * Package day-options cabs:
  * - price_delta = absolute cab fare for that vehicle
  * - upgrade_price = extra vs default (0 for default cab)
  * Default cab fare is already inside package base — peel it for display, add only upgrades on top.
  */
 export function mapPackageCabFromRaw(cab = {}, { defaultAbsolute = null } = {}) {
-  if (cab.isPackageCab || cab.externalSource === 'uno_package') {
+  if (cab.isPackageCab || String(cab.externalSource || '').includes('package')) {
     // Already mapped — refresh absolute/upgrade if raw-like fields present
     if (cab.absoluteFare != null || cab.priceDelta != null) return cab;
   }
@@ -43,7 +43,7 @@ export function mapPackageCabFromRaw(cab = {}, { defaultAbsolute = null } = {}) 
     seatingCapacity: cab.seats ?? cab.seatingCapacity,
     description: cab.description || '',
     featuredImage: cab.image_url || cab.featuredImage || '',
-    /** Absolute trip fare for this cab (from UNO price_delta). */
+    /** Absolute trip fare for this cab. */
     absoluteFare: absolute,
     /** Only the upgrade vs package-default cab (adds on top of peeled included fare). */
     cost: upgrade,
@@ -54,7 +54,7 @@ export function mapPackageCabFromRaw(cab = {}, { defaultAbsolute = null } = {}) 
     isPopular: Boolean(cab.is_popular ?? cab.isPopular),
     isActive: (cab.is_active ?? cab.isActive) !== false,
     sortOrder: toNumber(cab.sort_order ?? cab.sortOrder, 0),
-    externalSource: 'uno_package',
+    externalSource: 'catalog_package',
     isPackageCab: true,
     tripType: 'full_day',
   };
@@ -74,7 +74,7 @@ export function resolvePackageCabs(source = {}) {
   );
 }
 
-/** Absolute trip fare for a package cab (UNO price_delta). */
+/** Absolute trip fare for a package cab. */
 export function resolveCabAbsoluteFare(cab = null, packageCabs = []) {
   const cabs = Array.isArray(packageCabs) ? packageCabs : [];
   const defaultCab = cabs.find((c) => c.isDefault) || cabs[0] || null;

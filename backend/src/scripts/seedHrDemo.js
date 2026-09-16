@@ -408,7 +408,7 @@ async function seedHrDemo() {
       openings: 2,
       location: 'Shimla / Remote',
       employmentType: 'full_time',
-      description: 'React developer for Travel CRM',
+      description: 'React developer for Him Journey Tours',
       status: 'open',
       createdBy: hrAdmin?._id,
     },

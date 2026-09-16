@@ -4,6 +4,7 @@ import RouteFallback from "./ui/RouteFallback";
 import { useAuth } from "../context/AuthContext";
 import { SidebarProvider } from "../context/SidebarContext";
 import AppSidebar from "./sidebar/AppSidebar";
+import SidebarAccountFooter from "./sidebar/SidebarAccountFooter";
 import MobileSidebarDrawer from "./sidebar/MobileSidebarDrawer";
 import TopBar from "./TopBar";
 import MobileNav from "./MobileNav";
@@ -11,8 +12,6 @@ import MobileNav from "./MobileNav";
 function LayoutShell() {
   const { user } = useAuth();
   const { pathname } = useLocation();
-  const isAdminDashboard = pathname === "/admin/dashboard";
-  const isLeadProviderDashboard = pathname === "/lead-provider/dashboard";
   const isAdminLeadDetail =
     user?.role === "admin" &&
     pathname !== "/leads/new" &&
@@ -25,12 +24,15 @@ function LayoutShell() {
       ));
   const isQuotationBuilder = pathname === "/quotations/new";
   const isMobileImmersive =
-    isAdminDashboard ||
-    isLeadProviderDashboard ||
     isAdminLeadDetail ||
     isAdminLeadList ||
     isQuotationBuilder;
-  const sidebarProps = { user };
+  const showLightSidebar = user?.role === "admin" || user?.role === "lead_provider";
+  const sidebarProps = {
+    user,
+    sidebarVariant: showLightSidebar ? "light" : "sunset",
+    sidebarFooter: <SidebarAccountFooter />,
+  };
 
   return (
     <div className="flex min-h-screen bg-surface-app">
@@ -48,7 +50,7 @@ function LayoutShell() {
           className={`flex-1 overflow-auto ${isQuotationBuilder ? "pb-0 lg:pb-0" : "pb-20 lg:pb-0"}`}
         >
           <div
-            className={`${isMobileImmersive ? "p-0 lg:p-8" : "p-4 sm:p-6 lg:p-8"} max-w-[1600px] mx-auto`}
+            className={`${isMobileImmersive ? "p-0 lg:p-6" : "p-4 sm:p-5 lg:p-6"} max-w-[1600px] mx-auto`}
           >
             <Suspense fallback={<RouteFallback />}>
               <Outlet />

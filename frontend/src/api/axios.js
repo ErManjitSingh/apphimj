@@ -29,7 +29,10 @@ API.interceptors.request.use((config) => {
     config.headers['x-branch-id'] = selectedBranchId;
     const method = (config.method || 'get').toLowerCase();
     const url = config.url || '';
-    const skipBranchQueryParam = url.includes('/public-packages') || url.includes('/uno-packages');
+    const skipBranchQueryParam =
+      url.includes('/public-packages') ||
+      url.includes('/catalog-hotels') ||
+      url.includes('/catalog-cabs');
     if (method === 'get') {
       if (!skipBranchQueryParam) {
         config.params = {

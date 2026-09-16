@@ -1,70 +1,71 @@
 /** Short labels for lead source — keep in sync with backend leadSources + leadSourceLabels */
 
 export const LEAD_SOURCE_KEYS = [
-  'dpw',
-  'dpw_wa',
-  'dpw_call',
-  'dpw2',
-  'dpw2_wa',
-  'dpw2_call',
+  'website',
+  'website_2',
   'referral',
+  'portal_lead',
   'call_lead',
-  'organic',
 ];
 
 const SOURCE_SHORT = {
-  dpw: 'DPW',
-  dpw_wa: 'DPW WA',
-  dpw_call: 'DPW CALL',
-  dpw2: 'DPW2',
-  dpw2_wa: 'DPW2 WA',
-  dpw2_call: 'DPW2 CALL',
+  website: 'Website',
+  website_2: 'Website 2',
   referral: 'Referral',
+  portal_lead: 'Portal Lead',
   call_lead: 'Call Lead',
-  organic: 'Organic',
-  // legacy
-  website: 'DPW',
-  google_ads: 'DPW',
-  facebook_ads: 'DPW2',
-  whatsapp: 'DPW2 WA',
-  social: 'DPW2',
+  dpw: 'Website',
+  dpw_wa: 'Website',
+  dpw_call: 'Call Lead',
+  dpw2: 'Website 2',
+  dpw2_wa: 'Website 2',
+  dpw2_call: 'Call Lead',
+  organic: 'Website',
+  google_ads: 'Website',
+  facebook_ads: 'Portal Lead',
+  whatsapp: 'Website',
+  social: 'Website 2',
   phone: 'Call Lead',
   'walk-in': 'Call Lead',
-  other: 'Organic',
+  other: 'Website',
+  potal_lead: 'Portal Lead',
 };
 
 const ALIASES = {
-  dpw: 'dpw',
-  website: 'dpw',
-  google_ads: 'dpw',
-  google: 'dpw',
-  dpw_wa: 'dpw_wa',
-  google_whatsapp: 'dpw_wa',
-  dpw_call: 'dpw_call',
-  'dpw call': 'dpw_call',
-  google_call: 'dpw_call',
-  dpw2: 'dpw2',
-  facebook_ads: 'dpw2',
-  facebook: 'dpw2',
-  social: 'dpw2',
-  instagram: 'dpw2',
-  dpw2_wa: 'dpw2_wa',
-  whatsapp: 'dpw2_wa',
-  wa: 'dpw2_wa',
-  facebook_whatsapp: 'dpw2_wa',
-  ctwa: 'dpw2_wa',
-  dpw2_call: 'dpw2_call',
-  'dpw2 call': 'dpw2_call',
-  facebook_call: 'dpw2_call',
-  fb_call: 'dpw2_call',
+  website: 'website',
+  dpw: 'website',
+  google_ads: 'website',
+  google: 'website',
+  organic: 'website',
+  other: 'website',
+  dpw_wa: 'website',
+  whatsapp: 'website',
+  wa: 'website',
+  website_2: 'website_2',
+  website2: 'website_2',
+  'website 2': 'website_2',
+  dpw2: 'website_2',
+  social: 'website_2',
+  dpw2_wa: 'website_2',
   referral: 'referral',
+  portal_lead: 'portal_lead',
+  potal_lead: 'portal_lead',
+  'portal lead': 'portal_lead',
+  'potal lead': 'portal_lead',
+  portal: 'portal_lead',
+  facebook_ads: 'portal_lead',
+  facebook: 'portal_lead',
+  instagram: 'portal_lead',
+  meta: 'portal_lead',
+  ctwa: 'portal_lead',
   call_lead: 'call_lead',
+  'call lead': 'call_lead',
   phone: 'call_lead',
   call: 'call_lead',
+  dpw_call: 'call_lead',
+  dpw2_call: 'call_lead',
   'walk-in': 'call_lead',
   walk_in: 'call_lead',
-  organic: 'organic',
-  other: 'organic',
 };
 
 function normalizeSourceKey(raw) {
@@ -87,27 +88,23 @@ function resolveKey(raw) {
   return '';
 }
 
-/** Canonical source key (dpw, dpw_wa, call_lead, …) or '' */
+/** Canonical source key or '' */
 export function resolveLeadSourceKey(source, sourceLabel) {
   return resolveKey(sourceLabel) || resolveKey(source) || '';
 }
 
 /**
  * Channel for UI icons: whatsapp | call | form | other
- * Form covers website / Meta lead-form (DPW, DPW2) — not Facebook brand.
  */
 export function getLeadSourceChannel(source, sourceLabel) {
   const key = resolveLeadSourceKey(source, sourceLabel);
-  if (key === 'dpw_wa' || key === 'dpw2_wa') return 'whatsapp';
-  if (key === 'dpw_call' || key === 'dpw2_call' || key === 'call_lead') return 'call';
-  if (key === 'dpw' || key === 'dpw2') return 'form';
+  if (key === 'call_lead') return 'call';
+  if (key === 'website' || key === 'website_2' || key === 'portal_lead') return 'form';
 
   const blob = `${source || ''} ${sourceLabel || ''}`.toLowerCase();
   if (/(^|[\s_])wa([\s_]|$)|whatsapp|ctwa/.test(blob)) return 'whatsapp';
   if (/\bcall\b|phone|walk[\s_-]?in/.test(blob)) return 'call';
-  if (/facebook|instagram|fb[\s_-]?lead|lead[\s_-]?form|form|website|google/.test(blob)) {
-    return 'form';
-  }
+  if (/website|portal|facebook|instagram|form|google/.test(blob)) return 'form';
   return 'other';
 }
 
@@ -116,33 +113,19 @@ export function getLeadSourceShortLabel(source, sourceLabel) {
   if (explicit) {
     const fromLabel = resolveKey(explicit);
     if (fromLabel && SOURCE_SHORT[fromLabel]) return SOURCE_SHORT[fromLabel];
-    const lower = explicit.toLowerCase();
-    if (lower === 'dpw call' || lower === 'dpw_call') return 'DPW CALL';
-    if (lower === 'dpw2 call' || lower === 'dpw2_call') return 'DPW2 CALL';
-    if (lower === 'dpw wa' || lower === 'dpw_wa') return 'DPW WA';
-    if (lower === 'dpw2 wa' || lower === 'dpw2_wa') return 'DPW2 WA';
-    if (lower === 'dpw2') return 'DPW2';
-    if (lower === 'dpw') return 'DPW';
-    if (lower === 'call lead') return 'Call Lead';
   }
 
   const key = resolveKey(source);
   if (key && SOURCE_SHORT[key]) return SOURCE_SHORT[key];
 
   const label = explicit.toLowerCase();
-  if (label.includes('dpw2') && label.includes('call')) return 'DPW2 CALL';
-  if (label.includes('dpw') && label.includes('call') && !label.includes('wa')) return 'DPW CALL';
-  if (label.includes('dpw2') && (label.includes('wa') || label.includes('whatsapp'))) return 'DPW2 WA';
-  if (label.includes('dpw') && (label.includes('wa') || label.includes('whatsapp'))) return 'DPW WA';
-  if (label.includes('facebook') || label.includes('instagram')) return 'DPW2';
+  if (label.includes('website 2') || label.includes('website_2')) return 'Website 2';
+  if (label.includes('website')) return 'Website';
+  if (label.includes('portal') || label.includes('potal')) return 'Portal Lead';
   if (label.includes('call')) return 'Call Lead';
   if (label.includes('referral')) return 'Referral';
-  if (label.includes('organic')) return 'Organic';
-  if (label.includes('whatsapp')) return 'DPW WA';
-  if (label.includes('dpw2')) return 'DPW2';
-  if (label.includes('dpw') || label.includes('google')) return 'DPW';
 
-  return SOURCE_SHORT.organic;
+  return SOURCE_SHORT.website;
 }
 
 export const LEAD_SOURCE_FILTER_OPTIONS = [

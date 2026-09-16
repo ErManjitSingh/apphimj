@@ -3,12 +3,13 @@ import { MessageCircle, Mail, ChevronRight, Thermometer } from 'lucide-react';
 import PageHeader from '../../components/ui/PageHeader';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useAuth } from '../../context/AuthContext';
+import { CHANNELS } from '../../config/channels';
 
 export default function SettingsPage() {
   const { can } = usePermissions();
   const { user } = useAuth();
-  const canManageWhatsApp = can('whatsapp', 'manage');
-  const canManageEmail = can('email', 'manage');
+  const canManageWhatsApp = CHANNELS.whatsapp && can('whatsapp', 'manage');
+  const canManageEmail = CHANNELS.email && can('email', 'manage');
   const isAdmin = user?.role === 'admin';
 
   const items = [
@@ -30,7 +31,7 @@ export default function SettingsPage() {
       to: '/settings/email-templates',
       icon: Mail,
       title: 'Email Templates',
-      description: 'Manage email templates for sales@example.com',
+      description: 'Manage email templates for bookinghimjourneytours@gmail.com',
       color: 'text-sky-600 bg-sky-500/10',
     },
   ].filter(Boolean);

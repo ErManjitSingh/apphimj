@@ -460,6 +460,12 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
             <div className="quote-ht-contact-line">{COMPANY_INFO.email}</div>
             <div>Address: {COMPANY_INFO.address}</div>
             <div className="quote-ht-contact-line">{COMPANY_INFO.website}</div>
+            <div className="quote-ht-contact-line">
+              Instagram: {COMPANY_INFO.instagram.replace('https://www.', '')}
+            </div>
+            <div className="quote-ht-contact-line">
+              Facebook: {COMPANY_INFO.facebook.replace('https://www.', '')}
+            </div>
           </div>
         </div>
       </PdfSection>
@@ -476,6 +482,7 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
         </p>
         <p>{COMPANY_INFO.tagline}</p>
         <p>{COMPANY_INFO.phone} · {COMPANY_INFO.email}</p>
+        <p>{COMPANY_INFO.website} · Instagram · Facebook</p>
         <p className="quote-ht-footer-thanks">Thank you for choosing {COMPANY_INFO.name}</p>
       </div>
     </div>

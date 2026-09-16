@@ -12,8 +12,12 @@ const {
   invalidateMailboxCache,
 } = require('../services/emailMailboxCache');
 const { wantsFreshData } = require('../services/dashboardCacheService');
+const channels = require('../config/channels');
 
 const sendLeadEmail = asyncHandler(async (req, res) => {
+  if (!channels.email) {
+    throw new ApiError(410, 'Email is not connected on this CRM');
+  }
   if (!req.permissions?.email?.send) {
     throw new ApiError(403, 'You do not have permission to send emails');
   }

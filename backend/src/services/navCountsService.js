@@ -3,6 +3,7 @@ const FollowUp = require('../models/FollowUp');
 const Quotation = require('../models/Quotation');
 const Package = require('../models/Package');
 const { getUnoPackagesTotal } = require('./unoHotelsPackageService');
+const { countLocalCatalog } = require('./localPackageCatalogService');
 const Notification = require('../models/Notification');
 const Booking = require('../models/Booking');
 const SupportTicket = require('../models/SupportTicket');
@@ -141,7 +142,11 @@ async function buildAdminNavCounts(userId, { branchId } = {}) {
     ),
     Quotation.countDocuments(withBranch({}, branchId)),
     Quotation.countDocuments(withBranch({ status: 'pending_approval' }, branchId)),
-    getUnoPackagesTotal().catch(() => Package.countDocuments()),
+    (async () => {
+      const local = await countLocalCatalog();
+      if (local > 0) return local;
+      return getUnoPackagesTotal().catch(() => Package.countDocuments());
+    })(),
     unreadNotifications(userId, branchId),
     countFollowUpsToday({}, branchId),
     buildOperationsNavCounts(userId, { branchId }),

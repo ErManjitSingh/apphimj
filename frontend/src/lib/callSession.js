@@ -1,6 +1,6 @@
 import API from '../api/axios';
 
-const CALL_SESSION_KEY = 'uno-crm-active-call-session';
+const CALL_SESSION_KEY = 'hjt-crm-active-call-session';
 /** Cap on how long dialing waits for the backend to confirm Opened — keeps a slow/offline
  * network from blocking the executive's ability to place a call; addCallNote's own
  * markLeadViewedByExecutive safety net still guarantees Opened gets set once the call lands. */

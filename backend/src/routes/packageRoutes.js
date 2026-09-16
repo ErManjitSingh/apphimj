@@ -8,6 +8,8 @@ const {
   deletePackage,
   duplicatePackage,
   cloneFromUnoPackage,
+  catalogStatus,
+  importUnoCatalog,
   listHotels,
   createHotel,
   updateHotel,
@@ -22,10 +24,13 @@ const {
   deleteFlight,
 } = require('../controllers/packageController');
 const { protect } = require('../middleware/auth');
+const { authorize } = require('../middleware/rbac');
 
 router.use(protect);
 
-router.post('/clone-from-uno/:unoId', cloneFromUnoPackage);
+router.get('/catalog-status', authorize('admin', 'sales_manager'), catalogStatus);
+router.post('/import-catalog', authorize('admin'), importUnoCatalog);
+router.post('/clone-from-catalog/:id', cloneFromUnoPackage);
 router.post('/duplicate/:id', duplicatePackage);
 router.route('/').get(listPackages).post(createPackage);
 router.route('/:id').get(getPackage).put(updatePackage).delete(deletePackage);

@@ -17,6 +17,7 @@ const { purgeOldActivityLogs } = require('./services/activityService');
 const { startEmailInboxPoller } = require('./services/emailInboxService');
 const { archiveOldTrips } = require('./services/operationsArchiveService');
 const { validateEnvOnBoot: validateFacebookEnv } = require('./services/facebookLeadWebhookService');
+const channels = require('./config/channels');
 const {
   reconcileSessions,
   SESSION_RECONCILE_INTERVAL_MS,
@@ -72,14 +73,14 @@ app.get('/api/health', (req, res) => {
   const db = getDbStatus();
   res.status(200).json({
     status: 'ok',
-    service: 'unotravel-crm-api',
+    service: 'himjourney-crm-api',
     database: db,
     time: new Date().toISOString(),
   });
 });
 
 app.get('/api', (req, res) => {
-  res.json({ message: 'Travel CRM API', version: '1.0.0' });
+  res.json({ message: 'Him Journey Tours API', version: '1.0.0' });
 });
 
 app.use('/api', apiLimiter, apiRoutes);
@@ -98,7 +99,11 @@ async function start() {
   } else {
     console.log('[NotificationScheduler] Disabled (set NOTIFICATIONS_ENABLED=true to enable)');
   }
-  startEmailInboxPoller();
+  if (channels.email) {
+    startEmailInboxPoller();
+  } else {
+    console.log('[EmailInbox] Disabled until EMAIL_ENABLED=true');
+  }
 
   archiveOldTrips().catch(() => {});
   setInterval(() => archiveOldTrips().catch(() => {}), 24 * 60 * 60 * 1000);
@@ -110,8 +115,12 @@ async function start() {
   httpServer.listen(port, () => {
     console.log(`[API] Running on http://127.0.0.1:${port}`);
     console.log(`[API] Health: http://127.0.0.1:${port}/api/health`);
-    console.log('[API] Facebook webhook: /api/facebook/webhook');
-    validateFacebookEnv();
+    if (channels.facebook) {
+      console.log('[API] Facebook webhook: /api/facebook/webhook');
+      validateFacebookEnv();
+    } else {
+      console.log('[API] Meta lead webhook disconnected');
+    }
   });
 }
 

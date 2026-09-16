@@ -12,30 +12,23 @@ export const LEAD_FORM_STEPS = [
 export const LEAD_FORM_STEP_IDS = LEAD_FORM_STEPS.map((s) => s.anchorId);
 
 export const LEAD_SOURCES = [
-  { value: 'dpw', label: 'DPW' },
-  { value: 'dpw_wa', label: 'DPW WA' },
-  { value: 'dpw_call', label: 'DPW CALL' },
-  { value: 'dpw2', label: 'DPW2' },
-  { value: 'dpw2_wa', label: 'DPW2 WA' },
-  { value: 'dpw2_call', label: 'DPW2 CALL' },
+  { value: 'website', label: 'Website' },
+  { value: 'website_2', label: 'Website 2' },
   { value: 'referral', label: 'Referral' },
+  { value: 'portal_lead', label: 'Portal Lead' },
   { value: 'call_lead', label: 'Call Lead' },
-  { value: 'organic', label: 'Organic' },
 ];
 
 /** Hidden for sales executive when creating / picking a source */
-export const SE_HIDDEN_LEAD_SOURCES = new Set(['dpw', 'organic']);
+export const SE_HIDDEN_LEAD_SOURCES = new Set();
 
-export function getLeadSourcesForRole(role) {
-  if (role === 'sales_executive') {
-    return LEAD_SOURCES.filter((s) => !SE_HIDDEN_LEAD_SOURCES.has(s.value));
-  }
+export function getLeadSourcesForRole(_role) {
   return LEAD_SOURCES;
 }
 
 export function defaultLeadSourceForRole(role) {
   if (role === 'sales_executive') return 'call_lead';
-  return 'dpw';
+  return 'website';
 }
 
 /** Keep in sync with backend/src/models/Lead.js REFERRAL_RELATIONSHIPS */
@@ -209,7 +202,7 @@ export const CAB_TYPE_OPTIONS = [
   { value: 'not_required', label: 'Not required' },
 ];
 
-export const DRAFT_STORAGE_KEY = 'uno-crm-lead-wizard-draft-v10';
+export const DRAFT_STORAGE_KEY = 'hjt-crm-lead-wizard-draft-v10';
 
 export const defaultWizardValues = {
   name: '',
@@ -239,7 +232,7 @@ export const defaultWizardValues = {
   budgetRange: '',
   customBudget: '',
   budget: '',
-  leadSource: 'dpw',
+  leadSource: 'website',
   priority: 'medium',
   branchId: '',
   leadType: 'fit',

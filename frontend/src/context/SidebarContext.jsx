@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 
 const SidebarContext = createContext(null);
 
-const STORAGE_KEY = 'uno-sidebar-collapsed';
+const STORAGE_KEY = 'hjt-sidebar-collapsed';
 
 export function SidebarProvider({ children }) {
   const location = useLocation();

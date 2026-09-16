@@ -7,24 +7,13 @@ const ApiError = require('../utils/apiError');
 const { enqueueEmailJob } = require('./emailQueueService');
 const { isEmailConfigured, normalizeRecipients } = require('./emailService');
 const { invalidateMailboxCache } = require('./emailMailboxCache');
+const company = require('../config/company');
 
 /** Bump when HTML layout changes so stored receipts regenerate. */
-const RECEIPT_TEMPLATE_VERSION = 7;
+const RECEIPT_TEMPLATE_VERSION = 8;
 
 const COMPANY = {
-  name: 'Travel CRM',
-  brand: 'TRAVEL CRM',
-  tagline: 'Travel made simple',
-  address: '',
-  gstin: '',
-  pan: '',
-  phone: process.env.COMPANY_PHONE || '',
-  email: process.env.SMTP_USER || 'sales@example.com',
-  website: '',
-  hsn: '998552',
-  bankName: '',
-  accountNo: '',
-  ifsc: '',
+  ...company,
   cgstRate: 2.5,
   sgstRate: 2.5,
 };
@@ -162,7 +151,7 @@ function buildPaymentReceiptHtml({
   actor,
 }) {
   const v = buildVoucherPayload({ lead, payment, booking, quotation });
-  const executive = actor?.name || booking?.executiveName || 'Travel CRM Sales';
+  const executive = actor?.name || booking?.executiveName || 'Him Journey Tours Sales';
   const quoteOrBooking = v.quoteNumber !== '—' ? v.quoteNumber : v.bookingNumber;
   const refLine = v.paymentRef ? `Ref: ${escapeHtml(v.paymentRef)}` : 'Confirmed';
 
@@ -244,7 +233,7 @@ function buildPaymentReceiptHtml({
   <div class="hero">
     <div class="hero-inner">
       <div>
-        <p class="brand">TRAVEL CRM</p>
+        <p class="brand">HIM JOURNEY TOURS</p>
         <h1 class="title">Advance / Token Receipt</h1>
         <p class="sub">Voucher ID: ${escapeHtml(v.receiptNumber)} · ${escapeHtml(v.paidAtLabel)}</p>
       </div>
@@ -266,7 +255,7 @@ function buildPaymentReceiptHtml({
         <h3>Company</h3>
         <p><strong>${escapeHtml(COMPANY.name)}</strong> · ${escapeHtml(COMPANY.tagline)}</p>
         <p>${escapeHtml(COMPANY.address)}</p>
-        <p><strong>GSTIN:</strong> ${escapeHtml(COMPANY.gstin)} &nbsp;·&nbsp; <strong>PAN:</strong> ${escapeHtml(COMPANY.pan)}</p>
+        ${COMPANY.gstin || COMPANY.pan ? `<p>${COMPANY.gstin ? `<strong>GSTIN:</strong> ${escapeHtml(COMPANY.gstin)}` : ''}${COMPANY.gstin && COMPANY.pan ? ' &nbsp;·&nbsp; ' : ''}${COMPANY.pan ? `<strong>PAN:</strong> ${escapeHtml(COMPANY.pan)}` : ''}</p>` : ''}
         <p><strong>HSN:</strong> ${escapeHtml(COMPANY.hsn)} &nbsp;·&nbsp; Original for Recipient</p>
         ${COMPANY.phone ? `<p><strong>Phone:</strong> ${escapeHtml(COMPANY.phone)}</p>` : ''}
       </div>
@@ -387,7 +376,7 @@ function buildPaymentReceiptHtml({
     <div class="terms">
       <h3>Terms &amp; Conditions</h3>
       <ol>
-        <li>All payments to be made against the receipt of Travel CRM.</li>
+        <li>All payments to be made against the receipt of Him Journey Tours.</li>
         <li>Interest will be charged @ 18% if not paid to us on presentation.</li>
         <li>No claim and discrepancy shall be considered if not sent to us in writing and acknowledged by us within three days.</li>
         <li>Please credit the amount in our bank account as mentioned above.</li>
@@ -454,11 +443,11 @@ async function sendReceiptToCustomer({ lead, payment, actor }) {
   const total = Number(payment.amount) || 0;
   const advance = Number(payment.paidAmount) || 0;
   const balance = Math.max(0, total - advance);
-  const subject = `Travel CRM — Payment voucher ${payment.receiptNumber || ''}`.trim();
+  const subject = `Him Journey Tours — Payment voucher ${payment.receiptNumber || ''}`.trim();
   const text = [
     `Dear ${lead?.name || payment.customerName || 'Customer'},`,
     '',
-    `Thank you for choosing Travel CRM for your trip to ${lead?.destination || 'your destination'}.`,
+    `Thank you for choosing Him Journey Tours for your trip to ${lead?.destination || 'your destination'}.`,
     '',
     `Package total: ${formatINR(total)}`,
     `Advance / token received: ${formatINR(advance)}`,
@@ -467,7 +456,7 @@ async function sendReceiptToCustomer({ lead, payment, actor }) {
     'Please find your advance / token receipt in this email.',
     '',
     `Warm regards,`,
-    actor?.name || 'Travel CRM Sales Team',
+    actor?.name || 'Him Journey Tours Sales Team',
   ].join('\n');
 
   const log = await EmailLog.create({
@@ -728,7 +717,7 @@ async function getLeadPaymentReceipt(leadId, { branchId, extraFilter = {}, refre
       payment,
       booking,
       quotation,
-      actor: { name: booking?.executiveName || 'Travel CRM' },
+      actor: { name: booking?.executiveName || 'Him Journey Tours' },
     });
   }
 

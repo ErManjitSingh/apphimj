@@ -1,4 +1,4 @@
-/** Dark navy sidebar with purple active states — matches Travel CRM design */
+/** Dark navy sidebar with purple active states — matches Him Journey Tours design */
 const DARK_NAVY = {
   brandGradient: 'from-orange-500 to-orange-600',
   brandShadow: 'shadow-orange-500/40',
@@ -86,6 +86,31 @@ export const SIDEBAR_ACCENTS = {
     subtitleText: 'text-orange-100/80',
     subtitleBorder: 'border-white/15',
     overlay: 'from-transparent to-transparent',
+  },
+  light: {
+    brandGradient: 'from-orange-500 to-orange-600',
+    brandShadow: 'shadow-orange-500/20',
+    brandGlow: 'bg-orange-400/15',
+    titleOrange: 'text-slate-900',
+    titleGradient: 'text-slate-900',
+    indicator: 'bg-orange-500',
+    hideIndicator: true,
+    iconActive: 'text-white',
+    iconInactive: 'text-slate-400 group-hover:text-slate-600',
+    itemIdle: 'text-slate-500 hover:text-slate-800 hover:bg-slate-100',
+    itemActive: 'bg-orange-500 text-white shadow-md shadow-orange-500/20',
+    groupActive: 'text-slate-900 bg-slate-100',
+    groupIdle: 'text-slate-500 hover:text-slate-800 hover:bg-slate-100',
+    avatarGradient: 'from-orange-500 to-orange-600',
+    badge: 'bg-slate-100 text-slate-500',
+    headerBg: 'from-transparent to-transparent',
+    headerBorder: 'border-slate-100',
+    subtitleBg: 'bg-slate-50',
+    subtitleText: 'text-slate-400',
+    subtitleBorder: 'border-slate-100',
+    overlay: 'from-transparent to-transparent',
+    searchFocus: 'focus:ring-orange-500/20 focus:border-orange-400/50',
+    searchIconFocus: 'group-focus-within:text-slate-400',
   },
 };
 

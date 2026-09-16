@@ -66,14 +66,14 @@ export function logSelectedPackageDebug(pkg, meta = {}) {
   }
 
   if (pkg._apiRaw?.package) {
-    console.group('🔗 Raw UNO API — GET /v1/packages/{slug}');
+    console.group('🔗 Raw catalog payload — package');
     console.log(pkg._apiRaw.package);
     console.groupEnd();
   }
 
   if (pkg._apiRaw?.dayOptions) {
     const dayOptions = pkg._apiRaw.dayOptions;
-    console.group('🔗 Raw UNO API — GET /v1/packages/{slug}/day-options');
+    console.group('🔗 Raw catalog payload — day options');
     console.log('Top-level keys:', Object.keys(dayOptions || {}));
 
     if (Array.isArray(dayOptions?.cabs) && dayOptions.cabs.length) {

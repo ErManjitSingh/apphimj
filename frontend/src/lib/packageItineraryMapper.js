@@ -19,7 +19,7 @@ function formatMealsLabel(meals = {}) {
   return selected.join(', ');
 }
 
-/** UNO stay meal codes → display label. */
+/** Stay meal codes → display label. */
 function formatMealPlanCode(code = '') {
   const key = normalizeMealPlanKey(code) || String(code || '').trim().toLowerCase();
   const map = {
@@ -86,7 +86,7 @@ export function findStayForDay(stays = [], dayNumber) {
 }
 
 /**
- * UNO day-options put hotels on top-level `stays[]`, not on each day.
+ * Day-options put hotels on top-level `stays[]`, not on each day.
  * Build hotel_options[] (default first) for a stay night.
  */
 export function hotelOptionsFromStay(stay = {}) {
@@ -137,7 +137,7 @@ export function hotelOptionsFromStay(stay = {}) {
   return options;
 }
 
-/** Normalize a UNO hotel option / stay option into itinerary hotelMeta. */
+/** Normalize a hotel option / stay option into itinerary hotelMeta. */
 export function mapHotelOption(option = {}) {
   if (!option || typeof option !== 'object') return null;
   const name = pickHotelLabel(option);
@@ -647,7 +647,7 @@ export function resolvePackageItinerary(source = {}) {
   const stays = source._apiRaw?.dayOptions?.stays || source.stays || [];
   const existing = Array.isArray(source.itinerary) ? source.itinerary : [];
 
-  // Backend already hydrates hotel_ids via Uno Hotels search — keep that payload.
+  // Keep already-hydrated hotel_ids on the itinerary payload.
   if (existing.length && itineraryHotelRichness(existing) > 0) {
     const existingScore = itineraryHotelRichness(existing);
     let merged = [];

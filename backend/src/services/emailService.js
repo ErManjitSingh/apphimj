@@ -1,13 +1,17 @@
 require('../config/env');
 const nodemailer = require('nodemailer');
+const channels = require('../config/channels');
 
-const DEFAULT_FROM = process.env.SMTP_USER || 'sales@example.com';
-const DEFAULT_FROM_NAME = process.env.SMTP_FROM_NAME || 'Travel CRM';
+const DEFAULT_FROM = process.env.SMTP_USER || 'bookinghimjourneytours@gmail.com';
+const DEFAULT_FROM_NAME = process.env.SMTP_FROM_NAME || 'Him Journey Tours';
 
 let transporter = null;
 
 function isEmailConfigured() {
-  return !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+  return (
+    channels.email &&
+    !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS)
+  );
 }
 
 function getTransporter() {

@@ -165,7 +165,7 @@ export function expandDestinationMatchTerms(destination = '') {
   return [...terms];
 }
 
-/** Preferred UNO/catalog search string — prefer state name for broader related packages. */
+/** Preferred catalog search string — prefer state name for broader related packages. */
 export function preferredDestinationSearch(destination = '') {
   const family = resolveFamily(destination);
   if (family?.name) return family.name;

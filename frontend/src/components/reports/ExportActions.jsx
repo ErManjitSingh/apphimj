@@ -12,8 +12,8 @@ export default function ExportActions({ data }) {
       ...rows.destinations.map((r) => ({ section: 'Destination', ...r })),
       ...rows.packages.map((r) => ({ section: 'Package', ...r })),
     ];
-    if (type === 'csv') exportToCSV('uno-crm-report.csv', flat);
-    else if (type === 'excel') exportToExcel('uno-crm-report.xls', flat);
+    if (type === 'csv') exportToCSV('him-journey-report.csv', flat);
+    else if (type === 'excel') exportToExcel('him-journey-report.xls', flat);
     else window.print();
   };
 

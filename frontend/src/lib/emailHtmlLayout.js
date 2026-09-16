@@ -1,8 +1,10 @@
+import { COMPANY_INFO } from '../config/branding';
+
 const BRAND = {
-  name: 'Travel CRM',
-  tagline: 'Crafting unforgettable journeys',
-  email: 'sales@example.com',
-  website: 'http://localhost:5173',
+  name: COMPANY_INFO.name,
+  tagline: COMPANY_INFO.tagline,
+  email: COMPANY_INFO.email,
+  website: COMPANY_INFO.websiteUrl,
 };
 
 const CATEGORY_ACCENT = {
@@ -90,12 +92,19 @@ export function wrapEmailHtml(bodyText, options = {}) {
           ${highlight}
           ${paragraphs}
           <div style="text-align:center;margin-top:20px;">
-            <span style="display:inline-block;padding:12px 24px;background:linear-gradient(135deg,${accent.primary},${accent.secondary});color:#fff;font-weight:700;font-size:13px;border-radius:10px;">Explore Travel CRM</span>
+            <span style="display:inline-block;padding:12px 24px;background:linear-gradient(135deg,${accent.primary},${accent.secondary});color:#fff;font-weight:700;font-size:13px;border-radius:10px;">Explore Him Journey Tours</span>
           </div>
         </div>
         <div style="padding:16px 24px;background:#f8fafc;border-top:1px solid #e2e8f0;">
-          <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#0f172a;">${escapeHtml(executiveName || 'Travel CRM Sales Team')}</p>
-          <p style="margin:0;font-size:12px;color:#64748b;">${BRAND.email}</p>
+          <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#0f172a;">${escapeHtml(executiveName || 'Him Journey Tours Sales Team')}</p>
+          <p style="margin:0;font-size:12px;color:#64748b;">
+            ${BRAND.email} · ${COMPANY_INFO.phone}<br/>
+            <a href="${COMPANY_INFO.instagram}" style="color:#64748b;">Instagram</a>
+            &nbsp;·&nbsp;
+            <a href="${COMPANY_INFO.facebook}" style="color:#64748b;">Facebook</a>
+            &nbsp;·&nbsp;
+            <a href="${BRAND.website}" style="color:#64748b;">${COMPANY_INFO.website}</a>
+          </p>
         </div>
       </div>
     </div>
@@ -118,7 +127,7 @@ export function buildEmailPreviewOptions(lead, category, extras = {}) {
     quotationNumber: extras.quotationNumber || extras.quoteNumber,
     amount: formattedAmount,
     travelDate,
-    executiveName: extras.executiveName || 'Travel CRM Sales Team',
+    executiveName: extras.executiveName || 'Him Journey Tours Sales Team',
   };
 }
 

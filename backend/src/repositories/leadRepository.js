@@ -10,6 +10,7 @@ const {
   DEEP_PAGE_THRESHOLD,
 } = require('../utils/pagination');
 const { withBranch } = require('../utils/branchScope');
+const { expandLeadSourceFilter } = require('../constants/leadSources');
 const {
   findPackageSharedLeadIds,
   wantsPackageSharedLeads,
@@ -98,7 +99,7 @@ async function buildLeadListFilter(query = {}, { branchId } = {}) {
     mongoFilter.status = 'converted';
   }
   if (destination) mongoFilter.destination = destination;
-  if (source) mongoFilter.source = source;
+  if (source) mongoFilter.source = expandLeadSourceFilter(source);
   if (agent) mongoFilter.assignedTo = agent;
   if (teamId) mongoFilter.teamId = teamId;
   if (state) {

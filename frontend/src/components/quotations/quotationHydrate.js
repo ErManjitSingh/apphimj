@@ -36,7 +36,7 @@ export function hydrateDayWiseHotelsFromQuote(quote = {}) {
         reviewCount: h.reviewCount,
         thumbnailUrl: h.thumbnailUrl,
         images: h.images || [],
-        externalSource: h.externalSource || 'uno_hotels',
+        externalSource: h.externalSource || 'catalog',
         startingPrice: absolute || unitPerNight,
       },
       room: h.room
@@ -94,7 +94,7 @@ export function hydrateCabsFromQuote(quote = {}, packageDetail = null) {
       priceDelta: upgrade,
       upgradePrice: upgrade,
       fare: snap.fare || {},
-      externalSource: snap.externalSource || 'uno_package',
+      externalSource: snap.externalSource || 'catalog_package',
       _vehicleCount: count,
       role: snap.role || 'primary',
     };
@@ -145,7 +145,7 @@ export function hydrateWizardFromQuote(quote) {
 
   const dayWiseHotels = hydrateDayWiseHotelsFromQuote(quote);
   const hydratedCabs = hydrateCabsFromQuote(quote, packageDetail);
-  const selectedUnoCab = hydratedCabs.primary;
+  const selectedPackageCab = hydratedCabs.primary;
   const extraCabs = hydratedCabs.extraCabs;
 
   const selectedFlightIds = (quote.selectedFlights || [])
@@ -195,7 +195,7 @@ export function hydrateWizardFromQuote(quote) {
     customInclusions: Array.isArray(pkg.inclusions) && pkg.inclusions.length ? [...pkg.inclusions] : [''],
     customExclusions: Array.isArray(pkg.exclusions) && pkg.exclusions.length ? [...pkg.exclusions] : [''],
     dayWiseHotels,
-    selectedUnoCab,
+    selectedPackageCab,
     extraCabs,
     selectedFlightIds,
     selectedActivityIds,

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { BedDouble, Check, Copy } from 'lucide-react';
 import { Button } from '../ui/button';
-import UnoHotelSelector from './UnoHotelSelector';
+import CatalogHotelSelector from './CatalogHotelSelector';
 import { formatINR } from './quotationUtils';
 import { cn } from '../../lib/utils';
 import { resolveHotelNightDisplayRate } from '../../lib/mealPlanDefaults';
@@ -236,7 +236,7 @@ export default function DayWiseHotelSelector({
         <p className="text-sm font-semibold text-content-primary">
           Night {activeDay} — Hotel, room & meals
         </p>
-        <UnoHotelSelector
+        <CatalogHotelSelector
           key={`night-${activeDay}`}
           destination={destination}
           nights={1}

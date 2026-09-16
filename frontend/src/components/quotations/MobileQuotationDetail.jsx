@@ -25,6 +25,7 @@ import { openWhatsApp } from '../../lib/whatsappContact';
 import { toast } from '../../context/ToastContext';
 import { cn } from '../../lib/utils';
 import { formatINR } from './quotationUtils';
+import { getLeadSourceShortLabel } from '../../lib/leadSourceLabels';
 
 const STATUS_PILL = {
   draft: { label: 'Draft', className: 'bg-violet-100 text-violet-700', dot: 'bg-violet-500' },
@@ -80,27 +81,7 @@ function formatCreatedOn(value) {
 }
 
 function formatSource(lead = {}) {
-  if (lead.sourceLabel) return lead.sourceLabel;
-  const map = {
-    dpw: 'DPW',
-    dpw_wa: 'DPW WA',
-    dpw_call: 'DPW CALL',
-    dpw2: 'DPW2',
-    dpw2_wa: 'DPW2 WA',
-    dpw2_call: 'DPW2 CALL',
-    call_lead: 'Call Lead',
-    website: 'DPW',
-    google_ads: 'DPW',
-    facebook_ads: 'DPW2',
-    facebook: 'DPW2',
-    whatsapp: 'DPW WA',
-    referral: 'Referral',
-    phone: 'Call Lead',
-    organic: 'Organic',
-    'walk-in': 'Call Lead',
-  };
-  const key = String(lead.source || '').toLowerCase();
-  return map[key] || (key ? key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : '—');
+  return getLeadSourceShortLabel(lead.source, lead.sourceLabel) || '—';
 }
 
 function DetailRow({ icon: Icon, label, value }) {

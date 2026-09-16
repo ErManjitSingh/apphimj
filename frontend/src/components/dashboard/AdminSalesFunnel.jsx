@@ -14,7 +14,7 @@ function pct(n, d) {
 }
 
 /**
- * True inverted trapezoid funnel — same visual language as the UNO admin mock.
+ * True inverted trapezoid funnel.
  * Each band is a trapezoid polygon (top wider than bottom).
  */
 export default function AdminSalesFunnel({ data = [] }) {

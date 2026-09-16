@@ -1,4 +1,4 @@
-/** Package nights are usually MAP; last/departure day is often EP in Uno packages. */
+/** Package nights are usually MAP; last/departure day is often EP. */
 export const DEFAULT_MEAL_PLAN_KEY = 'map';
 
 export const DEFAULT_MAP_MEAL_PLAN = {

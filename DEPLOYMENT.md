@@ -1,4 +1,4 @@
-# Travel CRM — Local Setup
+# Him Journey Tours — Local Setup
 
 **Frontend:** http://localhost:5173  
 **API:** http://localhost:5000/api  

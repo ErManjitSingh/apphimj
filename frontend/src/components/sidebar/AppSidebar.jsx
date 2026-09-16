@@ -15,6 +15,7 @@ import SidebarNavGroup from './SidebarNavGroup';
 import SidebarNavSection from './SidebarNavSection';
 import SidebarQuickActions from './SidebarQuickActions';
 import SidebarCollectionTarget from './SidebarCollectionTarget';
+import SidebarSparkles from './SidebarSparkles';
 import { SidebarThemeProvider } from './SidebarThemeContext';
 import { mainNavItems } from './sidebar-config';
 import { filterNavItemsBySearch, injectSectionHeaders, isNavItemActive } from './sidebar-utils';
@@ -128,7 +129,13 @@ export default function AppSidebar({
 
   return (
     <SidebarThemeProvider
-      accent={sidebarVariant === 'sunset' ? 'sunset' : accent}
+      accent={
+        sidebarVariant === 'sunset'
+          ? 'sunset'
+          : sidebarVariant === 'light'
+            ? 'light'
+            : accent
+      }
       profilePath={resolvedProfilePath}
     >
       <TooltipProvider delayDuration={0}>
@@ -136,19 +143,21 @@ export default function AppSidebar({
           animate={{ width }}
           transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
           className={cn(
-            'sidebar-dark relative flex flex-col h-full shrink-0 overflow-hidden',
-            'border-r border-white/[0.06]',
-            'shadow-[4px_0_32px_-8px_rgba(0,0,0,0.4)]',
+            'relative flex flex-col h-full shrink-0 overflow-hidden',
+            sidebarVariant === 'light'
+              ? 'sidebar-light border-r border-slate-100 shadow-[4px_0_24px_-12px_rgba(15,23,42,0.12)]'
+              : 'sidebar-dark border-r border-white/[0.06] shadow-[4px_0_32px_-8px_rgba(0,0,0,0.4)]',
             sidebarVariant === 'sunset' && 'hr-sidebar-sunset',
             sidebarVariant === 'sunset' && timeTheme,
             className
           )}
         >
+          {sidebarVariant === 'light' ? <SidebarSparkles /> : null}
           <div className="relative z-10 flex flex-col h-full min-h-0">
             <SidebarBrand title={resolvedBrandTitle} subtitle={resolvedBrandSubtitle} />
             {sidebarHero}
 
-            <nav className="relative flex-1 px-2 py-2 space-y-0.5 overflow-y-auto overflow-x-hidden scrollbar-thin">
+            <nav className="relative min-h-0 flex-1 space-y-0.5 overflow-y-auto overflow-x-hidden px-2 py-2 scrollbar-thin">
               {navItems.length === 0 && searchQuery && !collapsed && (
                 <p className="px-3 py-6 text-center text-xs text-sidebar-muted">No menu items match your search.</p>
               )}

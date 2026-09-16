@@ -7,7 +7,6 @@ const {
   normalizeLeadSourceKey,
 } = require('../constants/leadSources');
 
-/** Short display labels for lead source (tables, badges) */
 const SOURCE_SHORT = { ...LEAD_SOURCE_LABELS };
 
 function getLeadSourceShortLabel(source, sourceLabel) {
@@ -17,34 +16,12 @@ function getLeadSourceShortLabel(source, sourceLabel) {
     if (resolvedFromLabel && LEAD_SOURCE_KEYS.includes(resolvedFromLabel)) {
       return LEAD_SOURCE_LABELS[resolvedFromLabel];
     }
-    const lower = explicit.toLowerCase();
-    if (lower === 'dpw call' || lower === 'dpw_call') return 'DPW CALL';
-    if (lower === 'dpw2 call' || lower === 'dpw2_call') return 'DPW2 CALL';
-    if (lower === 'dpw wa' || lower === 'dpw_wa') return 'DPW WA';
-    if (lower === 'dpw2 wa' || lower === 'dpw2_wa') return 'DPW2 WA';
-    if (lower === 'dpw2') return 'DPW2';
-    if (lower === 'dpw') return 'DPW';
-    if (lower === 'call lead' || lower === 'call_lead') return 'Call Lead';
   }
 
   const key = resolveLeadSourceKey(source || '', '');
   if (key && SOURCE_SHORT[key]) return SOURCE_SHORT[key];
-
-  const label = explicit.toLowerCase();
-  if (label.includes('dpw2') && label.includes('call')) return 'DPW2 CALL';
-  if (label.includes('dpw') && label.includes('call') && !label.includes('wa')) return 'DPW CALL';
-  if (label.includes('dpw2') && (label.includes('wa') || label.includes('whatsapp'))) return 'DPW2 WA';
-  if (label.includes('dpw') && (label.includes('wa') || label.includes('whatsapp'))) return 'DPW WA';
-  if (label.includes('facebook') || label.includes('instagram') || label.includes('fb ')) return 'DPW2';
-  if (label.includes('google') && !label.includes('whatsapp')) return 'DPW';
-  if (label.includes('call')) return 'Call Lead';
-  if (label.includes('referral')) return 'Referral';
-  if (label.includes('organic')) return 'Organic';
-  if (label.includes('whatsapp') || label.includes('wa ')) return 'DPW WA';
-  if (label.includes('dpw2')) return 'DPW2';
-  if (label.includes('dpw')) return 'DPW';
-
-  return SOURCE_SHORT.organic;
+  if (explicit) return leadSourceLabel(explicit);
+  return SOURCE_SHORT.website;
 }
 
 module.exports = {

@@ -14,6 +14,7 @@
     "seed:hr-demo": "node src/scripts/seedHrDemo.js",
     "seed:operations-demo": "node src/scripts/seedOperationsDemo.js",
     "cleanup:extra-branches": "node src/scripts/cleanupExtraBranches.js",
+    "import:uno-packages": "node src/scripts/importUnoPackages.js",
     "seed:load-test-leads": "node src/scripts/seedLoadTestLeads.js",
     "clear:load-test-leads": "node src/scripts/clearLoadTestLeads.js",
     "clear-leads": "node src/scripts/clearLeads.js",

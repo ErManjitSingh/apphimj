@@ -44,12 +44,4 @@ export const WIZARD_STEPS = [
 export const HOTEL_CATEGORIES = ['Budget', '3 Star', '4 Star', '5 Star', 'Luxury', 'Boutique'];
 export const MEAL_PLANS = ['EP (Room Only)', 'CP (Breakfast)', 'MAP (Breakfast + Dinner)', 'AP (All Meals)', 'All Inclusive'];
 
-export const COMPANY_INFO = {
-  name: 'TRAVEL CRM',
-  tagline: 'Travel made simple',
-  logoUrl: '/homelogo.webp',
-  phone: '',
-  email: 'info@example.com',
-  website: '',
-  address: '',
-};
+export { COMPANY_INFO } from '../../config/branding';

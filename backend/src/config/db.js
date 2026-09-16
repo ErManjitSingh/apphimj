@@ -48,6 +48,10 @@ async function connectDB() {
   logTargetUri(mongoUri);
 
   try {
+    if (nodeEnv === 'production') {
+      mongoose.set('autoIndex', false);
+    }
+
     const conn = await mongoose.connect(mongoUri, {
       serverSelectionTimeoutMS: 10000,
       maxPoolSize: 50,

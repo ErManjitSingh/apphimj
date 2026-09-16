@@ -543,13 +543,10 @@ async function createLeadFromConversation(conversationId, extras = {}, actor = n
     inbound === 'google_ad' ||
     (!isFbWa && (inbound === 'ad' || !inbound));
 
-  // Meta CTWA → DPW2 WA. Google Ads WA / no Meta referral → DPW WA.
-  let sourceKey = 'dpw_wa';
-  if (isFbWa) sourceKey = 'dpw2_wa';
-  else if (isGoogleWa) sourceKey = 'dpw_wa';
-  else if (String(process.env.WHATSAPP_DEFAULT_LEAD_SOURCE || 'dpw_wa').toLowerCase() === 'dpw2_wa') {
-    sourceKey = 'dpw2_wa';
-  }
+  // Meta CTWA → Portal Lead. Google / other WhatsApp → Website.
+  let sourceKey = 'website';
+  if (isFbWa) sourceKey = 'portal_lead';
+  else if (isGoogleWa) sourceKey = 'website';
   const lead = await ingestPublicLead({
     name: extras.name || conversation.profileName || `WhatsApp ${conversation.phone.slice(-4)}`,
     phone: conversation.phone,
@@ -570,7 +567,7 @@ async function createLeadFromConversation(conversationId, extras = {}, actor = n
       : '',
     channel: 'whatsapp',
     source: sourceKey,
-    sourceLabel: sourceKey === 'dpw_wa' ? 'DPW WA' : 'DPW2 WA',
+    sourceLabel: sourceKey === 'portal_lead' ? 'Portal Lead' : 'Website',
     sourceKey,
     inboundAdSource: conversation.inboundAdSource || '',
     waAdSource: conversation.inboundAdSource || '',

@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Link, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Users, Sun, Moon, Lock, Mail, ArrowRight } from 'lucide-react';
+import { Sun, Moon, Lock, Mail, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { AuthError } from '../../auth/authService';
 import { cn } from '../../lib/utils';
+import BrandLogo from '../../components/BrandLogo';
 
 const HR_PRESET = {
   name: 'HR Admin',
@@ -90,10 +91,8 @@ export default function HrLogin() {
         className="relative z-10 w-full max-w-md"
       >
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-[#5D5FEF] to-indigo-700 text-white shadow-lg shadow-[#5D5FEF]/30 mb-4">
-            <Users className="w-7 h-7" />
-          </div>
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Travel CRM HR</h1>
+          <BrandLogo className="mx-auto mb-4 h-16 w-16 shadow-lg shadow-black/20" />
+          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Him Journey Tours HR</h1>
           <p className="text-sm text-slate-600 mt-1">HR Management Portal — sign in to continue</p>
         </div>
 

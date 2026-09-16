@@ -1,7 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { Plus, Bell, Sun, Moon, Menu, X, LogOut, User, LogIn, ChevronDown, RefreshCw, Search, Command } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Plus, Bell, Sun, Moon, Menu, X, LogOut, User, LogIn, ChevronDown, RefreshCw } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDispatch, useSelector } from 'react-redux';
 import { useTheme } from '../context/ThemeContext';
@@ -9,9 +8,17 @@ import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import { NOTIFICATIONS_ENABLED } from '../config/notifications';
 import { getTopBarAccent } from './topbarAccent';
-import { DropdownMenuRoot, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from './ui/dropdown-menu';
+import {
+  DropdownMenuRoot,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from './ui/dropdown-menu';
 import { cn } from '../lib/utils';
 import AttendanceTopBarAction from './attendance/AttendanceTopBarAction';
+import HeaderLatestActivity from './HeaderLatestActivity';
 import API from '../api/axios';
 import {
   hydrateSelectedBranch,
@@ -41,31 +48,14 @@ function getProfilePath(pathname) {
   return '/profile';
 }
 
-function formatBranchLabel(name) {
-  const raw = String(name || '').trim();
-  if (!raw) return '';
-  const normalized = raw.toLowerCase().replace(/[\s_-]+/g, '');
-  if (
-    normalized.includes('bhatakhur') ||
-    normalized.includes('bhatakufar') ||
-    normalized.includes('bhattakufer') ||
-    normalized.includes('bhattakufar') ||
-    normalized.includes('bhata')
-  ) {
-    return 'PTW';
-  }
-  if (normalized.includes('shimla')) return 'Shimla';
-  return raw;
-}
-
 function IconButton({ children, className, accent, ...props }) {
   return (
     <button
       type="button"
       className={cn(
-        'relative flex items-center justify-center w-10 h-10 rounded-xl',
-        'border border-subtle bg-surface/90 shadow-sm',
-        'text-content-secondary transition-all duration-200',
+        'relative flex items-center justify-center h-8 w-8 rounded-lg',
+        'bg-white/80 text-slate-500 ring-1 ring-orange-100/80',
+        'transition-all duration-150 hover:text-orange-600 hover:bg-orange-50 hover:ring-orange-200',
         accent.iconHover,
         className
       )}
@@ -83,7 +73,7 @@ export default function TopBar({ onMenuClick }) {
   const { toggleTheme, isDark } = useTheme();
   const { user, logout, hasPermission } = useAuth();
   const { unreadCount, openDrawer } = useNotifications();
-  const { selectedBranchId, availableBranches } = useSelector((s) => s.branch);
+  const { selectedBranchId } = useSelector((s) => s.branch);
   const navigate = useNavigate();
   const location = useLocation();
   const accent = getTopBarAccent(location.pathname);
@@ -92,16 +82,8 @@ export default function TopBar({ onMenuClick }) {
   const isLeadProvider = user?.role === 'lead_provider';
   const canSwitchBranches = isAdmin || isLeadProvider;
   const canAddLead = isAdmin || isLeadProvider || hasPermission?.('leads', 'create');
-  const selectedBranch = availableBranches.find((b) => b._id === selectedBranchId);
-  const selectedBranchLabel = formatBranchLabel(selectedBranch?.name);
-  const adminRoleLine = canSwitchBranches
-    ? `${user?.roleName || user?.role}${selectedBranchLabel ? ` - ${selectedBranchLabel}` : ''}`
-    : (user?.roleName || user?.role);
-  const [isBranchSwitching, setIsBranchSwitching] = useState(false);
+  const adminRoleLine = user?.roleName || user?.role;
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const refreshTimerRef = useRef(null);
-  const failSafeTimerRef = useRef(null);
 
   useEffect(() => {
     dispatch(hydrateSelectedBranch());
@@ -139,31 +121,6 @@ export default function TopBar({ onMenuClick }) {
       });
   }, [dispatch, canSwitchBranches, selectedBranchId, user?.branchId]);
 
-  const handleBranchChange = (branchId) => {
-    if (!branchId || branchId === selectedBranchId) return;
-    setIsBranchSwitching(true);
-    dispatch(setSelectedBranch(branchId));
-    refreshTimerRef.current = window.setTimeout(() => {
-      window.location.reload();
-    }, 1400);
-    // Safety net: never leave user stuck on loading.
-    failSafeTimerRef.current = window.setTimeout(() => {
-      window.location.reload();
-    }, 10000);
-  };
-
-  useEffect(() => () => {
-    if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
-    if (failSafeTimerRef.current) window.clearTimeout(failSafeTimerRef.current);
-  }, []);
-
-  const handleBranchToggle = () => {
-    if (!availableBranches.length) return;
-    const currentIndex = availableBranches.findIndex((b) => b._id === selectedBranchId);
-    const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % availableBranches.length : 0;
-    handleBranchChange(availableBranches[nextIndex]?._id);
-  };
-
   const handleLogout = async () => {
     try {
       await logout();
@@ -175,124 +132,53 @@ export default function TopBar({ onMenuClick }) {
   const handleAppRefresh = () => {
     if (isRefreshing) return;
     setIsRefreshing(true);
+    queryClient.invalidateQueries({ queryKey: ['header-activity'] });
     refreshAppData(queryClient).finally(() => {
       window.setTimeout(() => setIsRefreshing(false), 900);
     });
   };
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    const q = searchQuery.trim();
-    if (q) navigate(`/leads?search=${encodeURIComponent(q)}`);
-  };
-
   return (
-    <header className="sticky top-0 z-30 border-b border-subtle bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl shadow-sm">
-      <div className="relative flex items-center gap-3 sm:gap-4 px-4 lg:px-6 h-[68px]">
-        {/* Mobile menu */}
+    <header className="sticky top-0 z-30 border-b border-orange-100/60 bg-white/85 backdrop-blur-2xl">
+      <div className={cn('absolute inset-x-0 top-0 h-px bg-gradient-to-r', accent.stripe)} />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(249,115,22,0.07)_0%,rgba(255,255,255,0)_45%,rgba(251,191,36,0.08)_100%)]" />
+      <div className="relative flex items-center gap-2 px-3 lg:px-5 h-14">
         <button
           type="button"
           onClick={() => toggleMobileOpen()}
           className={cn(
-            'lg:hidden flex items-center justify-center w-10 h-10 rounded-xl',
-            'border border-subtle bg-surface/90 text-content-secondary shadow-sm transition-colors',
+            'lg:hidden flex items-center justify-center h-8 w-8 rounded-lg',
+            'bg-white/80 text-slate-500 ring-1 ring-orange-100',
             accent.iconHover
           )}
           aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
           aria-expanded={mobileOpen}
         >
-          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
         </button>
 
-        {/* Search bar */}
-        <form onSubmit={handleSearchSubmit} className="hidden sm:flex flex-1 max-w-xl">
-          <div className="relative w-full group">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-content-muted" />
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search leads, customers, bookings..."
-              className={cn(
-                'w-full h-10 pl-10 pr-20 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-subtle text-sm text-content-primary placeholder:text-content-muted outline-none transition-all',
-                accent.searchFocus
-              )}
-            />
-            <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-white dark:bg-slate-700 border border-subtle text-[10px] font-semibold text-content-muted pointer-events-none">
-              <Command className="w-2.5 h-2.5" />
-              <span>K</span>
-            </div>
-          </div>
-        </form>
+        {user ? <HeaderLatestActivity /> : <div className="flex-1" />}
 
-        <div className="flex-1 sm:hidden" />
-
-        {/* Actions */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           {user && (
-            <button
-              type="button"
+            <IconButton
+              accent={accent}
               onClick={handleAppRefresh}
               disabled={isRefreshing}
-              className={cn(
-                'inline-flex items-center gap-2 h-10 rounded-xl border border-subtle bg-surface/95',
-                'text-xs font-semibold text-content-primary transition-colors',
-                'px-3 disabled:opacity-70',
-                accent.iconHover
-              )}
               title="Refresh data"
               aria-label="Refresh data"
             >
-              <RefreshCw className={cn('w-3.5 h-3.5 shrink-0', isRefreshing && 'animate-spin')} />
-              <span className="hidden md:inline">Refresh</span>
-            </button>
-          )}
-          {canSwitchBranches && availableBranches.length > 0 && (
-            <div className="hidden md:inline-flex items-center h-10 rounded-xl border border-subtle bg-surface/95 p-1">
-              {availableBranches.slice(0, 2).map((branch) => {
-                const isActive = branch._id === selectedBranchId;
-                const branchLabel = formatBranchLabel(branch.name);
-                return (
-                  <button
-                    key={branch._id}
-                    type="button"
-                    onClick={() => handleBranchChange(branch._id)}
-                    disabled={isBranchSwitching || isActive}
-                    className={cn(
-                      'px-3 h-8 rounded-lg text-xs font-semibold transition-colors',
-                      isActive
-                        ? 'bg-brand-600 text-white'
-                        : 'text-content-muted hover:text-content-primary',
-                      'disabled:opacity-90'
-                    )}
-                    title={`Switch to ${branchLabel}`}
-                  >
-                    {branchLabel}
-                  </button>
-                );
-              })}
-              {availableBranches.length > 2 && (
-                <button
-                  type="button"
-                  onClick={handleBranchToggle}
-                  disabled={isBranchSwitching}
-                  className="px-2 h-8 rounded-lg text-xs font-semibold text-content-muted hover:text-content-primary"
-                  title="Switch to next branch"
-                >
-                  +{availableBranches.length - 2}
-                </button>
-              )}
-            </div>
+              <RefreshCw className={cn('w-3.5 h-3.5', isRefreshing && 'animate-spin')} />
+            </IconButton>
           )}
 
           {canAddLead && (
             <Link
               to={user?.role === 'sales_executive' ? '/sales-executive/leads/add' : '/leads/new'}
-              className="inline-flex items-center gap-2 h-10 px-4 rounded-xl text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 shadow-md shadow-blue-500/25 transition-all active:scale-[0.98] hidden sm:inline-flex"
+              className="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-semibold text-white bg-gradient-to-r from-orange-500 to-amber-500 shadow-sm shadow-orange-500/25 hover:from-orange-400 hover:to-amber-400 active:scale-[0.98] transition"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3.5 h-3.5" />
               Add Lead
-              <ChevronDown className="w-3.5 h-3.5 opacity-80" />
             </Link>
           )}
 
@@ -301,12 +187,14 @@ export default function TopBar({ onMenuClick }) {
           {canAddLead && (
             <Link
               to={user?.role === 'sales_executive' ? '/sales-executive/leads/add' : '/leads/new'}
-              className="sm:hidden flex items-center justify-center w-10 h-10 rounded-xl text-white bg-blue-500 shadow-md"
+              className="sm:hidden flex items-center justify-center h-8 w-8 rounded-lg text-white bg-orange-500 shadow-sm"
               aria-label="Add Lead"
             >
-              <Plus className="w-5 h-5" />
+              <Plus className="w-4 h-4" />
             </Link>
           )}
+
+          <span className="hidden sm:block mx-0.5 h-5 w-px bg-orange-100" />
 
           {NOTIFICATIONS_ENABLED && (
             <IconButton
@@ -314,9 +202,9 @@ export default function TopBar({ onMenuClick }) {
               aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
               onClick={openDrawer}
             >
-              <Bell className="w-[18px] h-[18px]" />
+              <Bell className="w-3.5 h-3.5" />
               {unreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white dark:ring-slate-900">
+                <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-0.5 flex items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white ring-2 ring-white">
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}
@@ -324,7 +212,7 @@ export default function TopBar({ onMenuClick }) {
           )}
 
           <IconButton accent={accent} onClick={toggleTheme} aria-label="Toggle theme">
-            {isDark ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
+            {isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
           </IconButton>
 
           {user ? (
@@ -332,31 +220,26 @@ export default function TopBar({ onMenuClick }) {
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className={cn(
-                    'flex items-center gap-2.5 pl-1.5 pr-2 h-10 rounded-xl',
-                    'border border-subtle bg-surface/95 shadow-sm',
-                    'hover:bg-surface-elevated transition-all',
-                    'focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-brand-500/25'
-                  )}
+                  className="flex items-center gap-2 pl-1 pr-1.5 h-8 rounded-lg bg-white/90 ring-1 ring-orange-100 hover:bg-orange-50/80 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/40"
                 >
                   <div className="relative">
-                    <div className={cn('w-8 h-8 rounded-lg bg-gradient-to-br flex items-center justify-center text-[11px] font-bold text-white', accent.avatar)}>
+                    <div className={cn('w-6 h-6 rounded-md bg-gradient-to-br flex items-center justify-center text-[9px] font-bold text-white', accent.avatar)}>
                       {getInitials(user.name)}
                     </div>
-                    <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900" />
+                    <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white" />
                   </div>
-                  <div className="hidden md:block text-left min-w-0 max-w-[110px]">
-                    <p className="text-xs font-bold text-content-primary truncate leading-tight">{user.name}</p>
-                    <p className="text-[10px] text-content-muted truncate leading-tight">{adminRoleLine}</p>
+                  <div className="hidden lg:block text-left min-w-0 max-w-[96px]">
+                    <p className="text-[11px] font-semibold text-slate-800 truncate leading-none">{user.name}</p>
+                    <p className="mt-0.5 text-[9px] font-medium text-orange-500 truncate leading-none">{adminRoleLine}</p>
                   </div>
-                  <ChevronDown className="w-3.5 h-3.5 text-content-muted hidden md:block shrink-0" />
+                  <ChevronDown className="w-3 h-3 text-slate-400 hidden lg:block shrink-0" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 p-1.5">
                 <DropdownMenuLabel className="px-2 py-2">
                   <p className="font-bold text-content-primary truncate">{user.name}</p>
                   <p className="text-xs font-normal text-content-muted truncate mt-0.5">{user.email}</p>
-                  <span className="inline-block mt-2 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
+                  <span className="inline-block mt-2 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700">
                     ● Online
                   </span>
                 </DropdownMenuLabel>
@@ -381,7 +264,7 @@ export default function TopBar({ onMenuClick }) {
             <Link
               to="/login"
               className={cn(
-                'inline-flex items-center gap-2 h-10 px-4 rounded-xl text-sm font-semibold text-white',
+                'inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-semibold text-white',
                 'bg-gradient-to-r shadow-md transition-all', accent.addBtn
               )}
             >
@@ -391,17 +274,6 @@ export default function TopBar({ onMenuClick }) {
           )}
         </div>
       </div>
-      {isBranchSwitching && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center px-4">
-          <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-slate-900 text-white shadow-2xl p-6 text-center">
-            <div className="mx-auto mb-4 w-10 h-10 rounded-full border-2 border-white/25 border-t-white animate-spin" />
-            <p className="text-base font-semibold">Switching branch...</p>
-            <p className="text-sm text-slate-300 mt-1">Refreshing data. Please wait.</p>
-          </div>
-        </div>,
-        document.body
-      )}
-
     </header>
   );
 }

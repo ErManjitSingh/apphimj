@@ -53,20 +53,41 @@ router.use('/followups', followUpRoutes);
 router.use('/reminders', reminderRoutes);
 router.use('/quotations', quotationRoutes);
 router.use('/packages', packageRoutes);
-router.use('/uno-packages', unoHotelsPackageRoutes);
 router.use('/public-packages', unoHotelsPackageRoutes);
-router.use('/uno-hotels', unoHotelsHotelRoutes);
-router.use('/uno-cabs', unoHotelsCabRoutes);
+router.use('/catalog-hotels', unoHotelsHotelRoutes);
+router.use('/catalog-cabs', unoHotelsCabRoutes);
 router.use('/hotels', hotelRoutes);
 router.use('/cabs', cabRoutes);
 router.use('/flights', flightRoutes);
 router.use('/activities', activityRoutes);
 router.use('/users', userRoutes);
 router.use('/roles', roleRoutes);
-router.use('/whatsapp', whatsappRoutes);
-router.use('/whatsapp-templates', whatsappTemplateRoutes);
-router.use('/email-templates', emailTemplateRoutes);
-router.use('/emails', emailRoutes);
+const channels = require('../config/channels');
+
+function channelDisconnected(name) {
+  return (_req, res) => {
+    res.status(410).json({
+      ok: false,
+      message: `${name} is not connected on this CRM`,
+    });
+  };
+}
+
+if (channels.whatsapp) {
+  router.use('/whatsapp', whatsappRoutes);
+  router.use('/whatsapp-templates', whatsappTemplateRoutes);
+} else {
+  router.use('/whatsapp', channelDisconnected('WhatsApp'));
+  router.use('/whatsapp-templates', channelDisconnected('WhatsApp'));
+}
+
+if (channels.email) {
+  router.use('/email-templates', emailTemplateRoutes);
+  router.use('/emails', emailRoutes);
+} else {
+  router.use('/email-templates', channelDisconnected('Email'));
+  router.use('/emails', channelDisconnected('Email'));
+}
 router.use('/sales-targets', salesTargetRoutes);
 router.use('/announcements', announcementRoutes);
 router.use('/lead-status-config', require('./leadStatusConfigRoutes'));
@@ -94,10 +115,25 @@ router.use('/marketing-spend', marketingSpendRoutes);
 const publicLeadRoutes = require('./publicLeadRoutes');
 const facebookWebhookRoutes = require('./facebookWebhookRoutes');
 const whatsappWebhookRoutes = require('./whatsappWebhookRoutes');
-router.use('/public', publicLeadRoutes);
-router.use('/webhooks/facebook', facebookWebhookRoutes);
-// Alias — Meta docs/users often enter /api/facebook/webhook
-router.use('/facebook/webhook', facebookWebhookRoutes);
-router.use('/webhooks/whatsapp', whatsappWebhookRoutes);
+
+if (channels.publicLeadIngest) {
+  router.use('/public', publicLeadRoutes);
+} else {
+  router.use('/public', channelDisconnected('Landing lead ingest'));
+}
+
+if (channels.facebook) {
+  router.use('/webhooks/facebook', facebookWebhookRoutes);
+  router.use('/facebook/webhook', facebookWebhookRoutes);
+} else {
+  router.use('/webhooks/facebook', channelDisconnected('Meta'));
+  router.use('/facebook/webhook', channelDisconnected('Meta'));
+}
+
+if (channels.whatsapp) {
+  router.use('/webhooks/whatsapp', whatsappWebhookRoutes);
+} else {
+  router.use('/webhooks/whatsapp', channelDisconnected('WhatsApp'));
+}
 
 module.exports = router;

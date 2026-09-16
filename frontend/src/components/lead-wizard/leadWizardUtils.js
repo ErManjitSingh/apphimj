@@ -1,5 +1,6 @@
 import { LEAD_SOURCES, MEAL_PLAN_LABELS, defaultWizardValues } from './constants';
 import { normalizeMealPlanKey } from '../../lib/mealPlanDefaults';
+import { resolveLeadSourceKey } from '../../lib/leadSourceLabels';
 
 const sourceLabel = (value) => LEAD_SOURCES.find((s) => s.value === value)?.label || value;
 
@@ -63,7 +64,7 @@ export function leadToWizardValues(lead) {
     adults,
     children,
     infants,
-    leadSource: lead.leadSource || lead.source || 'dpw',
+    leadSource: resolveLeadSourceKey(lead.leadSource || lead.source, lead.sourceLabel) || 'website',
     referrerLeadId: lead.referral?.referrerLeadId
       ? String(lead.referral.referrerLeadId._id || lead.referral.referrerLeadId)
       : '',

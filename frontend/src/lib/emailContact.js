@@ -21,7 +21,7 @@ export function renderEmailTemplate(text, lead = {}, extras = {}) {
     quotationNumber: extras.quotationNumber || extras.quoteNumber || '',
     amount: formattedAmount,
     travelDate,
-    executiveName: extras.executiveName || 'Travel CRM',
+    executiveName: extras.executiveName || 'Him Journey Tours',
   };
 
   return String(text || '').replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? '');
@@ -61,7 +61,7 @@ export function buildQuotationHtmlAttachment(quote, lead = {}) {
     lead.destination ||
     '';
 
-  const body = `Thank you for choosing Travel CRM. Your personalised quotation is ready for review.
+  const body = `Thank you for choosing Him Journey Tours. Your personalised quotation is ready for review.
 
 Our travel experts have prepared this package based on your requirements. Please review the summary and reach out if you'd like any changes.
 
@@ -77,12 +77,12 @@ We look forward to making your journey truly memorable!`;
     travelDate: travelDate
       ? new Date(travelDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
       : '—',
-    executiveName: 'Travel CRM Sales Team',
+    executiveName: 'Him Journey Tours Sales Team',
   });
 
   const content = btoa(unescape(encodeURIComponent(html)));
   return {
-    filename: `Quotation-${quote.quoteNumber || 'UNO'}.html`,
+    filename: `Quotation-${quote.quoteNumber || 'HJT'}.html`,
     content,
     encoding: 'base64',
     contentType: 'text/html',

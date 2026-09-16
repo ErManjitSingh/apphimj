@@ -299,7 +299,7 @@ function SelectedHotelBanner({ hotel }) {
   );
 }
 
-export default function UnoHotelSelector({
+export default function CatalogHotelSelector({
   destination,
   value,
   onChange,
@@ -327,7 +327,7 @@ export default function UnoHotelSelector({
   useEffect(() => {
     let cancelled = false;
     setLoadingHotels(true);
-    API.get('/uno-hotels', {
+    API.get('/catalog-hotels', {
       params: {
         destination,
         limit: debouncedSearch ? 50 : 24,
@@ -355,7 +355,7 @@ export default function UnoHotelSelector({
     setHotelDetail(null);
     onChange(null);
     try {
-      const res = await API.get('/uno-hotels/detail', {
+      const res = await API.get('/catalog-hotels/detail', {
         params: {
           city: hotel.city,
           slug: hotel.slug,
@@ -488,7 +488,7 @@ export default function UnoHotelSelector({
               <p className="text-xs text-content-muted mt-1">
                 {debouncedSearch
                   ? 'Try a different search term or clear the search.'
-                  : 'Try a different destination or check Uno Hotels catalog.'}
+                  : 'Try a different destination or check the Him Journey catalog.'}
               </p>
             </div>
           ) : (

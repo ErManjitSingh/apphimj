@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { APP_GREETING } from '../config/branding';
 
-export const APP_GREETING = 'Welcome to Travel CRM';
+export { APP_GREETING };
 
 /** Fixed brand greeting for dashboards / login */
 export function getTimeGreeting() {
@@ -9,11 +9,5 @@ export function getTimeGreeting() {
 
 /** Static brand greeting (no time-of-day swap) */
 export function useTimeGreeting() {
-  const [greeting, setGreeting] = useState(() => getTimeGreeting());
-
-  useEffect(() => {
-    setGreeting(getTimeGreeting());
-  }, []);
-
-  return greeting;
+  return APP_GREETING;
 }

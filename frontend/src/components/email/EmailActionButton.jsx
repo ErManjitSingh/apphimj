@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Mail } from 'lucide-react';
 import { usePermissions } from '../../hooks/usePermissions';
+import { CHANNELS } from '../../config/channels';
 import { Button } from '../ui/button';
 import EmailComposerModal from './EmailComposerModal';
 
@@ -17,7 +18,7 @@ export default function EmailActionButton({
   className = '',
 }) {
   const { can } = usePermissions();
-  const canSendEmail = can('email', 'send');
+  const canSendEmail = CHANNELS.email && can('email', 'send');
   const [open, setOpen] = useState(false);
 
   if (!canSendEmail) return null;

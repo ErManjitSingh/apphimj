@@ -1,0 +1,8 @@
+{
+  "name": "himjourney-crm-deploy",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "ssh2": "^1.16.0"
+  }
+}

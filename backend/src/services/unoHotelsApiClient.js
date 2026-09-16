@@ -34,6 +34,12 @@ function sanitizeImages(images = [], options = {}) {
   return (Array.isArray(images) ? images : []).map((url) => sanitizeImageUrl(url, options)).filter(Boolean);
 }
 
+function publicCatalogMessage(message, fallback) {
+  const text = String(message || '').trim();
+  if (!text || /\buno\b/i.test(text) || /unohotels/i.test(text)) return fallback;
+  return text;
+}
+
 async function getAdminToken() {
   if (process.env.UNO_HOTELS_ADMIN_TOKEN) return process.env.UNO_HOTELS_ADMIN_TOKEN;
 
@@ -51,12 +57,12 @@ async function getAdminToken() {
 
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new ApiError(502, json.message || 'Failed to authenticate with Uno Hotels API');
+    throw new ApiError(502, publicCatalogMessage(json.message, 'Failed to authenticate with the hotel catalog'));
   }
 
   const payload = unwrapPayload(json);
   const token = payload?.tokens?.access_token;
-  if (!token) throw new ApiError(502, 'Uno Hotels API login did not return an access token');
+  if (!token) throw new ApiError(502, 'Hotel catalog login did not return an access token');
 
   cachedAdminToken = token;
   tokenExpiresAt = Date.now() + Math.max(60, Number(payload.tokens.expires_in || 3600) - 60) * 1000;
@@ -74,7 +80,7 @@ async function unoFetch(path, { query = {}, admin = false, method = 'GET', body 
   const headers = { Accept: 'application/json' };
   if (admin) {
     const token = await getAdminToken();
-    if (!token) throw new ApiError(503, 'Uno Hotels admin credentials are not configured');
+    if (!token) throw new ApiError(503, 'Hotel catalog credentials are not configured');
     headers.Authorization = `Bearer ${token}`;
   }
 
@@ -88,7 +94,10 @@ async function unoFetch(path, { query = {}, admin = false, method = 'GET', body 
   const json = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    throw new ApiError(res.status >= 500 ? 502 : res.status, json.message || 'Uno Hotels API request failed');
+    throw new ApiError(
+      res.status >= 500 ? 502 : res.status,
+      publicCatalogMessage(json.message, 'Hotel catalog request failed'),
+    );
   }
 
   return json;

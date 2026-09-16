@@ -1,4 +1,4 @@
-/** Travel CRM Sales SOP — Phase 1 constants */
+/** Him Journey Tours Sales SOP — Phase 1 constants */
 
 const LEAD_ACCEPT_MINUTES = 30;
 

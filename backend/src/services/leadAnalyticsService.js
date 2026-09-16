@@ -3,25 +3,29 @@ const FollowUp = require('../models/FollowUp');
 const User = require('../models/User');
 const { withBranch } = require('../utils/branchScope');
 const { startOfDay, endOfDay } = require('../utils/queryHelpers');
+const { leadSourceLabel, expandLeadSourceFilter } = require('../constants/leadSources');
 
 const SOURCE_LABELS = {
-  dpw: 'DPW',
-  dpw_wa: 'DPW WA',
-  dpw_call: 'DPW CALL',
-  dpw2: 'DPW2',
-  dpw2_wa: 'DPW2 WA',
-  dpw2_call: 'DPW2 CALL',
+  website: 'Website',
+  website_2: 'Website 2',
   referral: 'Referral',
+  portal_lead: 'Portal Lead',
   call_lead: 'Call Lead',
-  organic: 'Organic',
-  google_ads: 'DPW',
-  facebook_ads: 'DPW2',
-  website: 'DPW',
-  whatsapp: 'DPW2 WA',
+  dpw: 'Website',
+  dpw_wa: 'Website',
+  dpw_call: 'Call Lead',
+  dpw2: 'Website 2',
+  dpw2_wa: 'Website 2',
+  dpw2_call: 'Call Lead',
+  organic: 'Website',
+  google_ads: 'Website',
+  facebook_ads: 'Portal Lead',
+  website_old: 'Website',
+  whatsapp: 'Website',
   'walk-in': 'Call Lead',
   phone: 'Call Lead',
-  social: 'DPW2',
-  other: 'Organic',
+  social: 'Website 2',
+  other: 'Website',
 };
 
 const AGING_LABELS = {
@@ -91,7 +95,7 @@ async function getSourceAnalytics(branchId) {
   return {
     sources: rows.map((r) => ({
       key: r._id || 'other',
-      label: SOURCE_LABELS[r._id] || r._id || 'Other',
+      label: leadSourceLabel(r._id) || r._id || 'Other',
       total: r.total,
       converted: r.converted,
       connected: r.connected || 0,
@@ -133,7 +137,7 @@ function periodTouchFilter(periodStart, periodEnd) {
 async function getExecutivePerformance(branchId, options = {}) {
   const { dateFrom, dateTo, source } = options;
   const { isAllTime, periodStart, periodEnd } = resolvePerformancePeriod(dateFrom, dateTo);
-  const sourceFilter = source ? { source } : {};
+  const sourceFilter = source ? { source: expandLeadSourceFilter(source) } : {};
   const touch = periodTouchFilter(periodStart, periodEnd);
 
   const execFilter = {

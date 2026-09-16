@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Plane,
   Moon,
   Sun,
   Lock,
@@ -19,6 +18,7 @@ import { AuthError } from '../auth/authService';
 import { cn } from '../lib/utils';
 import { APP_BRAND_NAME } from '../config/branding';
 import { APP_GREETING } from '../lib/greeting';
+import BrandLogo from '../components/BrandLogo';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -66,28 +66,25 @@ export default function Login() {
 
   return (
     <div
-      className="relative min-h-screen flex flex-col items-center justify-center px-4 py-10 sm:py-12 overflow-hidden bg-[#E8F0F8] bg-cover bg-center bg-no-repeat"
-      style={{
-        backgroundImage:
-          "url('https://img.magnific.com/free-photo/particle-lines-futuristic-gradient-background_53876-104053.jpg?semt=ais_hybrid&w=740&q=80')",
-      }}
+      className="relative min-h-screen flex flex-col items-center justify-center px-4 py-10 sm:py-12 overflow-hidden bg-slate-900 bg-cover bg-center bg-no-repeat"
+      style={{ backgroundImage: "url('/login-bg.jpg')" }}
     >
-      <div className="pointer-events-none absolute inset-0 bg-white/20" />
+      <div className="pointer-events-none absolute inset-0 bg-black/30" />
 
       <div className="absolute top-4 right-4 z-20 flex items-center gap-2.5 sm:top-5 sm:right-6">
         <button
           type="button"
           onClick={toggleTheme}
           className={cn(
-            'relative flex h-9 w-[3.25rem] items-center rounded-full border border-slate-200/80 bg-white shadow-sm transition-colors',
-            isDark && 'border-violet-300 bg-violet-50',
+            'relative flex h-9 w-[3.25rem] items-center rounded-full border border-white/50 bg-white/80 shadow-lg shadow-black/10 backdrop-blur-md transition-colors',
+            isDark && 'border-orange-200/70 bg-white',
           )}
           aria-label="Toggle theme"
         >
           <span
             className={cn(
               'absolute left-1 flex h-7 w-7 items-center justify-center rounded-full bg-slate-800 text-white shadow transition-transform',
-              isDark && 'translate-x-[1.35rem] bg-violet-600',
+              isDark && 'translate-x-[1.35rem] bg-orange-500',
             )}
           >
             {isDark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
@@ -98,7 +95,7 @@ export default function Login() {
           <button
             type="button"
             onClick={() => setLangOpen((v) => !v)}
-            className="flex h-9 items-center gap-1.5 rounded-full border border-slate-200/80 bg-white px-3 text-sm font-medium text-slate-600 shadow-sm hover:bg-slate-50"
+            className="flex h-9 items-center gap-1.5 rounded-full border border-white/50 bg-white/80 px-3 text-sm font-medium text-slate-700 shadow-lg shadow-black/10 backdrop-blur-md hover:bg-white"
           >
             <Globe className="h-4 w-4 text-slate-500" />
             English
@@ -110,14 +107,14 @@ export default function Login() {
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
-                className="absolute right-0 mt-1.5 w-36 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
+                className="absolute right-0 mt-1.5 w-36 overflow-hidden rounded-xl border border-white/70 bg-white/95 py-1 shadow-xl backdrop-blur-md"
               >
                 {['English', 'Hindi'].map((lang) => (
                   <button
                     key={lang}
                     type="button"
                     onClick={() => setLangOpen(false)}
-                    className="block w-full px-3 py-2 text-left text-sm text-slate-600 hover:bg-violet-50 hover:text-violet-700"
+                    className="block w-full px-3 py-2 text-left text-sm text-slate-600 hover:bg-orange-50 hover:text-orange-700"
                   >
                     {lang}
                   </button>
@@ -129,27 +126,36 @@ export default function Login() {
       </div>
 
       <motion.div
-        initial={{ opacity: 0, y: 18 }}
+        initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.45, ease: 'easeOut' }}
-        className="relative z-10 w-full max-w-[440px]"
+        transition={{ duration: 0.4, ease: 'easeOut' }}
+        className="relative z-10 w-full max-w-[360px]"
       >
-        <div className="overflow-hidden rounded-[28px] border border-white bg-white shadow-[0_25px_60px_-20px_rgba(109,40,217,0.28)]">
-          <div className="px-7 pt-9 pb-8 sm:px-10 sm:pt-10 sm:pb-9">
-            <div className="mb-7 text-center">
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#8B5CF6] to-[#4F46E5] text-white shadow-lg shadow-violet-500/35">
-                <Plane className="h-7 w-7" strokeWidth={2.2} />
+        <div className="overflow-hidden rounded-[26px] bg-white shadow-[0_28px_70px_-18px_rgba(0,0,0,0.65)]">
+          <div
+            className="relative h-[96px] bg-cover bg-center"
+            style={{ backgroundImage: "url('/login-bg.jpg')" }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/20 to-white" />
+            <div className="absolute -bottom-8 left-1/2 -translate-x-1/2">
+              <div className="flex h-[68px] w-[68px] items-center justify-center rounded-full bg-white shadow-[0_8px_24px_rgba(0,0,0,0.25)] ring-4 ring-white">
+                <BrandLogo className="h-[62px] w-[62px]" />
               </div>
+            </div>
+          </div>
+
+          <div className="bg-white px-5 pb-5 pt-11 sm:px-6">
+            <div className="mb-4 text-center">
               <p
-                className="mb-1 text-[1.65rem] font-semibold leading-none text-[#7C3AED]"
+                className="mb-1 text-[1.25rem] font-semibold leading-none text-orange-500"
                 style={{ fontFamily: '"Caveat", cursive' }}
               >
                 {APP_GREETING}
               </p>
-              <h1 className="text-[1.55rem] font-bold tracking-tight text-[#1A1D2E] sm:text-[1.7rem]">
+              <h1 className="text-[1.2rem] font-bold tracking-tight text-slate-900">
                 Sign in to your account
               </h1>
-              <p className="mt-1.5 text-sm text-slate-500">
+              <p className="mt-1 text-[12px] text-slate-500">
                 Access your {APP_BRAND_NAME} dashboard
               </p>
             </div>
@@ -160,43 +166,43 @@ export default function Login() {
               </div>
             )}
             {info && (
-              <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50 px-3.5 py-2.5 text-sm text-violet-700">
+              <div className="mb-4 rounded-xl border border-orange-200 bg-orange-50 px-3.5 py-2.5 text-sm text-orange-800">
                 {info}
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-3">
               <div>
-                <label className="mb-1.5 block text-sm font-semibold text-[#1A1D2E]">
+                <label className="mb-1.5 block text-[13px] font-semibold text-slate-800">
                   Email Address
                 </label>
                 <div className="relative">
-                  <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" />
+                  <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     autoComplete="email"
-                    className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-500/10"
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-500/15"
                     placeholder="Enter your email address"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="mb-1.5 block text-sm font-semibold text-[#1A1D2E]">
+                <label className="mb-1.5 block text-[13px] font-semibold text-slate-800">
                   Password
                 </label>
                 <div className="relative">
-                  <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" />
+                  <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     autoComplete="current-password"
-                    className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-11 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-500/10"
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-11 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-500/15"
                     placeholder="Enter your password"
                   />
                   <button
@@ -205,7 +211,7 @@ export default function Login() {
                     className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 hover:text-slate-600"
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
-                    {showPassword ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
               </div>
@@ -216,9 +222,9 @@ export default function Login() {
                     type="checkbox"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
-                    className="h-4 w-4 rounded border-slate-300 text-violet-600 accent-violet-600 focus:ring-violet-500"
+                    className="h-4 w-4 rounded border-slate-300 text-orange-500 accent-orange-500 focus:ring-orange-500"
                   />
-                  <span className="text-sm text-slate-500">Remember me</span>
+                  <span className="text-[13px] text-slate-500">Remember me</span>
                 </label>
                 <button
                   type="button"
@@ -226,7 +232,7 @@ export default function Login() {
                     setInfo('Please contact your admin to reset your password.');
                     setError('');
                   }}
-                  className="text-sm font-medium text-[#7C3AED] hover:text-violet-700 hover:underline"
+                  className="text-[13px] font-semibold text-orange-500 hover:text-orange-600 hover:underline"
                 >
                   Forgot Password?
                 </button>
@@ -235,7 +241,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={loading}
-                className="mt-1 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#8B5CF6] to-[#4F46E5] text-sm font-semibold text-white shadow-lg shadow-violet-500/30 transition hover:from-[#7C3AED] hover:to-[#4338CA] disabled:opacity-60"
+                className="mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-orange-400 to-orange-500 text-sm font-semibold text-white shadow-lg shadow-orange-500/30 transition hover:from-orange-500 hover:to-orange-600 hover:shadow-orange-500/40 disabled:opacity-60"
               >
                 {loading ? 'Signing in…' : (
                   <>
@@ -249,12 +255,12 @@ export default function Login() {
         </div>
       </motion.div>
 
-      <div className="relative z-10 mt-8 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-slate-500">
-        <a href="#" className="hover:text-violet-600" onClick={(e) => e.preventDefault()}>Privacy Policy</a>
-        <span className="text-slate-300">•</span>
-        <a href="#" className="hover:text-violet-600" onClick={(e) => e.preventDefault()}>Terms &amp; Conditions</a>
-        <span className="text-slate-300">•</span>
-        <a href="#" className="hover:text-violet-600" onClick={(e) => e.preventDefault()}>Support</a>
+      <div className="relative z-10 mt-7 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[13px] text-white/80">
+        <a href="#" className="hover:text-white" onClick={(e) => e.preventDefault()}>Privacy Policy</a>
+        <span className="text-white/40">•</span>
+        <a href="#" className="hover:text-white" onClick={(e) => e.preventDefault()}>Terms &amp; Conditions</a>
+        <span className="text-white/40">•</span>
+        <a href="#" className="hover:text-white" onClick={(e) => e.preventDefault()}>Support</a>
       </div>
     </div>
   );

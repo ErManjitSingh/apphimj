@@ -9,15 +9,15 @@ import Avatar from '../ui/Avatar';
 import VirtualizedList from '../ui/VirtualizedList';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { buildListParams, unwrapPagination } from '../../utils/apiHelpers';
-import { fetchUnoPublicPackages, fetchUnoPublicPackageDetail, matchesPackageNameSearch } from '../../lib/unoPublicPackages';
+import { fetchPublicPackages, fetchPublicPackageDetail, matchesPackageNameSearch } from '../../lib/publicPackages';
 import { logSelectedPackageDebug } from '../../lib/logPackageDebug';
 import { resolvePackageItinerary, seedDayWiseHotelsFromItinerary } from '../../lib/packageItineraryMapper';
 import { shortLeadMealPlan } from '../lead-wizard/leadWizardUtils';
 import { resolvePackageCabs } from '../../lib/packageCabMapper';
 import { suggestCompanionCabs } from '../../lib/packageCabCompanions';
 import InclusionExclusionEditor, { cleanInclusionExclusionLines } from './InclusionExclusionEditor';
-import { buildSelectedCabSnapshot } from './UnoCabSelector';
-import { parsePackageNights } from './UnoHotelSelector';
+import { buildSelectedCabSnapshot } from './CatalogCabSelector';
+import { parsePackageNights } from './CatalogHotelSelector';
 import { WIZARD_STEPS } from './constants';
 import { applyAskDiscount, calculatePricing, bakeCompanyMarginIntoLineCosts, defaultItineraryDay, defaultWizardState, formatINR, hasExtraDiscountRequest, matchesResourceDestination } from './quotationUtils';
 import { buildWebsiteAlignedQuoteCosts } from './partyCosting';
@@ -44,7 +44,7 @@ const ADMIN_CONFIG = {
   backPath: '/quotations',
   successPath: '/quotations',
   title: 'Package Builder',
-  subtitle: 'Customize Uno packages with live hotels, cabs, itinerary and pricing',
+  subtitle: 'Customize Him Journey packages with live hotels, cabs, itinerary and pricing',
   draftStatus: 'draft',
   submitStatus: 'sent',
   draftLabel: 'Save Draft',
@@ -61,7 +61,7 @@ const EXECUTIVE_CONFIG = {
   backPath: '/sales-executive/quotations',
   successPath: '/sales-executive/quotations',
   title: 'Package Builder',
-  subtitle: 'Lead auto-loads into a GTrip-style tour package builder with live hotels, cabs & pricing',
+  subtitle: 'Lead auto-loads into a Him Journey tour package builder with live hotels, cabs & pricing',
   draftStatus: 'draft',
   submitStatus: 'pending_approval',
   draftLabel: 'Save Draft',
@@ -133,7 +133,7 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [flights, setFlights] = useState([]);
   const [activities, setActivities] = useState([]);
-  const [selectedUnoCab, setSelectedUnoCab] = useState(null);
+  const [selectedPackageCab, setSelectedPackageCab] = useState(null);
   const [state, setState] = useState({ ...defaultWizardState });
   const [customItinerary, setCustomItinerary] = useState([]);
   const [customInclusions, setCustomInclusions] = useState([]);
@@ -272,7 +272,7 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
         setCustomInclusions(hydrated.customInclusions);
         setCustomExclusions(hydrated.customExclusions);
         setDayWiseHotels(hydrated.dayWiseHotels);
-        setSelectedUnoCab(hydrated.selectedUnoCab);
+        setSelectedPackageCab(hydrated.selectedPackageCab);
         setExtraCabs(Array.isArray(hydrated.extraCabs) ? hydrated.extraCabs : []);
         setStayWithMattress(Boolean(hydrated.pricing?.party?.stayWithMattress));
         setOpeningPackageMeta({
@@ -381,14 +381,14 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
     gcTime: 15 * 60_000,
     queryFn: async () => {
       const destination = packageDestination;
-      const [unoResult, localRes] = await Promise.all([
-        fetchUnoPublicPackages({
+      const [catalogResult, localRes] = await Promise.all([
+        fetchPublicPackages({
           limit: 50,
           page: 1,
           destination,
         }),
         API.get('/packages', {
-          params: { sourceType: 'uno_clone' },
+          params: { sourceType: 'custom' },
           skipErrorToast: true,
         }).catch(() => ({ data: [] })),
       ]);
@@ -396,17 +396,17 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
         const hasDest = String(p.destination || p.destinationName || '').trim();
         return Boolean(hasDest) && matchesResourceDestination(p, destination);
       };
-      const uno = (unoResult.items || [])
+      const catalog = (catalogResult.items || [])
         .filter(matchDest)
         .map((p) => ({
           ...p,
           _id: p._id || p.id,
-          catalogSource: 'uno',
+          catalogSource: 'catalog',
         }));
       const customs = unwrapList(localRes.data)
         .filter((p) => matchDest(p))
         .map((p) => ({ ...p, catalogSource: 'custom' }));
-      return [...customs, ...uno];
+      return [...customs, ...catalog];
     },
   });
 
@@ -468,7 +468,7 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
     itinerary: customItinerary,
     inclusions: cleanInclusionExclusionLines(customInclusions),
     exclusions: cleanInclusionExclusionLines(customExclusions),
-    cabCategory: selectedUnoCab?.cabCategory || selectedUnoCab?.vehicleType || pkg?.cabCategory || '',
+    cabCategory: selectedPackageCab?.cabCategory || selectedPackageCab?.vehicleType || pkg?.cabCategory || '',
   });
 
   const selectLead = (lead) => {
@@ -479,7 +479,7 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
     setCustomExclusions([]);
     setCustomizeTab('itinerary');
     setDayWiseHotels([]);
-    setSelectedUnoCab(null);
+    setSelectedPackageCab(null);
     setExtraCabs([]);
     setStayWithMattress(false);
     setStep(2);
@@ -542,7 +542,7 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
     setStayWithMattress(false);
 
     // Auto-select default package cab from day-options
-    setSelectedUnoCab(defaultCab);
+    setSelectedPackageCab(defaultCab);
 
     setState((s) => {
       const packageStart = Number(
@@ -629,7 +629,7 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
     setCustomizeTab('itinerary');
     setSelectedPkgDetail(null);
     setDayWiseHotels([]);
-    setSelectedUnoCab(null);
+    setSelectedPackageCab(null);
     setExtraCabs([]);
     setStayWithMattress(false);
     setOpeningPackageMeta({
@@ -642,15 +642,15 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
         const res = await API.get(`/packages/${id}`, { skipErrorToast: true });
         applyPackageDetail(res.data, { source: 'local_crm', listItem: pkg, apiPath: `/packages/${id}` });
       } else {
-        const detail = await fetchUnoPublicPackageDetail(pkg.slug || id, {
+        const detail = await fetchPublicPackageDetail(pkg.slug || id, {
           travelDate: toYmd(selectedLead?.travelDate),
           adults: selectedLead?.adults || 2,
           rooms: selectedLead?.numberOfRooms || 1,
         });
         applyPackageDetail(detail, {
-          source: 'uno_hotels',
+          source: 'catalog',
           listItem: pkg,
-          apiPath: `/uno-packages/${pkg.slug || id}`,
+          apiPath: `/public-packages/${pkg.slug || id}`,
         });
       }
     } catch {
@@ -692,15 +692,15 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
       lead: selectedLead,
       dayWiseHotels,
       itinerary: customItinerary,
-      selectedCab: selectedUnoCab,
+      selectedCab: selectedPackageCab,
       extraCabs,
-      cabSeats: selectedUnoCab?.seatingCapacity || 4,
+      cabSeats: selectedPackageCab?.seatingCapacity || 4,
       stayWithMattress,
     });
     const aligned = buildWebsiteAlignedQuoteCosts({
       packageAnchor,
       dayWiseHotels,
-      selectedCab: selectedUnoCab,
+      selectedCab: selectedPackageCab,
       packageCabs,
       lead: selectedLead,
       pkg: {
@@ -708,7 +708,7 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
         startingPrice: packageAnchor,
         baseStartingPrice: packageAnchor,
       },
-      cabSeats: selectedUnoCab?.seatingCapacity || 4,
+      cabSeats: selectedPackageCab?.seatingCapacity || 4,
       flightCost,
       activityCost,
       extraCabs,
@@ -807,7 +807,7 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
     });
     // Intentionally omit taxes/markup/total — those are outputs of this effect
   }, [
-    selectedUnoCab,
+    selectedPackageCab,
     selectedPkgDetail,
     selectedLead,
     state.selectedFlightIds,
@@ -866,8 +866,8 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
           rooms: state.pricing?.party?.rooms || 1,
           mattresses: state.pricing?.party?.mattresses || 0,
         }),
-        selectedCabs: buildSelectedCabSnapshot(selectedUnoCab, {
-          vehicleCount: state.pricing?.party?.cabCount || selectedUnoCab?._vehicleCount || 1,
+        selectedCabs: buildSelectedCabSnapshot(selectedPackageCab, {
+          vehicleCount: state.pricing?.party?.cabCount || selectedPackageCab?._vehicleCount || 1,
           travelers: state.pricing?.party?.travelers,
           extraCabs,
         }),
@@ -962,7 +962,7 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
       rooms: state.pricing?.party?.rooms || 1,
       mattresses: state.pricing?.party?.mattresses || 0,
     }),
-    selectedCabs: buildSelectedCabSnapshot(selectedUnoCab, {
+    selectedCabs: buildSelectedCabSnapshot(selectedPackageCab, {
       vehicleCount: state.pricing?.party?.cabCount || 1,
       travelers: state.pricing?.party?.travelers,
       extraCabs,
@@ -1074,8 +1074,8 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
           onExclusionsChange={setCustomExclusions}
           dayWiseHotels={dayWiseHotels}
           onDayWiseHotelsChange={handleDayWiseHotelChange}
-          selectedUnoCab={selectedUnoCab}
-          onCabChange={setSelectedUnoCab}
+          selectedPackageCab={selectedPackageCab}
+          onCabChange={setSelectedPackageCab}
           extraCabs={extraCabs}
           onExtraCabsChange={setExtraCabs}
           stayWithMattress={stayWithMattress}

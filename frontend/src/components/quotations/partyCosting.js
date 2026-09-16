@@ -88,7 +88,7 @@ export function resolveCoupleUnits(lead = {}) {
   return Math.max(1, Math.ceil(adults / 2));
 }
 
-/** Listed Uno/CRM package price → per-adult rate (use unmargined base when available). */
+/** Listed package price → per-adult rate (use unmargined base when available). */
 export function resolvePerPersonPackageRate(pkg = {}) {
   const listed =
     Number(pkg?.baseStartingPrice ?? pkg?.startingPrice ?? pkg?.basePrice ?? 0) || 0;

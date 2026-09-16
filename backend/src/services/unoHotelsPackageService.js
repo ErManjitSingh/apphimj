@@ -1001,7 +1001,7 @@ function mapPackageCab(cab = {}, { defaultAbsolute = 0 } = {}) {
     isDefault: Boolean(cab.is_default),
     isPopular: Boolean(cab.is_popular),
     isActive: cab.is_active !== false,
-    externalSource: 'uno_package',
+    externalSource: 'catalog_package',
     isPackageCab: true,
     tripType: 'full_day',
   };
@@ -1118,7 +1118,7 @@ function mapUnoPackage(pkg, { includeItinerary = false, includeDetail = false } 
     inclusions: pkg.inclusions || [],
     exclusions: pkg.exclusions || [],
     highlights: pkg.highlight_icons || [],
-    externalSource: 'uno_hotels',
+    externalSource: 'catalog',
     status: pkg.status,
     bookingCount: Number(pkg.booking_count || 0),
     avgRating: Number(pkg.avg_rating || 0),
@@ -1235,7 +1235,7 @@ async function fetchUnoPackages(query = {}) {
     page: unwrapped.page ?? page,
     limit: unwrapped.limit ?? limit,
     totalPages,
-    source: 'uno_hotels_public',
+    source: 'catalog',
     destination: query.destination || null,
   };
 }
@@ -1271,7 +1271,7 @@ async function fetchUnoPackageById(packageId, pricingQuery = {}) {
     const summary = list.items.find(
       (item) => item.id === key || item._id === key || item.slug === key
     );
-    if (!summary) throw new ApiError(404, 'Package not found in Uno Hotels catalog');
+    if (!summary) throw new ApiError(404, 'Package not found in the catalog');
 
     slug = summary.slug || slug;
 
@@ -1360,4 +1360,6 @@ module.exports = {
   getUnoPackageById,
   getUnoPackagesTotal,
   mapUnoPackage,
+  fetchUnoPackages,
+  fetchUnoPackageById,
 };

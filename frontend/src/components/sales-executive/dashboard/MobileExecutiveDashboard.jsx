@@ -25,6 +25,8 @@ import ExecutiveMonthlyTargetCard from './ExecutiveMonthlyTargetCard';
 import ExecutiveDashboardPeriodFilter from './ExecutiveDashboardPeriodFilter';
 import { withPeriodParams } from '../../../lib/periodFilters';
 import RecentUpdatesRemindersRow from './RecentUpdatesRemindersRow';
+import BrandLogo from '../../BrandLogo';
+import { APP_BRAND_NAME } from '../../../config/branding';
 
 const KPI_CARDS = [
   { key: 'myLeads', label: 'Total Leads', icon: Users, tone: 'bg-blue-500', spark: '#7c3aed', path: '/sales-executive/leads/all' },
@@ -144,8 +146,8 @@ export default function MobileExecutiveDashboard({
             <Menu className="h-6 w-6" />
           </button>
           <div className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-lg shadow-md">✈️</span>
-            <span className="text-[17px] font-bold">Travel CRM</span>
+            <BrandLogo className="h-9 w-9 shadow-md" />
+            <span className="text-[17px] font-bold">{APP_BRAND_NAME}</span>
           </div>
           <div className="flex items-center gap-3">
             <Link to="/sales-executive/leads/all" aria-label="Search leads">

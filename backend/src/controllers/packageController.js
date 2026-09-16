@@ -6,24 +6,20 @@ const ApiError = require('../utils/apiError');
 const asyncHandler = require('../utils/asyncHandler');
 const { getUnoPackageById } = require('../services/unoHotelsPackageService');
 const {
+  getLocalCatalogPackage,
+  importAllUnoPackages,
+  getImportStatus,
+  countLocalCatalog,
+  toPlain,
+  mapItineraryForDb,
+} = require('../services/localPackageCatalogService');
+const {
   applyMarginToPackage,
   applyMarginToPackages,
 } = require('../services/destinationMarginService');
 
-function mapItineraryForDb(days = []) {
-  return days.map((day) => ({
-    day: day.day,
-    title: day.title || `Day ${day.day}`,
-    description: day.description || '',
-    meals: day.meals || '',
-    accommodation: day.accommodation || day.hotel || '',
-    hotel: day.hotel || '',
-    activities: day.activities || '',
-    transport: day.transport || '',
-  }));
-}
-
 function mapUnoDetailToPackageDoc(detail, userId) {
+  const plain = toPlain(detail);
   return {
     name: detail.name,
     destination: detail.destination,
@@ -37,10 +33,42 @@ function mapUnoDetailToPackageDoc(detail, userId) {
     inclusions: detail.inclusions || [],
     exclusions: detail.exclusions || [],
     itinerary: mapItineraryForDb(detail.itinerary || []),
+    slug: detail.slug || '',
+    destinationName: detail.destinationName || detail.destination || '',
+    state: detail.state || '',
+    country: detail.country || 'India',
     sourceType: 'uno_clone',
     sourcePackageId: String(detail.id || detail._id || ''),
     sourceSlug: detail.slug || '',
+    listData: {},
+    fullData: plain,
+    rawUno: plain._apiRaw || {},
     createdBy: userId,
+  };
+}
+
+function publicSourceType(value) {
+  if (value === 'uno_clone') return 'custom';
+  if (value === 'uno_catalog') return 'catalog';
+  return value;
+}
+
+function internalSourceType(value) {
+  if (value === 'custom' || value === 'clone') return 'uno_clone';
+  if (value === 'catalog') return 'uno_catalog';
+  return value;
+}
+
+function sanitizePackageForClient(pkg) {
+  if (!pkg || typeof pkg !== 'object') return pkg;
+  const { rawUno, ...rest } = pkg;
+  return {
+    ...rest,
+    sourceType: publicSourceType(pkg.sourceType),
+    externalSource:
+      rest.externalSource === 'uno_hotels' || rest.externalSource === 'uno_hotels_public'
+        ? 'catalog'
+        : rest.externalSource,
   };
 }
 
@@ -54,35 +82,36 @@ const listPackages = asyncHandler(async (req, res) => {
   const { search, packageType, sourceType } = req.query;
   const filter = {};
   if (packageType) filter.packageType = packageType;
-  if (sourceType) filter.sourceType = sourceType;
+  if (sourceType) filter.sourceType = internalSourceType(sourceType);
+  else filter.sourceType = { $ne: 'uno_catalog' };
 
   const select = sourceType
     ? 'name destination destinationName sourceType startingPrice coverImage duration durationNights durationLabel packageCode slug createdAt'
-    : undefined;
+    : '-fullData -rawUno -listData';
 
   let packages = await Package.find(filter)
     .select(select)
     .sort({ createdAt: -1 })
     .lean();
   packages = applySearch(packages, search);
-  res.json(await applyMarginToPackages(packages));
+  res.json(await applyMarginToPackages(packages.map(sanitizePackageForClient)));
 });
 
 const getPackage = asyncHandler(async (req, res) => {
   const pkg = await Package.findById(req.params.id).lean();
   if (!pkg) throw new ApiError(404, 'Package not found');
-  res.json(await applyMarginToPackage(pkg));
+  res.json(await applyMarginToPackage(sanitizePackageForClient(pkg)));
 });
 
 const createPackage = asyncHandler(async (req, res) => {
   const pkg = await Package.create({ ...req.body, createdBy: req.user._id });
-  res.status(201).json(pkg);
+  res.status(201).json(sanitizePackageForClient(pkg.toObject()));
 });
 
 const updatePackage = asyncHandler(async (req, res) => {
   const pkg = await Package.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
   if (!pkg) throw new ApiError(404, 'Package not found');
-  res.json(pkg);
+  res.json(sanitizePackageForClient(pkg.toObject()));
 });
 
 const deletePackage = asyncHandler(async (req, res) => {
@@ -108,17 +137,39 @@ const duplicatePackage = asyncHandler(async (req, res) => {
     sourceSlug: original.sourceSlug || null,
     createdBy: req.user._id,
   });
-  res.status(201).json(copy);
+  res.status(201).json(sanitizePackageForClient(copy.toObject()));
 });
 
 const cloneFromUnoPackage = asyncHandler(async (req, res) => {
-  const detail = await getUnoPackageById(req.params.unoId);
+  const catalogId = req.params.id || req.params.unoId;
+  const detail =
+    (await getLocalCatalogPackage(catalogId)) ||
+    (await getUnoPackageById(catalogId));
   const payload = mapUnoDetailToPackageDoc(detail, req.user._id);
   const copy = await Package.create({
     ...payload,
     name: `${payload.name} (Copy)`,
   });
-  res.status(201).json(copy);
+  res.status(201).json(sanitizePackageForClient(copy.toObject()));
+});
+
+const catalogStatus = asyncHandler(async (_req, res) => {
+  const count = await countLocalCatalog();
+  res.json({ count, ...getImportStatus() });
+});
+
+const importUnoCatalog = asyncHandler(async (req, res) => {
+  const current = getImportStatus();
+  if (current.running) {
+    res.status(202).json({ message: 'Catalog import already running', ...current });
+    return;
+  }
+
+  const skipExisting = String(req.query.skipExisting || req.body?.skipExisting || '') === 'true';
+  importAllUnoPackages({ skipExisting }).catch((err) => {
+    console.error('[packages] catalog import failed:', err.message);
+  });
+  res.status(202).json({ message: 'Catalog import started', running: true, skipExisting });
 });
 
 const listHotels = asyncHandler(async (req, res) => {
@@ -198,6 +249,8 @@ module.exports = {
   deletePackage,
   duplicatePackage,
   cloneFromUnoPackage,
+  catalogStatus,
+  importUnoCatalog,
   listHotels,
   createHotel,
   updateHotel,

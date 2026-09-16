@@ -5,6 +5,7 @@ import store from '../store';
 import { LIST_STALE_MS, GC_TIME_MS } from '../lib/queryConfig';
 import { registerQueryClient } from '../lib/mutationCacheSync';
 import { TooltipProvider } from '../components/ui/tooltip';
+import { APP_PAGE_TITLE } from '../config/branding';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -21,6 +22,10 @@ const queryClient = new QueryClient({
 export default function AppProviders({ children }) {
   useEffect(() => {
     registerQueryClient(queryClient);
+  }, []);
+
+  useEffect(() => {
+    document.title = APP_PAGE_TITLE;
   }, []);
 
   return (

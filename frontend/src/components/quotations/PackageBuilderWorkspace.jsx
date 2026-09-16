@@ -43,7 +43,7 @@ function buildQuotationShareText({ lead, pkg, pricing, nights, daysCount, quoteN
   return [
     `Hello ${guest},`,
     '',
-    'Your customised travel quotation from Travel CRM is ready:',
+    'Your customised travel quotation from Him Journey Tours is ready:',
     '',
     pkg?.name ? `📦 Package: ${pkg.name}` : null,
     destination ? `📍 Destination: ${destination}` : null,
@@ -52,7 +52,7 @@ function buildQuotationShareText({ lead, pkg, pricing, nights, daysCount, quoteN
     quoteNumber ? `🔖 Ref: ${quoteNumber}` : null,
     '',
     'Please reply to confirm or request any changes.',
-    'Thank you — Travel CRM',
+    'Thank you — Him Journey Tours',
   ]
     .filter(Boolean)
     .join('\n');
@@ -323,7 +323,7 @@ export default function PackageBuilderWorkspace({
   onExclusionsChange,
   dayWiseHotels,
   onDayWiseHotelsChange,
-  selectedUnoCab,
+  selectedPackageCab,
   onCabChange,
   extraCabs = [],
   onExtraCabsChange,
@@ -388,7 +388,7 @@ export default function PackageBuilderWorkspace({
       return;
     }
     const payload = {
-      title: `Travel CRM quotation — ${pkg?.name || 'Package'}`,
+      title: `Him Journey Tours quotation — ${pkg?.name || 'Package'}`,
       text: shareText,
     };
     try {
@@ -460,10 +460,10 @@ export default function PackageBuilderWorkspace({
     () => [
       { icon: Moon, label: durationLabel.includes('Night') ? durationLabel : `${nights ?? '—'} Nights / ${itinerary?.length || '—'} Days` },
       { icon: Sparkles, label: pkg?.isCustomizable !== false ? 'Customizable' : typeCfg.label },
-      { icon: Car, label: selectedUnoCab?.name ? 'Private Transfer' : 'Transfer' },
+      { icon: Car, label: selectedPackageCab?.name ? 'Private Transfer' : 'Transfer' },
       { icon: ShieldCheck, label: 'Best Price Guarantee' },
     ],
-    [durationLabel, nights, itinerary, pkg, typeCfg, selectedUnoCab]
+    [durationLabel, nights, itinerary, pkg, typeCfg, selectedPackageCab]
   );
 
   const staySummary = useMemo(() => {
@@ -798,15 +798,15 @@ export default function PackageBuilderWorkspace({
   }, [picker, itinerary, dayWiseHotels]);
 
   const cabBasePrice = Number(
-    selectedUnoCab?.absoluteFare ??
-      selectedUnoCab?.totalAmount ??
-      selectedUnoCab?.cost ??
-      selectedUnoCab?.priceDelta ??
+    selectedPackageCab?.absoluteFare ??
+      selectedPackageCab?.totalAmount ??
+      selectedPackageCab?.cost ??
+      selectedPackageCab?.priceDelta ??
       0
   ) || 0;
 
   const cabSelectedId =
-    selectedUnoCab?.id || selectedUnoCab?.packageCabId || selectedUnoCab?.name || null;
+    selectedPackageCab?.id || selectedPackageCab?.packageCabId || selectedPackageCab?.name || null;
 
   return (
     <div className="relative space-y-4 rounded-none bg-[#f4f5f9] p-0 pb-36 sm:space-y-5 sm:rounded-3xl sm:bg-gradient-to-b sm:from-slate-100 sm:via-indigo-50/40 sm:to-amber-50/30 sm:p-3 sm:pb-4 xl:pb-4 -mx-0 sm:-mx-1">
@@ -946,7 +946,7 @@ export default function PackageBuilderWorkspace({
             <PackageBuilderDayTimeline
               itinerary={itinerary}
               dayWiseHotels={dayWiseHotels}
-              packageCab={selectedUnoCab}
+              packageCab={selectedPackageCab}
               onChange={onItineraryChange}
               onOpenHotelPicker={openDayHotelPicker}
               onAddHotelRoom={openAddRoomPicker}
