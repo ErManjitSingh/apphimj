@@ -12,7 +12,10 @@ export default function DashboardSkeleton() {
         <div className="h-64 rounded-[24px] bg-slate-100 xl:col-span-5" />
         <div className="h-64 rounded-[24px] bg-slate-100 xl:col-span-3" />
       </div>
-      <div className="h-80 rounded-[24px] bg-slate-100" />
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div className="h-[420px] rounded-[24px] bg-slate-100" />
+        <div className="h-[420px] rounded-[24px] bg-slate-100" />
+      </div>
     </div>
   );
 }

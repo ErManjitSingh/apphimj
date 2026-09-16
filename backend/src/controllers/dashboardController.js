@@ -1,6 +1,11 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/apiError');
-const { buildAdminDashboard, buildDestinationDetail } = require('../services/dashboardService');
+const {
+  buildAdminDashboard,
+  buildDestinationDetail,
+  buildDestinationInsight,
+  buildExecutiveInsight,
+} = require('../services/dashboardService');
 const { getOrSetFresh, cacheKey, DEFAULT_TTL_MS } = require('../services/dashboardCacheService');
 
 const getStats = asyncHandler(async (req, res) => {
@@ -56,4 +61,45 @@ const getDestinationDetail = asyncHandler(async (req, res) => {
   res.json(result);
 });
 
-module.exports = { getStats, getDestinationDetail };
+const insightQuery = (req) => {
+  const period = typeof req.query.period === 'string' ? req.query.period : 'today';
+  const dateFrom = typeof req.query.dateFrom === 'string' ? req.query.dateFrom : '';
+  const dateTo = typeof req.query.dateTo === 'string' ? req.query.dateTo : '';
+  return { period, dateFrom, dateTo };
+};
+
+const getDestinationInsight = asyncHandler(async (req, res) => {
+  const { period, dateFrom, dateTo } = insightQuery(req);
+  const result = await getOrSetFresh(
+    req,
+    cacheKey('admin', `dashboard-dest-insight:${req.branchId || 'all'}:${period}:${dateFrom || '-'}:${dateTo || '-'}`),
+    () =>
+      buildDestinationInsight({
+        branchId: req.branchId,
+        period,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      }),
+    DEFAULT_TTL_MS
+  );
+  res.json(result);
+});
+
+const getExecutiveInsight = asyncHandler(async (req, res) => {
+  const { period, dateFrom, dateTo } = insightQuery(req);
+  const result = await getOrSetFresh(
+    req,
+    cacheKey('admin', `dashboard-exec-insight:${req.branchId || 'all'}:${period}:${dateFrom || '-'}:${dateTo || '-'}`),
+    () =>
+      buildExecutiveInsight({
+        branchId: req.branchId,
+        period,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      }),
+    DEFAULT_TTL_MS
+  );
+  res.json(result);
+});
+
+module.exports = { getStats, getDestinationDetail, getDestinationInsight, getExecutiveInsight };

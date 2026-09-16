@@ -1,5 +1,4 @@
-import { lazy, Suspense, useCallback, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import API from "../api/axios";
 import { useAuth } from "../context/AuthContext";
@@ -14,35 +13,20 @@ import DashboardHeader, {
   getDefaultDashboardFilters,
 } from "../components/dashboard/DashboardHeader";
 import {
-  DashboardHero,
   DashboardSkeleton,
-  AdminDashboardGreeting,
-  ActionRequiredPanel,
-  AdminSalesFunnel,
-  LeadSourcePerformanceTable,
-  TopDestinationsDonut,
-  SalesTeamPerformanceTable,
-  FinancialMetricsRow,
+  ScenicDashboardBanner,
+  PastelKpiStrip,
+  LeadStatusOverviewCard,
+  BookingsTrendCard,
+  TopLeadSourcesCard,
+  DestinationInsightCard,
+  ExecutiveInsightCard,
 } from "../components/dashboard";
-
-const MobileAdminDashboard = lazy(
-  () => import("../components/dashboard/MobileAdminDashboard"),
-);
-const LeadTrendChart = lazy(
-  () => import("../components/dashboard/LeadTrendChart"),
-);
-
-function PanelSkeleton() {
-  return (
-    <div className="h-56 animate-pulse rounded-2xl border border-slate-100 bg-white sm:h-64" />
-  );
-}
 
 export default function Dashboard() {
   const { user } = useAuth();
   const isLeadProvider = user?.role === "lead_provider";
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const [filters, setFilters] = useState(getDefaultDashboardFilters);
   const [showFilters, setShowFilters] = useState(false);
   const {
@@ -51,12 +35,10 @@ export default function Dashboard() {
     isFetching,
   } = useDashboardQuery("/dashboard/stats", filters);
 
-  // Soft refresh after mutations — use Redis cache, do NOT send fresh=1 (that stampedes Mongo).
   const softRefreshDashboard = useCallback(() => {
     invalidateDashboard(queryClient);
   }, [queryClient]);
 
-  // Manual / filter refresh only — bypasses server cache once.
   const hardRefreshDashboard = useCallback(async () => {
     const endpoint = "/dashboard/stats";
     const key = dashboardQueryKey(endpoint, filters);
@@ -76,119 +58,58 @@ export default function Dashboard() {
 
   useDataRefresh(["dashboard"], softRefreshDashboard);
 
-  // Top Destinations drill-down — carries the exact backend rollup name(s) the clicked slice
-  // represents plus the dashboard's current period, so /destination never falls back to all-time.
-  const handleDestinationSelect = useCallback(
-    (row) => {
-      const names = (row.constituents || [row.name]).join(",");
-      const params = new URLSearchParams();
-      params.set("names", names);
-      if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
-      if (filters.dateTo) params.set("dateTo", filters.dateTo);
-      if (filters.source) params.set("source", filters.source);
-      navigate(`/destination/${encodeURIComponent(row.name)}?${params.toString()}`);
-    },
-    [navigate, filters]
-  );
-
-  const report = stats?.report;
-
   if (isLoading && !stats) return <DashboardSkeleton />;
   if (!stats) return null;
 
-  const funnel = report?.salesFunnel || stats.salesFunnel || [];
-  const actionRequired = report?.actionRequired || stats.actionRequired || [];
-  const financials = report?.financials || stats.financials || {};
   const sourceRows =
-    report?.leadsBySource ||
+    stats.report?.leadsBySource ||
     stats.leadSourceAnalytics ||
     stats.sourceAnalytics?.sources ||
     [];
 
   return (
-    <>
-      <div className="lg:hidden">
-        <Suspense fallback={<DashboardSkeleton />}>
-          <MobileAdminDashboard
-            stats={stats}
-            filters={filters}
-            onFiltersChange={setFilters}
-            isFetching={isFetching}
-          />
-        </Suspense>
-      </div>
+    <div className="mx-auto w-full max-w-[1600px] space-y-5 pb-8">
+      {isFetching && (
+        <div className="h-0.5 w-full overflow-hidden rounded-full bg-orange-500/30">
+          <div className="h-full w-1/3 animate-pulse bg-orange-500" />
+        </div>
+      )}
 
-      <div className="mx-auto hidden w-full max-w-[1600px] space-y-5 pb-8 lg:block">
-        {isFetching && (
-          <div className="h-0.5 w-full overflow-hidden rounded-full bg-violet-500/30">
-            <div className="h-full w-1/3 animate-pulse bg-violet-500" />
-          </div>
-        )}
+      <ScenicDashboardBanner
+        filters={filters}
+        periodLabel={stats.report?.period?.label}
+        onOpenFilters={() => setShowFilters((v) => !v)}
+      />
 
-        <AdminDashboardGreeting
+      {showFilters && (
+        <DashboardHeader
           filters={filters}
-          periodLabel={report?.period?.label}
-          onOpenFilters={() => setShowFilters((v) => !v)}
+          onFiltersChange={setFilters}
+          onRefresh={hardRefreshDashboard}
+          isRefreshing={isFetching}
+          periodLabel={stats.report?.period?.label}
+          badgeLabel={isLeadProvider ? "Lead Insights" : "Admin Insights"}
         />
+      )}
 
-        {showFilters && (
-          <DashboardHeader
-            filters={filters}
-            onFiltersChange={setFilters}
-            onRefresh={hardRefreshDashboard}
-            isRefreshing={isFetching}
-            periodLabel={report?.period?.label}
-            badgeLabel={isLeadProvider ? "Lead Insights" : "Admin Insights"}
-          />
-        )}
+      <PastelKpiStrip stats={stats} filters={filters} />
 
-        <DashboardHero stats={stats} filters={filters} />
-
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
-          {!isLeadProvider && (
-            <div className="min-w-0 xl:col-span-3">
-              <ActionRequiredPanel items={actionRequired} />
-            </div>
-          )}
-          <div
-            className={
-              isLeadProvider ? "min-w-0 xl:col-span-7" : "min-w-0 xl:col-span-5"
-            }
-          >
-            <AdminSalesFunnel data={funnel} />
-          </div>
-          <div
-            className={
-              isLeadProvider ? "min-w-0 xl:col-span-5" : "min-w-0 xl:col-span-4"
-            }
-          >
-            <LeadSourcePerformanceTable data={sourceRows} />
-          </div>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className="xl:col-span-4">
+          <LeadStatusOverviewCard stats={stats} />
         </div>
-
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
-          <div className="min-w-0 xl:col-span-5">
-            <Suspense fallback={<PanelSkeleton />}>
-              <LeadTrendChart stats={stats} />
-            </Suspense>
-          </div>
-          <div className="min-w-0 xl:col-span-3">
-            <TopDestinationsDonut
-              data={report?.topDestinations || []}
-              onSelect={handleDestinationSelect}
-            />
-          </div>
-          <div className="min-w-0 xl:col-span-4">
-            <SalesTeamPerformanceTable
-              data={stats.executivePerformance}
-              filters={filters}
-              periodLabel={report?.period?.label}
-            />
-          </div>
+        <div className="xl:col-span-5">
+          <BookingsTrendCard stats={stats} />
         </div>
-
-        {!isLeadProvider && <FinancialMetricsRow financials={financials} />}
+        <div className="xl:col-span-3">
+          <TopLeadSourcesCard data={sourceRows} />
+        </div>
       </div>
-    </>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <DestinationInsightCard />
+        <ExecutiveInsightCard />
+      </div>
+    </div>
   );
 }

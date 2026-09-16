@@ -20,6 +20,7 @@ const { withBranch } = require('../utils/branchScope');
 const { sumMarketingSpendInRange } = require('./marketingSpendService');
 const { rollupCityStatsIntoStates, resolveDestinationGroupValues } = require('../utils/destinationHierarchy');
 const { attachPhoneVisibility, maskLeadPhone } = require('../utils/leadPhoneVisibility');
+const { expandLeadSourceFilter, leadSourceLabel } = require('../constants/leadSources');
 
 /**
  * Apply the SAME call-gated phone visibility rule (see utils/leadPhoneVisibility.js) to a batch
@@ -427,23 +428,27 @@ function changeMeta(current, previous) {
 }
 
 const SOURCE_LABELS = {
-  dpw: 'DPW',
-  dpw_wa: 'DPW WA',
-  dpw_call: 'DPW CALL',
-  dpw2: 'DPW2',
-  dpw2_wa: 'DPW2 WA',
-  dpw2_call: 'DPW2 CALL',
+  website: 'Website',
+  website_2: 'Website 2',
   referral: 'Referral',
+  portal_lead: 'Portal Lead',
   call_lead: 'Call Lead',
-  organic: 'Organic',
-  website: 'DPW',
-  whatsapp: 'DPW2 WA',
-  social: 'DPW2',
+  dpw: 'Website',
+  dpw_wa: 'Website',
+  dpw_call: 'Call Lead',
+  dpw2: 'Website 2',
+  dpw2_wa: 'Website 2',
+  dpw2_call: 'Call Lead',
+  organic: 'Website',
+  google_ads: 'Website',
+  facebook_ads: 'Portal Lead',
+  whatsapp: 'Website',
+  social: 'Website 2',
   phone: 'Call Lead',
-  other: 'Organic',
-  google_ads: 'DPW',
-  facebook_ads: 'DPW2',
-  instagram: 'DPW2',
+  other: 'Website',
+  'walk-in': 'Call Lead',
+  walk_in: 'Call Lead',
+  instagram: 'Portal Lead',
 };
 
 const SOURCE_COLORS = ['#3B82F6', '#22C55E', '#8B5CF6', '#F59E0B', '#64748B', '#EC4899', '#06B6D4'];
@@ -455,7 +460,7 @@ function pctChange(current, previous) {
 
 function formatSourceName(source) {
   if (!source) return 'Other';
-  return SOURCE_LABELS[source] || String(source).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  return leadSourceLabel(source);
 }
 
 function activeLeadScope(extra = {}, branchId) {
@@ -525,7 +530,7 @@ async function buildAdminDashboard(options = {}) {
   const todayEnd = endOfDay();
   const { isAllTime, periodStart, periodEnd, prevStart, prevEnd, momStart, momEnd } =
     resolveReportPeriod(dateFrom, dateTo);
-  const sourceFilter = source ? { source } : {};
+  const sourceFilter = source ? { source: expandLeadSourceFilter(source) } : {};
   const periodLeadScope = activeLeadScope(
     { createdAt: { $gte: periodStart, $lte: periodEnd }, ...sourceFilter },
     branchId
@@ -621,7 +626,7 @@ async function buildAdminDashboard(options = {}) {
       { $group: { _id: null, total: { $sum: '$paidAmount' } } },
     ]),
     Lead.find(activeLeadScope({}, branchId))
-      .select('leadId name phone destination status budget assignedTo createdAt')
+      .select('leadId name phone destination status budget assignedTo createdAt source sourceLabel')
       .populate('assignedTo', 'name email')
       .sort({ createdAt: -1 })
       .limit(10)
@@ -1365,7 +1370,7 @@ async function sumRevenueForDestination(branchId, start, end, destinationValues)
 async function buildDestinationDetail(options = {}) {
   const { branchId, dateFrom, dateTo, source, names } = options;
   const { isAllTime, periodStart, periodEnd } = resolveReportPeriod(dateFrom, dateTo);
-  const sourceFilter = source ? { source } : {};
+  const sourceFilter = source ? { source: expandLeadSourceFilter(source) } : {};
   const baseScope = activeLeadScope(
     isAllTime ? { ...sourceFilter } : { createdAt: { $gte: periodStart, $lte: periodEnd }, ...sourceFilter },
     branchId
@@ -2496,7 +2501,7 @@ async function buildReportsAnalytics(options = {}) {
       },
     },
     leadSources: sourceAgg.map((s) => ({
-      source: SOURCE_LABELS[s._id] || s._id || 'Other',
+      source: leadSourceLabel(s._id) || s._id || 'Other',
       leads: s.leads,
       conversions: s.conversions,
       revenue: s.revenue,
@@ -2568,9 +2573,259 @@ async function buildTeamPerformance(options = {}) {
   };
 }
 
+function insightPeriodRange(period = 'total', dateFrom, dateTo) {
+  const key = String(period || 'total').toLowerCase();
+  if (key === 'custom' && (dateFrom || dateTo)) {
+    const resolved = resolveReportPeriod(dateFrom, dateTo);
+    return {
+      start: resolved.isAllTime ? null : resolved.periodStart,
+      end: resolved.isAllTime ? null : resolved.periodEnd,
+      isAllTime: resolved.isAllTime,
+      label: resolved.isAllTime
+        ? 'Total'
+        : `${resolved.periodStart.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} – ${resolved.periodEnd.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`,
+    };
+  }
+  if (key === 'today') {
+    const start = startOfDay();
+    const end = endOfDay();
+    return { start, end, isAllTime: false, label: 'Today' };
+  }
+  if (key === 'yesterday') {
+    const todayStart = startOfDay();
+    const start = startOfDay(new Date(todayStart.getTime() - 24 * 60 * 60 * 1000));
+    const end = endOfDay(new Date(todayStart.getTime() - 1));
+    return { start, end, isAllTime: false, label: 'Yesterday' };
+  }
+  return { start: null, end: null, isAllTime: true, label: 'Total' };
+}
+
+function destinationInsightFields() {
+  return {
+    destinationKey: {
+      $toLower: { $trim: { input: { $ifNull: ['$destination', 'Not specified'] } } },
+    },
+    destinationName: {
+      $cond: [
+        { $or: [{ $eq: [{ $ifNull: ['$destination', ''] }, ''] }, { $eq: ['$destination', null] }] },
+        'Not specified',
+        '$destination',
+      ],
+    },
+  };
+}
+
+async function buildDestinationInsight(options = {}) {
+  const { branchId, period = 'today', dateFrom, dateTo } = options;
+  const { start, end, isAllTime, label } = insightPeriodRange(period, dateFrom, dateTo);
+  const match = activeLeadScope(start && end ? { createdAt: { $gte: start, $lte: end } } : {}, branchId);
+
+  const rows = await Lead.aggregate([
+    { $match: match },
+    { $addFields: destinationInsightFields() },
+    {
+      $group: {
+        _id: '$destinationKey',
+        destination: { $first: '$destinationName' },
+        queries: { $sum: 1 },
+        connected: {
+          $sum: { $cond: [{ $ne: ['$status', 'new'] }, 1, 0] },
+        },
+        leads: {
+          $sum: {
+            $cond: [
+              { $in: ['$status', ['lost', 'booked_from_another_company', 'converted']] },
+              0,
+              1,
+            ],
+          },
+        },
+      },
+    },
+    { $sort: { queries: -1 } },
+  ]);
+
+  const mapped = rows.map((row) => ({
+    destination: row.destination,
+    queries: row.queries,
+    connected: row.connected,
+    leads: row.leads,
+    connectRate: row.queries ? Math.round((row.connected / row.queries) * 1000) / 10 : 0,
+  }));
+
+  const destinations = await rollupCityStatsIntoStates(mapped, {
+    nameField: 'destination',
+    metricFields: ['queries', 'connected', 'leads'],
+    rateConfig: { field: 'connectRate', numerator: 'connected', denominator: 'queries' },
+    sortField: 'queries',
+    limit: 40,
+  });
+
+  const totals = destinations.reduce(
+    (acc, row) => {
+      acc.queries += Number(row.queries || 0);
+      acc.connected += Number(row.connected || 0);
+      acc.leads += Number(row.leads || 0);
+      return acc;
+    },
+    { queries: 0, connected: 0, leads: 0 }
+  );
+
+  return {
+    period: isAllTime ? 'total' : period,
+    label,
+    totals: {
+      ...totals,
+      connectRate: totals.queries ? Math.round((totals.connected / totals.queries) * 1000) / 10 : 0,
+      destinations: destinations.length,
+    },
+    rows: destinations,
+  };
+}
+
+async function buildExecutiveInsight(options = {}) {
+  const { branchId, period = 'today', dateFrom, dateTo } = options;
+  const { start, end, isAllTime, label } = insightPeriodRange(period, dateFrom, dateTo);
+  const match = activeLeadScope(start && end ? { createdAt: { $gte: start, $lte: end } } : {}, branchId);
+
+  const [execUsers, destRows] = await Promise.all([
+    User.find(withBranch({ role: 'sales_executive', status: 'active' }, branchId))
+      .select('name email')
+      .lean(),
+    Lead.aggregate([
+      { $match: match },
+      { $addFields: destinationInsightFields() },
+      {
+        $group: {
+          _id: {
+            exec: { $ifNull: ['$assignedTo', 'unassigned'] },
+            dest: '$destinationKey',
+          },
+          destination: { $first: '$destinationName' },
+          queries: { $sum: 1 },
+          connected: {
+            $sum: { $cond: [{ $ne: ['$status', 'new'] }, 1, 0] },
+          },
+          leads: {
+            $sum: {
+              $cond: [
+                { $in: ['$status', ['lost', 'booked_from_another_company', 'converted']] },
+                0,
+                1,
+              ],
+            },
+          },
+        },
+      },
+    ]),
+  ]);
+
+  const execMap = new Map(execUsers.map((u) => [String(u._id), u]));
+  const extraIds = [
+    ...new Set(
+      destRows
+        .map((row) => row._id?.exec)
+        .filter((id) => id && id !== 'unassigned')
+        .map((id) => String(id))
+        .filter((id) => !execMap.has(id))
+    ),
+  ];
+  if (extraIds.length) {
+    const extraUsers = await User.find({ _id: { $in: extraIds } }).select('name').lean();
+    extraUsers.forEach((u) => execMap.set(String(u._id), u));
+  }
+  const byExec = new Map();
+
+  for (const row of destRows) {
+    const execId = row._id.exec === 'unassigned' ? 'unassigned' : String(row._id.exec);
+    if (!byExec.has(execId)) {
+      const user = execMap.get(execId);
+      byExec.set(execId, {
+        _id: execId,
+        name: user?.name || (execId === 'unassigned' ? 'Unassigned' : 'Unknown'),
+        unassigned: execId === 'unassigned',
+        queries: 0,
+        connected: 0,
+        leads: 0,
+        rawDests: [],
+      });
+    }
+    const exec = byExec.get(execId);
+    exec.queries += row.queries;
+    exec.connected += row.connected;
+    exec.leads += row.leads;
+    exec.rawDests.push({
+      destination: row.destination,
+      queries: row.queries,
+      connected: row.connected,
+      leads: row.leads,
+    });
+  }
+
+  for (const user of execUsers) {
+    const id = String(user._id);
+    if (!byExec.has(id)) {
+      byExec.set(id, {
+        _id: id,
+        name: user.name,
+        unassigned: false,
+        queries: 0,
+        connected: 0,
+        leads: 0,
+        rawDests: [],
+      });
+    }
+  }
+
+  const executives = [];
+  for (const exec of byExec.values()) {
+    const destinations = await rollupCityStatsIntoStates(exec.rawDests, {
+      nameField: 'destination',
+      metricFields: ['queries', 'connected', 'leads'],
+      sortField: 'queries',
+      limit: 8,
+    });
+    executives.push({
+      _id: exec._id,
+      name: exec.name,
+      unassigned: exec.unassigned,
+      queries: exec.queries,
+      connected: exec.connected,
+      leads: exec.leads,
+      connectRate: exec.queries ? Math.round((exec.connected / exec.queries) * 1000) / 10 : 0,
+      destinations,
+    });
+  }
+
+  executives.sort((a, b) => b.queries - a.queries || a.name.localeCompare(b.name));
+  const withLeads = executives.filter((e) => e.queries > 0);
+  const totals = withLeads.reduce(
+    (acc, row) => {
+      acc.queries += row.queries;
+      acc.connected += row.connected;
+      acc.leads += row.leads;
+      return acc;
+    },
+    { queries: 0, connected: 0, leads: 0 }
+  );
+
+  return {
+    period: isAllTime ? 'total' : period,
+    label,
+    totals: {
+      ...totals,
+      executives: withLeads.length,
+      connectRate: totals.queries ? Math.round((totals.connected / totals.queries) * 1000) / 10 : 0,
+    },
+    rows: executives,
+  };
+}
+
 module.exports = {
   buildAdminDashboard,
   buildDestinationDetail,
+  buildDestinationInsight,
+  buildExecutiveInsight,
   buildExecutiveDashboard,
   buildSalesManagerDashboard,
   buildTeamLeaderDashboard,
