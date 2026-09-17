@@ -26,6 +26,7 @@ const hotelSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     destination: { type: String, trim: true, index: true },
     category: { type: String, default: '4 Star' },
+    starRating: { type: Number, default: 0 },
     location: { type: String, required: true },
     address: { type: String, trim: true, default: '' },
     contactPerson: { type: String, trim: true, default: '' },
@@ -35,14 +36,29 @@ const hotelSchema = new mongoose.Schema(
     roomType: { type: String, default: 'Standard' },
     mealPlan: { type: String, default: 'CP (Breakfast)' },
     price: { type: Number, default: 0 },
+    absolutePerNight: { type: Number, default: 0 },
+    coverImage: { type: String, default: '' },
+    images: { type: [String], default: [] },
+    amenities: { type: [String], default: [] },
     contractRates: [contractRateSchema],
     specialNotes: { type: String, trim: true, default: '' },
+    sourceHotelId: { type: String, default: null, index: true },
+    sourceSlug: { type: String, default: null, index: true },
+    sourceType: {
+      type: String,
+      enum: ['local', 'catalog_import', 'manual'],
+      default: 'local',
+      index: true,
+    },
+    packageRefs: { type: [String], default: [] },
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', index: true },
     status: { type: String, enum: ['active', 'inactive'], default: 'active', index: true },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }
 );
 
 hotelSchema.index({ name: 'text', destination: 'text', location: 'text' });
+hotelSchema.index({ name: 1, location: 1 });
 
 module.exports = mongoose.model('Hotel', hotelSchema);

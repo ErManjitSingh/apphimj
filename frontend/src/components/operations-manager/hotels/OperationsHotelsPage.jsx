@@ -81,14 +81,23 @@ export default function OperationsHotelsPage() {
       header: 'Hotel',
       render: (h) => (
         <div className="flex items-center gap-3 min-w-[220px]">
-          <div
-            className={cn(
-              'w-12 h-12 rounded-xl bg-gradient-to-br shrink-0 flex items-center justify-center shadow-sm',
-              getHotelThumbClass(h.name)
-            )}
-          >
-            <Building2 className="w-5 h-5 text-white/90" />
-          </div>
+          {h.coverImage || h.images?.[0] ? (
+            <img
+              src={h.coverImage || h.images[0]}
+              alt={h.name}
+              className="w-12 h-12 rounded-xl object-cover shrink-0 shadow-sm"
+              loading="lazy"
+            />
+          ) : (
+            <div
+              className={cn(
+                'w-12 h-12 rounded-xl bg-gradient-to-br shrink-0 flex items-center justify-center shadow-sm',
+                getHotelThumbClass(h.name)
+              )}
+            >
+              <Building2 className="w-5 h-5 text-white/90" />
+            </div>
+          )}
           <div className="min-w-0">
             <p className="font-bold text-content-primary truncate">{h.name}</p>
             <p className="text-xs text-content-muted truncate">{h.displayCity || h.location}</p>

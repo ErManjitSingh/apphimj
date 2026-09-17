@@ -388,7 +388,6 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
           destination,
         }),
         API.get('/packages', {
-          params: { sourceType: 'custom' },
           skipErrorToast: true,
         }).catch(() => ({ data: [] })),
       ]);
@@ -405,6 +404,7 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
         }));
       const customs = unwrapList(localRes.data)
         .filter((p) => matchDest(p))
+        .filter((p) => String(p.sourceType || '') !== 'catalog')
         .map((p) => ({ ...p, catalogSource: 'custom' }));
       return [...customs, ...catalog];
     },

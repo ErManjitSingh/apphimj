@@ -10,6 +10,7 @@ const {
   cloneFromUnoPackage,
   catalogStatus,
   importUnoCatalog,
+  importHotelsFromCatalog,
   listHotels,
   createHotel,
   updateHotel,
@@ -30,6 +31,7 @@ router.use(protect);
 
 router.get('/catalog-status', authorize('admin', 'sales_manager'), catalogStatus);
 router.post('/import-catalog', authorize('admin'), importUnoCatalog);
+router.post('/import-hotels-from-catalog', authorize('admin'), importHotelsFromCatalog);
 router.post('/clone-from-catalog/:id', cloneFromUnoPackage);
 router.post('/duplicate/:id', duplicatePackage);
 router.route('/').get(listPackages).post(createPackage);

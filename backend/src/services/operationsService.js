@@ -534,10 +534,11 @@ function mapHotelRow(hotel) {
 
   return {
     ...hotel,
+    coverImage: hotel.coverImage || hotel.images?.[0] || '',
     displayCode: `HTL-${String(Number.isNaN(codeNum) ? 0 : codeNum).padStart(4, '0')}`,
     displayRoomType: hotel.roomType || room?.name || 'Standard',
     displayMealPlan: hotel.mealPlan || contract?.mealPlan || 'CP (Breakfast)',
-    displayPrice: hotel.price ?? room?.baseRate ?? contract?.rate ?? 0,
+    displayPrice: hotel.absolutePerNight ?? hotel.price ?? room?.baseRate ?? contract?.rate ?? 0,
     displayCity: hotel.destination || hotel.location?.split(',')[0] || hotel.location,
   };
 }

@@ -24,6 +24,7 @@ import {
   Percent,
   Thermometer,
   PhoneCall,
+  Building2,
 } from "lucide-react";
 import { operationsAdminMenuChildren } from "../operations-manager/operations-nav-config";
 import { leadManagementSections } from "./lead-management-config";
@@ -187,6 +188,12 @@ export const mainNavItems = [
     label: "Packages",
     icon: Globe2,
     countKey: "packages",
+    permission: { module: "packages", action: "view" },
+  },
+  {
+    path: "/hotel-control",
+    label: "Hotel Control",
+    icon: Building2,
     permission: { module: "packages", action: "view" },
   },
   {

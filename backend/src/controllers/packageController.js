@@ -17,6 +17,7 @@ const {
   applyMarginToPackage,
   applyMarginToPackages,
 } = require('../services/destinationMarginService');
+const { importHotelsFromPackages } = require('../services/localHotelCatalogService');
 
 function mapUnoDetailToPackageDoc(detail, userId) {
   const plain = toPlain(detail);
@@ -50,12 +51,14 @@ function mapUnoDetailToPackageDoc(detail, userId) {
 function publicSourceType(value) {
   if (value === 'uno_clone') return 'custom';
   if (value === 'uno_catalog') return 'catalog';
+  if (value === 'local') return 'local';
   return value;
 }
 
 function internalSourceType(value) {
   if (value === 'custom' || value === 'clone') return 'uno_clone';
   if (value === 'catalog') return 'uno_catalog';
+  if (value === 'local') return 'local';
   return value;
 }
 
@@ -104,7 +107,13 @@ const getPackage = asyncHandler(async (req, res) => {
 });
 
 const createPackage = asyncHandler(async (req, res) => {
-  const pkg = await Package.create({ ...req.body, createdBy: req.user._id });
+  const body = { ...req.body };
+  delete body.rawUno;
+  const pkg = await Package.create({
+    ...body,
+    sourceType: body.sourceType === 'uno_clone' ? 'uno_clone' : 'local',
+    createdBy: req.user._id,
+  });
   res.status(201).json(sanitizePackageForClient(pkg.toObject()));
 });
 
@@ -172,18 +181,51 @@ const importUnoCatalog = asyncHandler(async (req, res) => {
   res.status(202).json({ message: 'Catalog import started', running: true, skipExisting });
 });
 
+const importHotelsFromCatalog = asyncHandler(async (_req, res) => {
+  const result = await importHotelsFromPackages();
+  res.json({ message: 'Hotels imported from packages', ...result });
+});
+
 const listHotels = asyncHandler(async (req, res) => {
-  const hotels = await Hotel.find().sort({ createdAt: -1 }).lean();
-  res.json(applySearch(hotels, req.query.search));
+  const filter = {};
+  if (req.query.status) filter.status = req.query.status;
+  if (req.query.destination) {
+    filter.destination = { $regex: String(req.query.destination).trim(), $options: 'i' };
+  }
+  let hotels = await Hotel.find(filter).sort({ name: 1 }).lean();
+  hotels = applySearch(hotels, req.query.search);
+  res.json(
+    hotels.map((hotel) => ({
+      ...hotel,
+      displayPrice: hotel.absolutePerNight || hotel.price || 0,
+      displayCity: hotel.destination || hotel.location,
+      coverImage: hotel.coverImage || hotel.images?.[0] || '',
+    }))
+  );
 });
 
 const createHotel = asyncHandler(async (req, res) => {
-  const hotel = await Hotel.create(req.body);
+  const body = { ...req.body };
+  if (!body.sourceType) body.sourceType = 'manual';
+  if (!body.coverImage && Array.isArray(body.images) && body.images[0]) {
+    body.coverImage = body.images[0];
+  }
+  if (body.price != null && body.absolutePerNight == null) {
+    body.absolutePerNight = Number(body.price) || 0;
+  }
+  const hotel = await Hotel.create({ ...body, createdBy: req.user?._id });
   res.status(201).json(hotel);
 });
 
 const updateHotel = asyncHandler(async (req, res) => {
-  const hotel = await Hotel.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  const body = { ...req.body };
+  if (body.price != null && body.absolutePerNight == null) {
+    body.absolutePerNight = Number(body.price) || 0;
+  }
+  if (!body.coverImage && Array.isArray(body.images) && body.images[0]) {
+    body.coverImage = body.images[0];
+  }
+  const hotel = await Hotel.findByIdAndUpdate(req.params.id, body, { new: true, runValidators: true });
   if (!hotel) throw new ApiError(404, 'Hotel not found');
   res.json(hotel);
 });
@@ -251,6 +293,7 @@ module.exports = {
   cloneFromUnoPackage,
   catalogStatus,
   importUnoCatalog,
+  importHotelsFromCatalog,
   listHotels,
   createHotel,
   updateHotel,

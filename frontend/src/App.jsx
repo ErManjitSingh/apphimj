@@ -31,6 +31,7 @@ import {
   LeadAuditLog,
   WhatsAppLeads,
   Packages,
+  HotelControlPage,
   Quotations,
   Reports,
   Team,
@@ -256,6 +257,8 @@ function App() {
                     path="quotations"
                     element={<ExecutiveQuotationsPage />}
                   />
+                  <Route path="packages" element={<Packages />} />
+                  <Route path="hotel-control" element={<HotelControlPage />} />
                   <Route
                     path="customers"
                     element={<ExecutiveCustomersPage />}
@@ -905,6 +908,14 @@ function App() {
                     element={
                       <PermissionRoute module="packages">
                         <Packages />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="hotel-control"
+                    element={
+                      <PermissionRoute module="packages">
+                        <HotelControlPage />
                       </PermissionRoute>
                     }
                   />

@@ -15,6 +15,8 @@
     "seed:operations-demo": "node src/scripts/seedOperationsDemo.js",
     "cleanup:extra-branches": "node src/scripts/cleanupExtraBranches.js",
     "import:uno-packages": "node src/scripts/importUnoPackages.js",
+    "import:package-hotels": "node src/scripts/importPackageHotels.js",
+    "sync:se-packages": "node src/scripts/syncSalesExecutivePackages.js",
     "seed:load-test-leads": "node src/scripts/seedLoadTestLeads.js",
     "clear:load-test-leads": "node src/scripts/clearLoadTestLeads.js",
     "clear-leads": "node src/scripts/clearLeads.js",

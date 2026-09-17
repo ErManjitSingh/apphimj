@@ -17,7 +17,7 @@ const empty = {
   exclusions: [''],
 };
 
-export default function PackageFormModal({ open, onClose, onSubmit, editPackage, isClone }) {
+export default function PackageFormModal({ open, onClose, onSubmit, editPackage, isClone, isCreate }) {
   const [form, setForm] = useState(empty);
 
   useEffect(() => {
@@ -59,10 +59,17 @@ export default function PackageFormModal({ open, onClose, onSubmit, editPackage,
     <AppModal open={open} onClose={onClose} size="2xl" className="p-6">
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h3 className="text-lg font-bold text-content-primary">Edit package copy</h3>
-          {isClone && (
+          <h3 className="text-lg font-bold text-content-primary">
+            {isCreate ? 'Create package' : 'Edit package'}
+          </h3>
+          {isClone && !isCreate && (
             <p className="text-xs text-amber-700 bg-amber-500/10 border border-amber-500/20 rounded-lg px-2.5 py-1 mt-2 inline-block">
               This is your private copy — Him Journey catalog original stays unchanged
+            </p>
+          )}
+          {isCreate && (
+            <p className="text-xs text-sky-700 bg-sky-500/10 border border-sky-500/20 rounded-lg px-2.5 py-1 mt-2 inline-block">
+              New package will be saved in this CRM for quotations
             </p>
           )}
         </div>

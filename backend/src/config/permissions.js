@@ -64,7 +64,7 @@ const ROLE_PERMISSIONS = {
     customers: { view: true, create: false, edit: false, delete: false },
     quotations: { view: true, create: true, edit: true, delete: false, approve: false },
     reports: { view: true, export: false },
-    packages: { view: true, create: false, edit: false, delete: false },
+    packages: { view: true, create: true, edit: true, delete: false },
     whatsapp: { use: true, manage: false },
     email: { send: true, manage: false },
   },

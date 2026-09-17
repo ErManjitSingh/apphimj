@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Package, RefreshCw } from 'lucide-react';
+import { Search, Package, RefreshCw, Plus } from 'lucide-react';
 import API from '../../api/axios';
 import { fetchPublicPackages, fetchPublicPackageDetail } from '../../lib/publicPackages';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useDataRefresh } from '../../hooks/useDataRefresh';
+import { useAuth } from '../../context/AuthContext';
+import { canAccess } from '../../lib/permissions';
 import TablePagination, { PACKAGES_PAGE_SIZE } from '../ui/TablePagination';
 import PackageListTable from './PackageListTable';
 import PackageDetailModal from './PackageDetailModal';
 import PackageFormModal from './PackageFormModal';
+import { Button } from '../ui/button';
 
 const TOUR_TYPES = [
   { value: '', label: 'All Types' },
@@ -17,6 +20,8 @@ const TOUR_TYPES = [
 ];
 
 export default function PackageManagementPage() {
+  const { user } = useAuth();
+  const canCreate = canAccess(user, 'packages', 'create');
   const [packages, setPackages] = useState([]);
   const [customCopies, setCustomCopies] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +43,11 @@ export default function PackageManagementPage() {
     try {
       const res = await API.get('/packages', { skipErrorToast: true });
       const rows = Array.isArray(res.data) ? res.data : [];
-      setCustomCopies(rows.filter((p) => p.sourceType === 'custom' || p.sourceType === 'clone'));
+      setCustomCopies(
+        rows.filter((p) =>
+          ['custom', 'clone', 'local'].includes(String(p.sourceType || ''))
+        )
+      );
     } catch {
       setCustomCopies([]);
     }
@@ -125,9 +134,23 @@ export default function PackageManagementPage() {
     setModalOpen(true);
   };
 
+  const handleCreate = () => {
+    setEditPackage(null);
+    setModalOpen(true);
+  };
+
   const handleSave = async (data) => {
     if (editPackage?._id) {
       await API.put(`/packages/${editPackage._id}`, data);
+    } else {
+      await API.post('/packages', {
+        ...data,
+        sourceType: 'local',
+        fullData: {
+          ...data,
+          itinerary: data.itinerary || [],
+        },
+      });
     }
     setModalOpen(false);
     setEditPackage(null);
@@ -145,18 +168,26 @@ export default function PackageManagementPage() {
             </span>
           </div>
           <p className="text-sm text-content-muted">
-            Him Journey catalog — Edit always creates a private copy; originals are never changed
+            Him Journey catalog + your own packages. Create new or edit a private copy.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={fetchAll}
-          disabled={loading}
-          className="inline-flex items-center gap-2 rounded-xl border border-subtle px-4 py-2 text-sm font-medium text-content-secondary hover:bg-surface-elevated disabled:opacity-50"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {canCreate && (
+            <Button type="button" onClick={handleCreate} className="rounded-xl gap-2">
+              <Plus className="w-4 h-4" />
+              Create Package
+            </Button>
+          )}
+          <button
+            type="button"
+            onClick={fetchAll}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-xl border border-subtle px-4 py-2 text-sm font-medium text-content-secondary hover:bg-surface-elevated disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-3 mb-6">
@@ -220,9 +251,9 @@ export default function PackageManagementPage() {
 
       {customCopies.length > 0 && (
         <div className="mt-8">
-          <h2 className="text-lg font-bold text-content-primary mb-1">Your package copies</h2>
+          <h2 className="text-lg font-bold text-content-primary mb-1">Your packages</h2>
           <p className="text-sm text-content-muted mb-4">
-            Editable clones saved in CRM — safe to modify without touching the Him Journey catalog
+            Packages you created or cloned — safe to edit without changing the main catalog
           </p>
           <PackageListTable
             packages={customCopies.map((p) => ({
@@ -256,7 +287,13 @@ export default function PackageManagementPage() {
         }}
         onSubmit={handleSave}
         editPackage={editPackage}
-        isClone={editPackage?.sourceType === 'custom' || editPackage?.sourceType === 'clone'}
+        isClone={
+          !!editPackage &&
+          (editPackage?.sourceType === 'custom' ||
+            editPackage?.sourceType === 'clone' ||
+            editPackage?.sourceType === 'local')
+        }
+        isCreate={!editPackage}
       />
     </motion.div>
   );
