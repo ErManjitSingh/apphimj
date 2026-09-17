@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { SidebarProvider } from '../../context/SidebarContext';
 import AppSidebar from '../sidebar/AppSidebar';
+import SidebarAccountFooter from '../sidebar/SidebarAccountFooter';
 import MobileSidebarDrawer from '../sidebar/MobileSidebarDrawer';
 import TopBar from '../TopBar';
 import MissedFollowUpAlert from '../notifications/MissedFollowUpAlert';
@@ -21,14 +22,15 @@ function SalesManagerShell() {
     user,
     navItems: salesManagerNavItems,
     brandSubtitle: 'Sales Manager',
-    accent: 'violet',
+    sidebarVariant: 'light',
     profilePath: '/sales-manager/profile',
+    sidebarFooter: <SidebarAccountFooter />,
   };
 
   return (
-    <div className="flex min-h-screen bg-[#F4F6FB]">
+    <div className="flex min-h-screen bg-surface-app">
       <div className="hidden lg:block h-screen sticky top-0">
-        <AppSidebar {...sidebarProps} className="h-screen border-r-violet-500/10" />
+        <AppSidebar {...sidebarProps} className="h-screen" />
       </div>
 
       <MobileSidebarDrawer sidebarProps={sidebarProps} />
@@ -41,10 +43,8 @@ function SalesManagerShell() {
           <div
             className={`${
               isQuotationBuilder
-                ? 'p-0 lg:p-8'
-                : isCommandCenter
-                  ? 'p-4 sm:p-5 lg:p-6'
-                  : 'p-4 sm:p-6 lg:p-8'
+                ? 'p-0 lg:p-6'
+                : 'p-4 sm:p-5 lg:p-6'
             } max-w-[1600px] mx-auto`}
           >
             {!isQuotationBuilder && <MissedFollowUpAlert />}

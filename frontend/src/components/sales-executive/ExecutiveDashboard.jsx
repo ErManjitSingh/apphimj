@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
-import { CalendarDays, Moon, Sparkles, Sun } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useDataRefresh } from '../../hooks/useDataRefresh';
 import { useLogModuleOpened } from '../../hooks/useLogModuleOpened';
@@ -9,101 +7,22 @@ import { useDashboardQuery } from '../../features/dashboard/hooks/useDashboardQu
 import { invalidateDashboard } from '../../lib/queryInvalidation';
 import { fetchAnnouncementFeed } from '../../services/announcementApi';
 import API from '../../api/axios';
-import ExecutiveKpiCards from './dashboard/ExecutiveKpiCards';
-import ExecutiveDashboardPanels from './dashboard/ExecutiveDashboardPanels';
-import ExecutiveMonthlyTargetCard from './dashboard/ExecutiveMonthlyTargetCard';
-import ExecutiveDashboardPeriodFilter, {
-  applyExecDashboardPreset,
+import { APP_GREETING } from '../../lib/greeting';
+import MobileExecutiveDashboard from './dashboard/MobileExecutiveDashboard';
+import ExecutiveWelcomeBanner from './dashboard/ExecutiveWelcomeBanner';
+import ExecutiveHeroKpis from './dashboard/ExecutiveHeroKpis';
+import ExecutiveWorkspacePanel, {
+  ExecutiveTargetsCard,
+  ExecutiveTopDestinationsCard,
+} from './dashboard/ExecutiveWorkspacePanel';
+import ExecutiveRightRail from './dashboard/ExecutiveRightRail';
+import { ColdCallAlertsPanel } from './dashboard/DestinationAndColdPanels';
+import {
   getDefaultExecDashboardFilters,
 } from './dashboard/ExecutiveDashboardPeriodFilter';
-import MobileExecutiveDashboard from './dashboard/MobileExecutiveDashboard';
-import RecentUpdatesRemindersRow from './dashboard/RecentUpdatesRemindersRow';
-import {
-  ColdCallAlertsPanel,
-  DestinationWisePanel,
-} from './dashboard/DestinationAndColdPanels';
-import { APP_GREETING } from '../../lib/greeting';
 
 function getGreeting() {
   return APP_GREETING;
-}
-
-function formatTodayDate(date) {
-  return date.toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-}
-
-function getTimeScene(hour) {
-  if (hour >= 5 && hour < 12) {
-    return {
-      id: 'morning',
-      label: 'Morning',
-      wrapper: 'border-amber-200/70 bg-gradient-to-r from-amber-100 via-orange-50 to-sky-100 text-slate-800',
-      muted: 'text-slate-600',
-      date: 'border-white/70 bg-white/60 text-slate-700',
-      icon: 'bottom-[-14px] right-10 text-amber-400',
-    };
-  }
-  if (hour >= 12 && hour < 17) {
-    return {
-      id: 'afternoon',
-      label: 'Afternoon',
-      wrapper: 'border-sky-200/70 bg-gradient-to-r from-sky-100 via-blue-50 to-cyan-100 text-slate-800',
-      muted: 'text-slate-600',
-      date: 'border-white/70 bg-white/60 text-slate-700',
-      icon: 'right-[28%] top-1 text-amber-400',
-    };
-  }
-  return {
-    id: 'night',
-    label: 'Evening',
-    wrapper: 'border-indigo-800/60 bg-gradient-to-r from-slate-950 via-indigo-950 to-violet-900 text-white',
-    muted: 'text-indigo-100/75',
-    date: 'border-white/15 bg-white/10 text-white',
-    icon: 'right-12 top-2 text-amber-100',
-  };
-}
-
-function TimeScene({ scene }) {
-  if (scene.id === 'night') {
-    return (
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-        {[
-          ['12%', '24%'], ['22%', '70%'], ['42%', '18%'], ['57%', '72%'],
-          ['68%', '28%'], ['79%', '67%'], ['91%', '22%'],
-        ].map(([left, top], index) => (
-          <Sparkles
-            key={`${left}-${top}`}
-            className="absolute h-2.5 w-2.5 animate-pulse text-white/70"
-            style={{ left, top, animationDelay: `${index * 220}ms` }}
-          />
-        ))}
-        <motion.div
-          key={scene.id}
-          initial={{ opacity: 0, scale: 0.7, rotate: -20 }}
-          animate={{ opacity: 1, scale: 1, rotate: 0 }}
-          className={`absolute ${scene.icon}`}
-        >
-          <Moon className="h-14 w-14 fill-current drop-shadow-[0_0_18px_rgba(254,249,195,0.45)]" />
-        </motion.div>
-      </div>
-    );
-  }
-
-  return (
-    <motion.div
-      key={scene.id}
-      initial={{ opacity: 0, scale: 0.7 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className={`pointer-events-none absolute ${scene.icon}`}
-      aria-hidden
-    >
-      <Sun className="h-16 w-16 fill-current drop-shadow-[0_0_20px_rgba(251,191,36,0.5)]" />
-    </motion.div>
-  );
 }
 
 export default function ExecutiveDashboard() {
@@ -119,7 +38,6 @@ export default function ExecutiveDashboard() {
     staleTime: 120_000,
   });
   const firstName = user?.name?.trim().split(' ')[0] || 'Sales';
-  const scene = getTimeScene(now.getHours());
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
@@ -138,36 +56,12 @@ export default function ExecutiveDashboard() {
     refresh();
   }, [refresh]);
 
-  const handleDestinationPeriodChange = useCallback((period) => {
-    const presetKey =
-      period === 'today' ? 'all' :
-      period === 'week' ? '7d' :
-      period === '7d' || period === 'yesterday' || period === 'month' || period === 'all'
-        ? period
-        : 'all';
-    if (period === 'today') {
-      const day = new Date();
-      const yyyy = day.getFullYear();
-      const mm = String(day.getMonth() + 1).padStart(2, '0');
-      const dd = String(day.getDate()).padStart(2, '0');
-      const value = `${yyyy}-${mm}-${dd}`;
-      setFilters({ dateFrom: value, dateTo: value, destinationPeriod: 'today' });
-      return;
-    }
-    if (period === 'week') {
-      setFilters(applyExecDashboardPreset('7d'));
-      return;
-    }
-    setFilters(applyExecDashboardPreset(presetKey));
-  }, []);
-
-  // Soft invalidate only — don't rebuild on every lead/followup mutation
   useDataRefresh(['dashboard'], refresh);
 
   if (isLoading && !data) {
     return (
       <div className="flex justify-center py-32">
-        <div className="w-9 h-9 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+        <div className="h-9 w-9 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" />
       </div>
     );
   }
@@ -189,69 +83,43 @@ export default function ExecutiveDashboard() {
         periodLabel={periodLabel}
       />
 
-      <div className="hidden space-y-3 pb-6 lg:block">
+      <div className="hidden space-y-4 pb-6 lg:block">
         {isFetching && (
-          <div className="h-0.5 w-full bg-violet-500/30 rounded-full overflow-hidden">
-            <div className="h-full w-1/3 bg-violet-500 animate-pulse" />
+          <div className="h-0.5 w-full overflow-hidden rounded-full bg-orange-500/20">
+            <div className="h-full w-1/3 animate-pulse bg-orange-500" />
           </div>
         )}
 
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className={`relative min-h-[78px] overflow-hidden rounded-xl border px-4 py-3 shadow-sm transition-colors duration-1000 ${scene.wrapper}`}
-        >
-          <TimeScene scene={scene} />
-          <div className="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
-                {getGreeting()}
-              </h1>
-              <p className="mt-1 text-sm text-content-muted">Hi {firstName}</p>
-              <p className={`mt-0.5 text-xs ${scene.muted}`}>
-                Here&apos;s what&apos;s happening with your leads today.
-              </p>
-            </div>
-            <div className={`inline-flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium backdrop-blur-sm ${scene.date}`}>
-              <CalendarDays className="h-3.5 w-3.5" />
-              <span>{formatTodayDate(now)}</span>
-              <span className="opacity-50">·</span>
-              <span>{now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
-            </div>
-          </div>
-        </motion.div>
-
-        <ExecutiveDashboardPeriodFilter
-          filters={filters}
-          onChange={setFilters}
-          periodLabel={periodLabel}
-        />
+        <ExecutiveWelcomeBanner firstName={firstName} now={now} />
 
         <ColdCallAlertsPanel
           items={data?.coldCallReminders || []}
           onMarkDone={handleMarkColdCallDone}
         />
 
-        <ExecutiveKpiCards kpis={data?.kpis} trends={data?.kpiTrends} filters={filters} />
+        <ExecutiveHeroKpis kpis={data?.kpis} trends={data?.kpiTrends} />
 
-        <ExecutiveMonthlyTargetCard target={data?.target} now={now} />
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="space-y-4">
+            <ExecutiveWorkspacePanel
+              recentLeads={data?.recentLeads || []}
+              upcomingFollowups={data?.upcomingFollowups || []}
+              quotationsSent={data?.kpis?.quotationsSent || 0}
+            />
 
-        <RecentUpdatesRemindersRow
-          announcements={[
-            ...(announcementFeed?.hero ? [announcementFeed.hero] : []),
-            ...(announcementFeed?.carousel || []),
-          ]}
-          conversionProgress={data?.conversionProgress || []}
-          upcomingFollowups={data?.upcomingFollowups || []}
-        />
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <ExecutiveTargetsCard target={data?.target} />
+              <ExecutiveTopDestinationsCard rows={data?.destinationWise?.rows || []} />
+            </div>
+          </div>
 
-        <DestinationWisePanel
-          rows={data?.destinationWise?.rows || []}
-          period={filters.destinationPeriod || 'all'}
-          onPeriodChange={handleDestinationPeriodChange}
-        />
-
-        <ExecutiveDashboardPanels data={data} announcements={announcementFeed?.carousel || []} />
+          <ExecutiveRightRail
+            now={now}
+            todayTasks={data?.todayTasks || []}
+            upcomingFollowups={data?.upcomingFollowups || []}
+            todayActivities={data?.todayActivities || []}
+          />
+        </div>
       </div>
     </>
   );

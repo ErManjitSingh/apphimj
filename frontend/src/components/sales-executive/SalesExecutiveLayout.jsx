@@ -3,12 +3,12 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { SidebarProvider } from '../../context/SidebarContext';
 import AppSidebar from '../sidebar/AppSidebar';
+import SidebarAccountFooter from '../sidebar/SidebarAccountFooter';
 import MobileSidebarDrawer from '../sidebar/MobileSidebarDrawer';
 import TopBar from '../TopBar';
 import MissedFollowUpAlert from '../notifications/MissedFollowUpAlert';
 import RouteFallback from '../ui/RouteFallback';
 import SalesExecutiveMobileNav from './SalesExecutiveMobileNav';
-import ExecutiveSidebarFooter from './ExecutiveSidebarFooter';
 import { salesExecutiveNavItems } from './sidebar-config';
 
 function SalesExecutiveShell() {
@@ -30,16 +30,16 @@ function SalesExecutiveShell() {
     user,
     navItems: salesExecutiveNavItems,
     brandSubtitle: 'Sales Executive',
-    accent: 'violet',
+    sidebarVariant: 'light',
     profilePath: '/sales-executive/profile',
     quickActions: [],
-    sidebarFooter: <ExecutiveSidebarFooter />,
+    sidebarFooter: <SidebarAccountFooter />,
   };
 
   return (
-    <div className="flex h-dvh max-h-dvh overflow-hidden bg-[#F8F9FD] dark:bg-surface-app">
-      <div className="hidden lg:block shrink-0">
-        <AppSidebar {...sidebarProps} className="h-dvh border-r-violet-500/10" />
+    <div className="flex h-dvh max-h-dvh overflow-hidden bg-surface-app">
+      <div className="hidden lg:block shrink-0 h-dvh sticky top-0">
+        <AppSidebar {...sidebarProps} className="h-dvh" />
       </div>
 
       <MobileSidebarDrawer sidebarProps={sidebarProps} />
@@ -52,7 +52,7 @@ function SalesExecutiveShell() {
           data-workspace-main
           className={`flex-1 min-h-0 overflow-y-auto overscroll-y-contain ${isQuotationBuilder ? 'pb-0' : 'pb-20 lg:pb-0'}`}
         >
-          <div className={`mx-auto max-w-[1600px] ${isMobileImmersive ? 'p-0 lg:p-5' : 'p-3 sm:p-4 lg:p-5'}`}>
+          <div className={`mx-auto max-w-[1600px] ${isMobileImmersive ? 'p-0 lg:p-6' : 'p-4 sm:p-5 lg:p-6'}`}>
             <div className={isMobileImmersive ? 'hidden lg:block' : ''}>
               <MissedFollowUpAlert />
             </div>

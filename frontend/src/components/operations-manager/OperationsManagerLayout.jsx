@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { SidebarProvider } from '../../context/SidebarContext';
 import AppSidebar from '../sidebar/AppSidebar';
+import SidebarAccountFooter from '../sidebar/SidebarAccountFooter';
 import MobileSidebarDrawer from '../sidebar/MobileSidebarDrawer';
 import TopBar from '../TopBar';
 import RouteFallback from '../ui/RouteFallback';
@@ -17,14 +18,15 @@ function OperationsManagerShell() {
     navItems: operationsManagerNavItems,
     quickActions: operationsQuickActions,
     brandSubtitle: 'Operations Manager',
-    accent: 'teal',
+    sidebarVariant: 'light',
     profilePath: '/operations-manager/profile',
+    sidebarFooter: <SidebarAccountFooter />,
   };
 
   return (
     <div className="flex min-h-screen bg-surface-app">
       <div className="hidden lg:block h-screen sticky top-0">
-        <AppSidebar {...sidebarProps} className="h-screen border-r-teal-500/10" />
+        <AppSidebar {...sidebarProps} className="h-screen" />
       </div>
 
       <MobileSidebarDrawer sidebarProps={sidebarProps} />
@@ -32,7 +34,7 @@ function OperationsManagerShell() {
       <div className="flex-1 flex flex-col min-w-0">
         <TopBar />
         <main className="flex-1 overflow-auto pb-20 lg:pb-0">
-          <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto">
+          <div className="p-4 sm:p-5 lg:p-6 max-w-[1600px] mx-auto">
             <Suspense fallback={<RouteFallback />}>
               <Outlet />
             </Suspense>

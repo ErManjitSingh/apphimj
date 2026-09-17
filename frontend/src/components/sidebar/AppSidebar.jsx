@@ -62,7 +62,7 @@ export default function AppSidebar({
   brandTitle,
   brandSubtitle,
   accent = 'brand',
-  sidebarVariant = 'sunset',
+  sidebarVariant = 'light',
   profilePath,
   quickActions,
   sidebarHero,

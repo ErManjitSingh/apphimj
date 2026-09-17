@@ -27,10 +27,9 @@ function LayoutShell() {
     isAdminLeadDetail ||
     isAdminLeadList ||
     isQuotationBuilder;
-  const showLightSidebar = user?.role === "admin" || user?.role === "lead_provider";
   const sidebarProps = {
     user,
-    sidebarVariant: showLightSidebar ? "light" : "sunset",
+    sidebarVariant: "light",
     sidebarFooter: <SidebarAccountFooter />,
   };
 
