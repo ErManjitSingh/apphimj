@@ -223,9 +223,10 @@ const getLeadDetail = asyncHandler(async (req, res) => {
   }).catch(() => {});
 
   const paymentSummary = await getLeadPaymentSummary(lead._id);
-  // Phone Number Visibility / Call-Gating: masked until the assigned executive has logged a
-  // first call for this lead — see utils/leadPhoneVisibility.
-  const visibleLead = await applyPhoneVisibilityGate(enrichLead(lead));
+  // Phones visible to sales executives (call-gating disabled).
+  const visibleLead = await applyPhoneVisibilityGate(enrichLead(lead), {
+    viewerRole: req.user?.role || 'sales_executive',
+  });
 
   const includeRelated = req.query.includeRelated === '1' || req.query.includeRelated === 'true';
   if (!includeRelated) {
@@ -1152,10 +1153,10 @@ const listCustomers = asyncHandler(async (req, res) => {
     .sort({ updatedAt: -1 })
     .lean();
 
-  // Same call-gated phone rule as every other lead surface (utils/leadPhoneVisibility.js) — a
-  // repeat/converted customer the executive was never actually assigned to call first is not
-  // exempt just because this is the "Customers" quick view instead of the main Leads List.
-  leads = await applyPhoneVisibilityGate(leads);
+  // Phones visible to sales executives (call-gating disabled).
+  leads = await applyPhoneVisibilityGate(leads, {
+    viewerRole: req.user?.role || 'sales_executive',
+  });
 
   res.json(
     leads.map((l) => ({

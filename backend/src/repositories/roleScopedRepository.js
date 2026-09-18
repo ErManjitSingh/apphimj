@@ -391,11 +391,10 @@ async function findExecutiveLeadsPaginated(userId, query = {}, options = {}) {
     const { attachPaymentSummariesToLeads } = require('../services/paymentReceiptService');
     enriched = await attachPaymentSummariesToLeads(enriched);
   }
-  // Phone Number Visibility / Call-Gating: the Sales Executive doesn't see the real number on
-  // their own leads until they've logged a first call for it either — same gate as Admin (see
-  // utils/leadPhoneVisibility). Already-masked returned-to-pool rows (assignedTo cleared above)
-  // are simply re-masked as a no-op.
-  enriched = await applyPhoneVisibilityGate(enriched);
+  // Phones visible to sales executives (call-gating disabled).
+  enriched = await applyPhoneVisibilityGate(enriched, {
+    viewerRole: 'sales_executive',
+  });
 
   return paginatedResponse(enriched, {
     page,

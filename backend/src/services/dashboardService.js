@@ -23,37 +23,27 @@ const { attachPhoneVisibility, maskLeadPhone } = require('../utils/leadPhoneVisi
 const { expandLeadSourceFilter, leadSourceLabel } = require('../constants/leadSources');
 
 /**
- * Apply the SAME call-gated phone visibility rule (see utils/leadPhoneVisibility.js) to a batch
- * of lean lead docs before they leave a dashboard widget — one CallNote aggregation for the
- * whole batch, never per-lead. Admin/Sales-Executive dashboards must not leak a raw phone number
- * any earlier/differently than the Leads List / Lead Detail APIs already gate it.
+ * Phones stay visible on dashboard widgets for admin/sales (call-gating disabled).
  */
-async function maskDashboardLeads(leads = []) {
+async function maskDashboardLeads(leads = [], viewerRole = 'admin') {
   if (!leads.length) return leads;
-  await attachPhoneVisibility(leads);
-  // Mutate each lead in place (rather than returning a new masked array) — these lean docs are
-  // `const`-destructured from a single big Promise.all and get passed through further
-  // .map(enrichLead)/manual-shape calls afterward by the SAME array reference, so the mask must
-  // be visible to those later reads, not just to whatever this function itself returns.
+  await attachPhoneVisibility(leads, { viewerRole });
   leads.forEach((lead) => {
-    const masked = maskLeadPhone(lead);
-    if (masked !== lead) Object.assign(lead, masked);
+    const next = maskLeadPhone(lead, { viewerRole });
+    if (next !== lead) Object.assign(lead, next);
   });
   return leads;
 }
 
 /**
- * Same gate, applied to the populated `.lead` sub-document of a list of parent docs (e.g.
- * FollowUp.find(...).populate('lead', '...')) instead of to the lead docs themselves. The
- * populate select must include `assignedTo` — attachPhoneVisibility uses it as the CallNote
- * lookup key — same requirement as any other lead projection this gate is applied to.
+ * Same visibility rule for populated `.lead` sub-documents on dashboard widgets.
  */
-async function maskDashboardLeadRefs(items = [], leadKey = 'lead') {
+async function maskDashboardLeadRefs(items = [], leadKey = 'lead', viewerRole = 'admin') {
   const leads = items.map((item) => item[leadKey]).filter(Boolean);
   if (!leads.length) return items;
-  await attachPhoneVisibility(leads);
+  await attachPhoneVisibility(leads, { viewerRole });
   items.forEach((item) => {
-    if (item[leadKey]) item[leadKey] = maskLeadPhone(item[leadKey]);
+    if (item[leadKey]) item[leadKey] = maskLeadPhone(item[leadKey], { viewerRole });
   });
   return items;
 }

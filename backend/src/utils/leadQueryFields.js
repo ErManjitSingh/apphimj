@@ -81,18 +81,12 @@ function withManagementPopulate(basePopulate, includeManagementFields) {
 }
 
 /**
- * Admin cannot see a lead's phone/alternatePhone/whatsapp until the assigned Sales Executive has
- * logged an actual first call for it — see utils/leadPhoneVisibility (the same call-gated check
- * used for the Sales Executive's own views). Deliberately NOT gated on `firstOpenedAt` ("lead
- * opened") any more — opening a lead or clicking Call is not proof a call happened; only a
- * recorded CallNote is. Only applies to role 'admin'; every other role's phone visibility is
- * handled at its own call site (sales_manager/team_leader are unchanged/out of scope for now —
- * see PR notes). Async because it queries CallNote; every call site must await it.
+ * Phone numbers are visible to admin and sales roles — call-gating disabled.
+ * Kept as a named helper so existing call sites keep working.
  */
 async function applyAdminPhoneVisibility(leadOrList, role) {
-  if (role !== 'admin') return leadOrList;
   const { applyPhoneVisibilityGate } = require('./leadPhoneVisibility');
-  return applyPhoneVisibilityGate(leadOrList);
+  return applyPhoneVisibilityGate(leadOrList, { viewerRole: role });
 }
 
 const LEAD_DETAIL_POPULATE = [

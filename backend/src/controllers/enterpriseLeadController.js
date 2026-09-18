@@ -30,14 +30,10 @@ const checkDuplicate = asyncHandler(async (req, res) => {
     excludeId,
   });
 
-  // Search results are an alternate way a lead's real phone can reach a viewer — a suffix/fuzzy
-  // duplicate match can surface a DIFFERENT lead than the one the caller is typing about, one
-  // they don't already know the number of. Same call-gated rule as the Leads List/Detail APIs
-  // (utils/leadPhoneVisibility.js); sales_manager/other roles are unaffected — see that module's
-  // own docs on which roles this rule currently covers.
+  // Search results previously masked phones for admin/SE — numbers stay visible now.
   if (req.user?.role === 'admin' || req.user?.role === 'sales_executive') {
     const { applyPhoneVisibilityGate } = require('../utils/leadPhoneVisibility');
-    duplicates = await applyPhoneVisibilityGate(duplicates);
+    duplicates = await applyPhoneVisibilityGate(duplicates, { viewerRole: req.user.role });
   }
 
   const matches = duplicates.map((d) => ({
@@ -575,12 +571,10 @@ const bulkExportLeads = asyncHandler(async (req, res) => {
   };
 
   let leads = await Lead.find(filter).populate(LEAD_POPULATE).lean();
-  // Export is just another way a lead's real phone can leave the backend — same call-gated rule
-  // as everywhere else (utils/leadPhoneVisibility.js). See checkDuplicate above for why only
-  // admin/sales_executive are gated here.
+  // Export: phones stay visible for admin/sales (call-gating disabled).
   if (req.user?.role === 'admin' || req.user?.role === 'sales_executive') {
     const { applyPhoneVisibilityGate } = require('../utils/leadPhoneVisibility');
-    leads = await applyPhoneVisibilityGate(leads);
+    leads = await applyPhoneVisibilityGate(leads, { viewerRole: req.user.role });
   }
   const headers = [
     'Lead ID', 'Name', 'Phone', 'Email', 'Destination', 'Status',
