@@ -4,6 +4,7 @@ import {
   getAllOptionEntries,
   bucketFromOptionKey,
 } from './leadStatusOptionsStore';
+import { isBookedStatus } from './leadPipeline';
 
 function currentOptionLabels() {
   return [...getAllOptionEntries(), ...LEAD_FOLLOW_UP_OUTCOMES];
@@ -95,12 +96,12 @@ export function getExecutiveSetStatusDisplay(lead) {
   const optionLabel = findOptionLabel(reasonKey);
   const bucket = bucketFromReasonKey(reasonKey);
 
-  if (status === 'converted') {
+  if (status === 'converted' || status === 'booked' || isBookedStatus(status)) {
     return {
-      label: 'Converted',
+      label: 'Booked',
       detail: '',
-      pipelineLabel,
-      title: 'Converted',
+      pipelineLabel: 'Booked',
+      title: 'Booked',
       bucket: 'converted',
     };
   }
@@ -158,81 +159,72 @@ function humanizeReasonKey(key) {
 }
 
 /**
- * Status display for leads.
- * - Only Warm / Hot / Cold when user picked an option (temperature alone ≠ status)
- * - The selected option's bucket is always the lead's current Warm/Hot/Cold status
- * - Otherwise → No status
+ * Status display for leads — pipeline stage as label, temperature as color bucket.
  */
 export function getLeadListStatusDisplay(lead) {
-  const status = lead?.status || 'new';
+  const status = lead?.status || 'new_lead';
+  const tempRaw = String(lead?.temperature || '').toLowerCase();
+  const temp = tempRaw === 'vip' ? 'hot' : tempRaw;
   const reasonKey = resolveListReasonKey(lead);
-  const fromReason = bucketFromReasonKey(reasonKey);
-  const knownOption = findOptionLabel(reasonKey);
-  // Only treat as a real selected status when it maps to a known Warm/Hot/Cold option
-  const optionLabel =
-    knownOption ||
-    (fromReason ? humanizeReasonKey(reasonKey) : '') ||
-    (/^cnp$/i.test(reasonKey) ? 'CNP' : '');
+  const optionLabel = findOptionLabel(reasonKey) || humanizeReasonKey(reasonKey);
 
   let bucket = 'new';
-  if (status === 'converted') {
+  if (isBookedStatus(status) || status === 'converted' || status === 'booked') {
     bucket = 'converted';
-  } else if (fromReason) {
-    bucket = fromReason;
+  } else if (temp === 'hot' || temp === 'warm' || temp === 'cold') {
+    bucket = temp;
+  } else if (status === 'lost' || status === 'booked_from_another_company') {
+    bucket = 'cold';
   }
 
-  const categoryLabels = {
-    cold: 'Cold',
-    warm: 'Warm',
-    hot: 'Hot',
-    new: 'No status',
-    converted: 'Converted',
+  const pipelineKey =
+    status === 'converted' || status === 'booked'
+      ? 'booked'
+      : status === 'new'
+        ? 'new_lead'
+        : status === 'quotation_sent'
+          ? 'package_sent'
+          : status;
+
+  const PIPELINE_LABELS = {
+    new_lead: 'New Lead',
+    not_reachable: 'Not Reachable',
+    qualified: 'Qualified',
+    package_sent: 'Package Sent',
+    follow_up: 'Follow-up',
+    booked: 'Booked',
+    postponed: 'Postponed',
+    lost: 'Lost',
+    new: 'New Lead',
+    converted: 'Booked',
+    quotation_sent: 'Package Sent',
+    contacted: 'Qualified',
+    negotiation: 'Follow-up',
+    working_progress: 'Follow-up',
+    reactivated: 'Follow-up',
+    booked_from_another_company: 'Lost',
   };
 
-  const categoryLabel = categoryLabels[bucket] || 'No status';
-
-  // No user option and not converted → No status (ignore bare temperature)
-  const hasRealStatus = status === 'converted' || Boolean(optionLabel);
-
-  const mainLabel = !hasRealStatus
-    ? 'No status'
-    : bucket === 'converted'
-      ? 'Converted'
-      : bucket === 'hot'
-        ? 'Hot'
-        : bucket === 'cold'
-          ? 'Cold'
-          : bucket === 'warm'
-            ? 'Warm'
-            : 'No status';
-
-  let label = 'No status';
-  if (bucket === 'converted') {
-    label = 'Converted';
-  } else if (optionLabel) {
-    label = optionLabel;
-  }
+  const label = PIPELINE_LABELS[pipelineKey] || PIPELINE_LABELS[status] || 'New Lead';
+  const tempLabel = temp === 'hot' ? 'Hot' : temp === 'warm' ? 'Warm' : temp === 'cold' ? 'Cold' : '';
 
   return {
-    bucket: hasRealStatus ? bucket : 'new',
-    listBucket: hasRealStatus ? bucket : 'new',
-    label: hasRealStatus ? label : 'No status',
-    mainLabel,
-    subLabel: '',
-    categoryLabel: hasRealStatus ? categoryLabel : 'No status',
-    exactLabel: hasRealStatus ? optionLabel || label : 'No status',
-    pipelineLabel: hasRealStatus ? categoryLabel : 'No status',
-    detail: '',
-    title: !hasRealStatus
-      ? 'No status'
-      : optionLabel && categoryLabel !== optionLabel && bucket !== 'new' && bucket !== 'converted'
-        ? `${categoryLabel} · ${optionLabel}`
-        : label,
-    className: LIST_STATUS_STYLES[hasRealStatus ? bucket : 'new'] || LIST_STATUS_STYLES.new,
-    listClassName: LIST_STATUS_STYLES[hasRealStatus ? bucket : 'new'] || LIST_STATUS_STYLES.new,
-    dotClass: LIST_STATUS_DOT[hasRealStatus ? bucket : 'new'] || LIST_STATUS_DOT.new,
-    listDotClass: LIST_STATUS_DOT[hasRealStatus ? bucket : 'new'] || LIST_STATUS_DOT.new,
-    animateLabel: hasRealStatus && bucket === 'hot',
+    bucket,
+    listBucket: bucket,
+    label,
+    mainLabel: label,
+    subLabel: tempLabel,
+    categoryLabel: tempLabel || label,
+    exactLabel: optionLabel || label,
+    reasonLabel: optionLabel,
+    pipelineLabel: label,
+    detail: tempLabel,
+    title: tempLabel ? `${label} · ${tempLabel}` : label,
+    className: LIST_STATUS_STYLES[bucket] || LIST_STATUS_STYLES.new,
+    listClassName: LIST_STATUS_STYLES[bucket] || LIST_STATUS_STYLES.new,
+    dotClass: LIST_STATUS_DOT[bucket] || LIST_STATUS_DOT.new,
+    listDotClass: LIST_STATUS_DOT[bucket] || LIST_STATUS_DOT.new,
+    animateLabel: bucket === 'hot',
   };
 }
 

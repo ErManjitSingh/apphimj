@@ -59,7 +59,7 @@ const CALL_PICKED_OUTCOME_LABELS = {
   auto_connected_24h: 'Working in Progress',
 };
 
-const TERMINAL_STATUSES = ['converted', 'lost', 'booked_from_another_company'];
+const TERMINAL_STATUSES = ['booked', 'lost', 'converted', 'booked_from_another_company'];
 
 function outcomeLabel(category, key) {
   try {
@@ -149,8 +149,9 @@ async function applyCategoryToLead(lead, category, status, body = {}) {
 
   if (category === 'converted') {
     if (status === 'completed') {
-      lead.status = 'converted';
+      lead.status = 'booked';
       if (!lead.convertedAt) lead.convertedAt = new Date();
+      if (!lead.bookingDate) lead.bookingDate = lead.convertedAt;
       // Converted leaves the follow-up lifecycle — no active next-follow-up may remain.
       await cancelPendingFollowUpsForLead(lead._id);
       lead.nextFollowUp = undefined;
@@ -159,12 +160,18 @@ async function applyCategoryToLead(lead, category, status, body = {}) {
       lead.coldCallFollowUpId = undefined;
     }
   } else if (category === 'expected_conv') {
-    if (['new', 'contacted', 'follow_up'].includes(lead.status)) {
-      lead.status = 'negotiation';
+    if (['new_lead', 'new', 'not_reachable', 'qualified', 'follow_up', 'contacted'].includes(lead.status)) {
+      lead.status = 'follow_up';
+      lead.temperature = 'hot';
+      lead.isHot = true;
     }
   } else if (category === 'warm' || category === 'call_picked') {
     if (!TERMINAL_STATUSES.includes(lead.status)) {
-      lead.status = outcomeKey === 'cnp_same_day' ? 'follow_up' : 'contacted';
+      if (outcomeKey === 'cnp_same_day' || outcomeKey === 'not_picked') {
+        lead.status = lead.status === 'new_lead' || lead.status === 'new' ? 'not_reachable' : lead.status;
+        if (lead.status === 'new' || lead.status === 'new_lead') lead.status = 'not_reachable';
+      }
+      // Temperature only — do not force pipeline stage from warm outcomes
     }
     lead.temperature = 'warm';
     lead.isHot = false;
@@ -176,15 +183,28 @@ async function applyCategoryToLead(lead, category, status, body = {}) {
     }
   } else if (category === 'hot') {
     if (!TERMINAL_STATUSES.includes(lead.status)) {
-      lead.status = 'negotiation';
+      // Keep pipeline stage; only raise temperature
     }
     lead.temperature = 'hot';
     lead.isHot = true;
     if (body.statusReason) lead.statusReason = String(body.statusReason).trim();
     else if (outcomeKey) lead.statusReason = String(outcomeKey);
   } else if (category === 'cold') {
+    const terminalCold = [
+      'booked_elsewhere',
+      'not_interested',
+      'invalid_number',
+      'budget_issues',
+      'plan_cancelled',
+      'no_response',
+      'language_barrier',
+    ];
     if (!TERMINAL_STATUSES.includes(lead.status)) {
-      lead.status = 'follow_up';
+      if (terminalCold.includes(outcomeKey) || terminalCold.includes(String(body.coldReason || ''))) {
+        lead.status = 'lost';
+        lead.lostReason = outcomeKey || body.coldReason || 'other';
+      }
+      // else: keep pipeline; only mark cold temperature
     }
     lead.temperature = 'cold';
     lead.isHot = false;
@@ -192,28 +212,18 @@ async function applyCategoryToLead(lead, category, status, body = {}) {
     else if (outcomeKey) lead.statusReason = String(outcomeKey);
     else if (body.coldReason) lead.statusReason = String(body.coldReason).trim();
   } else if (category === 'dead_lead' || category === 'lost') {
-    if (outcomeKey === 'booked_elsewhere') {
-      lead.status = 'booked_from_another_company';
-    } else {
-      lead.status = 'lost';
-    }
+    lead.status = 'lost';
+    lead.lostReason = outcomeKey === 'booked_elsewhere' ? 'booked_elsewhere' : outcomeKey || body.lostReason || 'other';
     lead.temperature = 'cold';
     lead.isHot = false;
     if (body.lostReason || body.outcome || body.statusReason) {
       lead.statusReason = body.statusReason || body.lostReason || body.outcome;
     }
   } else if (category === 'call_not_picked') {
-    if (lead.status === 'contacted') {
-      /* keep connected */
-    } else if (
-      TERMINAL_STATUSES.includes(lead.status) ||
-      ['working_progress', 'qualified', 'quotation_sent', 'negotiation', 'follow_up'].includes(lead.status)
-    ) {
-      /* keep current pipeline status */
-    } else {
-      lead.status = 'follow_up';
+    if (['new_lead', 'new'].includes(lead.status)) {
+      lead.status = 'not_reachable';
     }
-    lead.temperature = 'warm';
+    lead.temperature = lead.temperature || 'warm';
     lead.isHot = false;
     if (body.statusReason) lead.statusReason = String(body.statusReason).trim();
     else if (outcomeKey) lead.statusReason = String(outcomeKey);

@@ -16,8 +16,8 @@ export default function SettingsPage() {
     isAdmin && {
       to: '/settings/lead-statuses',
       icon: Thermometer,
-      title: 'Lead Status Control',
-      description: 'Add or edit Warm / Hot / Cold options your way',
+      title: 'Lead Temperature Labels',
+      description: 'Customize Hot / Warm / Cold reason labels (pipeline stages are fixed)',
       color: 'text-orange-600 bg-orange-500/10',
     },
     canManageWhatsApp && {

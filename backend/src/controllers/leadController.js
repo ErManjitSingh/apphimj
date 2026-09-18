@@ -7,6 +7,13 @@ const Branch = require('../models/Branch');
 const ApiError = require('../utils/apiError');
 const asyncHandler = require('../utils/asyncHandler');
 const { LEAD_STATUSES, REACTIVATION_STAGES } = require('../models/Lead');
+const {
+  LOST_LEAD_STATUSES,
+  BOOKED_LEAD_STATUSES,
+  normalizeLeadStatus,
+  isBookedStatus,
+  isLostStatus,
+} = require('../constants/leadPipeline');
 const { logActivity, getClientIp } = require('../services/activityService');
 const {
   notifyLeadCreated,
@@ -93,12 +100,25 @@ async function findAccessibleLeadDoc(req, leadId, extra = {}) {
   });
 }
 
-const LOST_LEAD_STATUSES = ['lost', 'booked_from_another_company'];
-const WORKING_PIPELINE_STATUSES = ['working_progress', 'qualified', 'follow_up', 'quotation_sent', 'negotiation', 'reactivated', 'converted'];
+const WORKING_PIPELINE_STATUSES = [
+  'qualified',
+  'package_sent',
+  'follow_up',
+  'postponed',
+  'booked',
+  // legacy
+  'working_progress',
+  'quotation_sent',
+  'negotiation',
+  'reactivated',
+  'converted',
+];
 const REACTIVATION_STATUS_TO_STAGE = {
   contacted: 'contacted',
   follow_up: 'follow_up_scheduled',
+  package_sent: 'quotation_sent',
   quotation_sent: 'quotation_sent',
+  booked: 'converted',
   converted: 'converted',
 };
 
@@ -334,7 +354,7 @@ const getListKpis = asyncHandler(async (req, res) => {
 });
 
 const createLead = asyncHandler(async (req, res) => {
-  const status = req.body.status || 'new';
+  const status = normalizeLeadStatus(req.body.status || 'new_lead');
   if (!LEAD_STATUSES.includes(status)) {
     throw new ApiError(400, 'Invalid lead status');
   }
@@ -548,8 +568,14 @@ const updateLead = asyncHandler(async (req, res) => {
   const lead = await findAccessibleLeadDoc(req, req.params.id);
   if (!lead) throw new ApiError(404, 'Lead not found');
 
-  if (req.body.status && !LEAD_STATUSES.includes(req.body.status)) {
-    throw new ApiError(400, 'Invalid lead status');
+  if (req.body.status) {
+    const normalized = normalizeLeadStatus(req.body.status);
+    if (!LEAD_STATUSES.includes(normalized) && req.body.status !== normalized) {
+      // allow legacy aliases through normalizeLeadInput
+    } else if (!LEAD_STATUSES.includes(normalized) && !['converted', 'booked_from_another_company', 'new', 'contacted', 'quotation_sent', 'negotiation', 'reactivated', 'working_progress'].includes(String(req.body.status))) {
+      throw new ApiError(400, 'Invalid lead status');
+    }
+    req.body.status = normalized;
   }
 
   const prevStatus = lead.status;
@@ -574,22 +600,31 @@ const updateLead = asyncHandler(async (req, res) => {
   if (WORKING_PIPELINE_STATUSES.includes(nextStatus)) {
     ensureLeadQualifiedForPipeline(effectivePayload);
   }
-  if (data.status && LOST_LEAD_STATUSES.includes(data.status)) {
+  if (data.status && isLostStatus(data.status)) {
     const { assertValidLostReason } = require('../services/salesSopService');
-    const incoming = data.statusReason?.trim() || '';
+    const incoming = data.lostReason?.trim() || data.statusReason?.trim() || '';
     const reasonValue = assertValidLostReason(
       incoming || (data.status === 'booked_from_another_company' ? 'booked_elsewhere' : ''),
       { requireComment: true }
     );
     data.statusReason = reasonValue;
+    data.lostReason = data.lostReason || reasonValue;
+  }
+  if (data.status === 'postponed') {
+    if (!data.postponedReason && !req.body.postponedReason) {
+      throw new ApiError(400, 'Postponed reason is required');
+    }
+    if (!data.postponedAt && !req.body.postponedAt) {
+      data.postponedAt = new Date();
+    }
   }
   if (data.status && data.status !== prevStatus && isLeadStatusLocked(prevStatus)) {
     throw new ApiError(400, 'Lead status cannot be changed after conversion or closure');
   }
-  if (data.status === 'converted' && prevStatus !== 'converted') {
+  if (isBookedStatus(data.status) && !isBookedStatus(prevStatus)) {
     // Must run before Object.assign/lead.save() below — a missing advance amount or payment
     // screenshot must reject the request with zero side effects, not leave the lead already
-    // persisted as converted before the 400 is thrown (same requirement as the Sales Executive
+    // persisted as booked before the 400 is thrown (same requirement as the Sales Executive
     // path in salesExecutiveController.updateLead).
     const advance = Number(req.body.advanceAmount ?? req.body.tokenAmount);
     if (!Number.isFinite(advance) || advance < 0) {
@@ -606,13 +641,19 @@ const updateLead = asyncHandler(async (req, res) => {
   const prevTemperature = lead.temperature;
 
   Object.assign(lead, data);
-  if (data.temperature === 'warm' || data.status === 'working_progress') {
+  if (data.temperature === 'warm') {
     lead.coldReason = undefined;
   }
-  if (data.status === 'converted' && prevStatus !== 'converted' && !lead.convertedAt) {
-    lead.convertedAt = new Date();
+  if (isBookedStatus(data.status) && !isBookedStatus(prevStatus)) {
+    if (!lead.convertedAt) lead.convertedAt = new Date();
+    if (!lead.bookingDate) lead.bookingDate = lead.convertedAt;
   }
-  if (!lead.firstContactAt && (data.status === 'contacted' || ['contacted', 'working_progress', 'qualified', 'follow_up'].includes(nextStatus))) {
+  if (
+    !lead.firstContactAt &&
+    (data.status === 'qualified' ||
+      data.status === 'not_reachable' ||
+      ['qualified', 'package_sent', 'follow_up', 'not_reachable', 'contacted', 'working_progress'].includes(nextStatus))
+  ) {
     lead.firstContactAt = new Date();
     if (!lead.slaContactedAt) lead.slaContactedAt = lead.firstContactAt;
   }
@@ -707,7 +748,7 @@ const updateLead = asyncHandler(async (req, res) => {
     }
   }
 
-  if (data.status === 'converted' && prevStatus !== 'converted') {
+  if (isBookedStatus(data.status) && !isBookedStatus(prevStatus)) {
     await onLeadConverted(lead, req.user, {
       advanceAmount: req.body.advanceAmount ?? req.body.tokenAmount,
       paymentMethod: req.body.paymentMethod,
@@ -776,7 +817,9 @@ const reactivateLead = asyncHandler(async (req, res) => {
   const executive = await resolveReactivationExecutive(req, req.body.executiveId);
 
   const previousStatus = lead.status;
-  lead.status = 'reactivated';
+  lead.status = 'follow_up';
+  lead.reactivation = lead.reactivation || {};
+  lead.reactivation.isReactivated = true;
   lead.statusReason = reason;
   lead.statusReasonUpdatedAt = new Date();
   lead.reactivation = lead.reactivation || {};
@@ -831,7 +874,7 @@ const reassignReactivatedLead = asyncHandler(async (req, res) => {
   const lead = await Lead.findOne({ _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) });
   if (!lead) throw new ApiError(404, 'Lead not found');
   await assertLeadReactivationAccess(req, lead);
-  if (!lead.reactivation?.isReactivated || lead.status !== 'reactivated') {
+  if (!lead.reactivation?.isReactivated) {
     throw new ApiError(400, 'Lead is not in reactivated state');
   }
 
@@ -879,12 +922,13 @@ const updateReactivationStage = asyncHandler(async (req, res) => {
   if (!REACTIVATION_STAGES.includes(stage)) throw new ApiError(400, 'Invalid reactivation stage');
 
   setReactivationStage(lead, stage, req.user._id, (req.body.note || '').trim());
-  if (stage === 'contacted') lead.status = 'contacted';
+  if (stage === 'contacted') lead.status = 'qualified';
   if (stage === 'follow_up_scheduled') lead.status = 'follow_up';
-  if (stage === 'quotation_sent') lead.status = 'quotation_sent';
+  if (stage === 'quotation_sent') lead.status = 'package_sent';
   if (stage === 'converted') {
-    lead.status = 'converted';
+    lead.status = 'booked';
     if (!lead.convertedAt) lead.convertedAt = new Date();
+    if (!lead.bookingDate) lead.bookingDate = lead.convertedAt;
   }
   await lead.save();
 

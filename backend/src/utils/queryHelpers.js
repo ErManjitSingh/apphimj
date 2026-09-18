@@ -219,7 +219,9 @@ function isConvertedListQuery(query = {}) {
   if (filterKey === 'arrivals') return false;
   return (
     query.status === 'converted' ||
+    query.status === 'booked' ||
     filterKey === 'converted' ||
+    filterKey === 'booked' ||
     filterKey === 'bookings'
   );
 }

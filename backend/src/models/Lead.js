@@ -1,18 +1,10 @@
 const mongoose = require('mongoose');
-
-const LEAD_STATUSES = [
-  'new',
-  'contacted',
-  'working_progress',
-  'qualified',
-  'quotation_sent',
-  'follow_up',
-  'negotiation',
-  'reactivated',
-  'converted',
-  'lost',
-  'booked_from_another_company',
-];
+const {
+  LEAD_STATUSES,
+  LEAD_STATUS_ENUM,
+  LEAD_TEMPERATURES,
+  CALL_OUTCOMES,
+} = require('../constants/leadPipeline');
 
 const BUDGET_RANGES = [
   'under_20000',
@@ -34,6 +26,8 @@ const REACTIVATION_STAGES = [
   'follow_up_scheduled',
   'quotation_sent',
   'converted',
+  'package_sent',
+  'booked',
 ];
 
 /** Source = 'referral' → who sent us this lead. See leadSchema.referral below. */
@@ -78,7 +72,7 @@ const leadSchema = new mongoose.Schema(
     budgetRange: { type: String, enum: BUDGET_RANGES, default: 'custom' },
     leadScore: { type: String, enum: LEAD_SCORES, default: 'low', index: true },
     smartScore: { type: Number, default: 0, min: 0, max: 100, index: true },
-    temperature: { type: String, enum: ['hot', 'warm', 'cold', 'vip'], default: 'cold', index: true },
+    temperature: { type: String, enum: [...LEAD_TEMPERATURES, 'vip'], default: 'cold', index: true },
     /** Add/Edit Lead form's "Lead Score" (Step 6) — booking potential from customer+travel details
      *  entered on the form, distinct from smartScore's post-creation engagement signals. See
      *  services/leadScoringService.js computeBookingPotential(). */
@@ -126,11 +120,25 @@ const leadSchema = new mongoose.Schema(
     infants: { type: Number, default: 0 },
     /** Preferred window to call (from WhatsApp bot / intake) */
     preferredCallTime: { type: String, trim: true, default: '' },
-    status: { type: String, enum: LEAD_STATUSES, default: 'new', index: true },
+    status: { type: String, enum: LEAD_STATUS_ENUM, default: 'new_lead', index: true },
     statusReason: { type: String, trim: true, default: '' },
     statusReasonUpdatedAt: { type: Date },
-    /** When status first became converted (Bookings period filter) */
+    /** When status first became booked/converted (Bookings period filter) */
     convertedAt: { type: Date, index: true },
+    /** Alias stamp for booked date (mirrors convertedAt when booked) */
+    bookingDate: { type: Date, index: true },
+    /** Latest call outcome — independent of pipeline status */
+    callOutcome: {
+      type: String,
+      enum: [...CALL_OUTCOMES, ''],
+      default: '',
+      index: true,
+    },
+    /** Denormalized call attempt count (kept in sync with callStats.count) */
+    callAttempts: { type: Number, default: 0, min: 0 },
+    lostReason: { type: String, trim: true, default: '' },
+    postponedAt: { type: Date },
+    postponedReason: { type: String, trim: true, default: '' },
     source: {
       type: String,
       enum: [
@@ -296,16 +304,28 @@ leadSchema.pre('save', async function generateLeadId(next) {
   }
 });
 
-/** Stamp connectedAt when lead first enters Connected (`contacted`). */
+/** Stamp connectedAt when lead is first reachable / qualified from contact. */
 leadSchema.pre('save', function stampConnectedAt(next) {
-  if (this.isModified('status') && this.status === 'contacted' && !this.connectedAt) {
+  if (
+    this.isModified('status') &&
+    ['qualified', 'package_sent', 'follow_up', 'contacted'].includes(this.status) &&
+    !this.connectedAt
+  ) {
     this.connectedAt = new Date();
+  }
+  if (this.isModified('status') && (this.status === 'booked' || this.status === 'converted')) {
+    if (!this.convertedAt) this.convertedAt = new Date();
+    if (!this.bookingDate) this.bookingDate = this.convertedAt;
+  }
+  if (this.isModified('callStats.count') && this.callStats?.count != null) {
+    this.callAttempts = this.callStats.count;
   }
   next();
 });
 
 module.exports = mongoose.model('Lead', leadSchema);
 module.exports.LEAD_STATUSES = LEAD_STATUSES;
+module.exports.LEAD_STATUS_ENUM = LEAD_STATUS_ENUM;
 module.exports.REACTIVATION_STAGES = REACTIVATION_STAGES;
 module.exports.BUDGET_RANGES = BUDGET_RANGES;
 module.exports.LEAD_SCORES = LEAD_SCORES;

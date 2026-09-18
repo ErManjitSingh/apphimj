@@ -102,8 +102,8 @@ async function sendQuotationViaWhatsApp({
   lead.lastContactedBy = req.user._id;
   if (!lead.firstContactAt) lead.firstContactAt = now;
 
-  if (lead.status === 'new' || lead.status === 'contacted') {
-    lead.status = 'quotation_sent';
+  if (lead.status === 'new' || lead.status === 'new_lead' || lead.status === 'contacted' || lead.status === 'not_reachable' || lead.status === 'qualified') {
+    lead.status = 'package_sent';
   }
   await lead.save();
 

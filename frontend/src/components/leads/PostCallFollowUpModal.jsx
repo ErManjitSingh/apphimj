@@ -5,18 +5,19 @@ import { Button } from '../ui/button';
 import { addCallNote } from '../../services/leadEnterpriseApi';
 import { formatCallDurationExact } from '../../lib/callSession';
 import {
-  FOLLOWUP_CATEGORY_OPTIONS,
-  getOutcomesForCategory,
-} from '../../lib/leadTemperatureStatus';
+  CALL_OUTCOME_OPTIONS,
+  LEAD_TEMPERATURE_OPTIONS,
+  LEAD_PIPELINE_STATUSES,
+  normalizeLeadStatus,
+} from '../../lib/leadPipeline';
+import { cn } from '../../lib/utils';
 
-/** @deprecated older imports */
-export const CALL_PICKED_OUTCOMES = getOutcomesForCategory('warm');
-export const CALL_OUTCOMES = [
-  ...getOutcomesForCategory('warm'),
-  ...getOutcomesForCategory('hot'),
-  ...getOutcomesForCategory('cold'),
-  { value: 'no_answer', label: 'No answer / Not picked' },
-];
+/** Canonical call outcomes for logging UIs */
+export const CALL_OUTCOMES = CALL_OUTCOME_OPTIONS;
+/** @deprecated older imports — same as CALL_OUTCOMES */
+export const CALL_PICKED_OUTCOMES = CALL_OUTCOME_OPTIONS.filter((o) =>
+  ['connected', 'callback_requested', 'whatsapp_sent'].includes(o.value)
+);
 
 export default function PostCallFollowUpModal({
   open,
@@ -24,16 +25,18 @@ export default function PostCallFollowUpModal({
   onClose,
   onSaved,
 }) {
-  const [category, setCategory] = useState('warm');
-  const [outcome, setOutcome] = useState('');
+  const [callOutcome, setCallOutcome] = useState('');
+  const [temperature, setTemperature] = useState('warm');
+  const [status, setStatus] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (!open || !session) return;
-    setCategory('warm');
-    setOutcome('');
+    setCallOutcome('');
+    setTemperature(session.leadTemperature === 'vip' ? 'hot' : session.leadTemperature || 'warm');
+    setStatus(session.leadStatus ? normalizeLeadStatus(session.leadStatus) : '');
     setNotes('');
     setError('');
   }, [open, session]);
@@ -41,26 +44,27 @@ export default function PostCallFollowUpModal({
   if (!session) return null;
 
   const durationSeconds = Math.max(0, Math.round(Number(session.durationSeconds) || 0));
-  const options = getOutcomesForCategory(category);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!outcome) {
-      setError('Select a status option');
+    if (!callOutcome) {
+      setError('Select a call outcome');
       return;
     }
     setSaving(true);
     setError('');
     try {
       const saved = await addCallNote(session.leadId, {
-        outcome,
+        outcome: callOutcome,
+        callOutcome,
+        temperature,
+        status: status || undefined,
         notes: notes.trim(),
         durationSeconds,
         startedAt: session.startedAt ? new Date(session.startedAt).toISOString() : undefined,
         endedAt: session.endedAt ? new Date(session.endedAt).toISOString() : new Date().toISOString(),
         scheduleNextCall: true,
-        category,
-        statusReason: notes.trim() ? `${outcome} — ${notes.trim()}` : outcome,
+        statusReason: notes.trim() ? `${callOutcome} — ${notes.trim()}` : callOutcome,
       });
       onSaved?.(saved);
       onClose?.();
@@ -85,7 +89,7 @@ export default function PostCallFollowUpModal({
               Duration: {formatCallDurationExact(durationSeconds)}
             </p>
             <p className="mt-1 text-[11px] font-medium text-violet-600">
-              Set Warm / Hot / Cold from this call. Next reminder in 2 hours.
+              Set call outcome + temperature. Next reminder in 2 hours.
             </p>
           </div>
         </div>
@@ -96,45 +100,73 @@ export default function PostCallFollowUpModal({
 
         <div>
           <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-content-muted">
-            Status *
+            Call Outcome *
           </label>
-          <select
-            value={category}
-            onChange={(e) => {
-              setCategory(e.target.value);
-              setOutcome('');
-            }}
-            className="w-full rounded-xl border border-subtle bg-white p-3 text-sm font-medium"
-          >
-            {FOLLOWUP_CATEGORY_OPTIONS.filter((c) => c.value !== 'converted').map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-content-muted">
-            Option *
-          </p>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {options.map((item) => {
-              const selected = outcome === item.value;
+            {CALL_OUTCOME_OPTIONS.map((item) => {
+              const selected = callOutcome === item.value;
               return (
                 <button
                   key={item.value}
                   type="button"
-                  onClick={() => setOutcome(item.value)}
-                  className={`rounded-xl border px-3 py-2 text-left text-xs font-semibold transition-colors ${
+                  onClick={() => setCallOutcome(item.value)}
+                  className={cn(
+                    'rounded-xl border px-3 py-2 text-left text-xs font-semibold transition-colors',
                     selected
                       ? 'border-blue-500 bg-blue-50 text-blue-700'
                       : 'border-subtle bg-white text-content-secondary hover:border-blue-300'
-                  }`}
+                  )}
                 >
                   {item.label}
                 </button>
               );
             })}
           </div>
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-content-muted">
+            Temperature *
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {LEAD_TEMPERATURE_OPTIONS.map((t) => (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => setTemperature(t.value)}
+                className={cn(
+                  'h-10 px-4 rounded-xl border text-sm font-bold transition',
+                  temperature === t.value
+                    ? t.value === 'hot'
+                      ? 'border-rose-400 bg-rose-50 text-rose-700'
+                      : t.value === 'warm'
+                        ? 'border-amber-400 bg-amber-50 text-amber-800'
+                        : 'border-sky-400 bg-sky-50 text-sky-800'
+                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                )}
+              >
+                {t.emoji} {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-content-muted">
+            Pipeline Status (optional)
+          </label>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="w-full rounded-xl border border-subtle bg-white p-3 text-sm font-medium"
+          >
+            <option value="">Keep current</option>
+            {LEAD_PIPELINE_STATUSES.filter((s) => !['booked', 'lost'].includes(s.value)).map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div>
@@ -154,8 +186,8 @@ export default function PostCallFollowUpModal({
           <Button type="button" variant="outline" disabled={saving} onClick={() => onClose?.()}>
             Skip
           </Button>
-          <Button type="submit" disabled={saving || !outcome} className="bg-blue-600 text-white hover:bg-blue-500">
-            {saving ? 'Saving…' : 'Save status'}
+          <Button type="submit" disabled={saving || !callOutcome} className="bg-blue-600 text-white hover:bg-blue-500">
+            {saving ? 'Saving…' : 'Save'}
           </Button>
         </div>
       </form>

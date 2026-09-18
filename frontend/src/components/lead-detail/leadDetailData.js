@@ -12,11 +12,14 @@ import {
 import { getLeadStatusLabel } from '../../lib/leadStatusLabel';
 
 export const PIPELINE_STAGES = [
-  { value: 'new', label: 'New', shortLabel: 'New' },
-  { value: 'warm', label: 'Warm', shortLabel: 'Warm' },
-  { value: 'hot', label: 'Hot', shortLabel: 'Hot' },
-  { value: 'cold', label: 'Cold', shortLabel: 'Cold' },
-  { value: 'converted', label: 'Converted', shortLabel: 'Converted' },
+  { value: 'new_lead', label: 'New Lead', shortLabel: 'New' },
+  { value: 'not_reachable', label: 'Not Reachable', shortLabel: 'NR' },
+  { value: 'qualified', label: 'Qualified', shortLabel: 'Qualified' },
+  { value: 'package_sent', label: 'Package Sent', shortLabel: 'Package' },
+  { value: 'follow_up', label: 'Follow-up', shortLabel: 'Follow-up' },
+  { value: 'booked', label: 'Booked', shortLabel: 'Booked' },
+  { value: 'postponed', label: 'Postponed', shortLabel: 'Postponed' },
+  { value: 'lost', label: 'Lost', shortLabel: 'Lost' },
 ];
 
 export const ACTIVITY_CONFIG = {

@@ -1,4 +1,4 @@
-/** WhatsApp list filters — Warm / Hot / Cold only */
+/** WhatsApp list filters — temperature (independent of pipeline status) */
 export const STATUS_FILTERS = [
   { key: '', label: 'All' },
   { key: 'warm', label: 'Warm' },
@@ -6,7 +6,7 @@ export const STATUS_FILTERS = [
   { key: 'cold', label: 'Cold' },
 ];
 
-/** @deprecated Use Warm/Hot/Cold outcomes via leadTemperatureStatus */
+/** @deprecated Prefer LEAD_PIPELINE_STATUSES from leadPipeline.js */
 export const LEAD_STATUSES = [
   { value: 'warm', label: 'Warm' },
   { value: 'hot', label: 'Hot' },

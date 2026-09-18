@@ -12,10 +12,10 @@ const {
   sendReceiptToCustomer,
 } = require('./paymentReceiptService');
 
-const TERMINAL_STATUSES = ['converted', 'lost', 'booked_from_another_company'];
+const TERMINAL_STATUSES = ['booked', 'lost', 'converted', 'booked_from_another_company'];
 
 function isLeadStatusLocked(status) {
-  return TERMINAL_STATUSES.includes(status);
+  return TERMINAL_STATUSES.includes(String(status || ''));
 }
 
 async function pickQuotationForLead(leadId) {

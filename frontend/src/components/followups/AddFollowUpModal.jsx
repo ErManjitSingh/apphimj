@@ -2,33 +2,34 @@ import { X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import AppModal from '../ui/AppModal';
+import { FOLLOWUP_PRIORITIES, FOLLOWUP_TYPES } from './constants';
 import {
-  FOLLOWUP_PRIORITIES,
-  FOLLOWUP_CATEGORY_OPTIONS,
-  FOLLOWUP_TYPES,
-  getOutcomesForCategory,
-} from './constants';
-import { buildLeadStatusPayload } from '../../lib/leadTemperatureStatus';
-import { useLeadStatusOptions } from '../../context/LeadStatusOptionsContext';
+  LEAD_PIPELINE_STATUSES,
+  LEAD_TEMPERATURE_OPTIONS,
+  CALL_OUTCOME_OPTIONS,
+  LOST_REASON_OPTIONS,
+  buildPipelineStatusPayload,
+  normalizeLeadStatus,
+  isBookedStatus,
+} from '../../lib/leadPipeline';
+import { cn } from '../../lib/utils';
 
 const emptyForm = {
   lead: '',
   type: 'call',
-  category: 'warm',
+  status: 'follow_up',
+  temperature: 'warm',
+  callOutcome: '',
+  lostReason: '',
+  postponedReason: '',
+  postponedAt: '',
   date: '',
   time: '10:00',
   priority: 'medium',
   remarks: '',
-  outcome: '',
   totalPackageCost: '',
   tokenAmount: '',
 };
-
-function buildStatusFromCategory(form, lead = null) {
-  const { category, outcome } = form;
-  if (!outcome) return null;
-  return buildLeadStatusPayload(category, outcome, form.remarks, lead);
-}
 
 export default function AddFollowUpModal({
   open,
@@ -38,12 +39,10 @@ export default function AddFollowUpModal({
   editData = null,
   fixedLeadId = null,
   fixedLeadName = null,
-  /** When true, also pushes lead status from the selected category/reason */
+  /** When true, also pushes lead pipeline status / temperature / call outcome */
   showLeadOutcome = false,
   lead = null,
 }) {
-  const { loaded } = useLeadStatusOptions();
-  void loaded;
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -60,26 +59,23 @@ export default function AddFollowUpModal({
       const localTime = Number.isNaN(d.getTime())
         ? '10:00'
         : `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-      let cat = editData.category === 'dead_lead' ? 'cold' : (editData.category || 'warm');
-      if (cat === 'call_picked' || cat === 'call_not_picked') cat = 'warm';
-      if (cat === 'lost') cat = 'cold';
-      if (!['warm', 'hot', 'cold', 'converted'].includes(cat)) cat = 'warm';
+      const temp =
+        editData.category === 'hot' || editData.category === 'cold' || editData.category === 'warm'
+          ? editData.category
+          : lead?.temperature || 'warm';
       setForm({
         lead: editData.lead?._id || fixedLeadId || '',
         type: editData.type || 'call',
-        category: cat,
-        date: cat === 'converted' ? '' : localDate,
-        time: cat === 'converted' ? '' : localTime,
+        status: normalizeLeadStatus(lead?.status || editData.status || 'follow_up'),
+        temperature: temp === 'vip' ? 'hot' : temp,
+        callOutcome: editData.callOutcome || lead?.callOutcome || '',
+        lostReason: lead?.lostReason || '',
+        postponedReason: lead?.postponedReason || '',
+        postponedAt: lead?.postponedAt ? String(lead.postponedAt).slice(0, 10) : '',
+        date: localDate,
+        time: localTime,
         priority: editData.priority || 'medium',
         remarks: editData.notes || '',
-        outcome:
-          editData.outcome ||
-          editData.pickedOutcome ||
-          editData.warmOutcome ||
-          editData.hotOutcome ||
-          editData.coldReason ||
-          editData.notPickedReason ||
-          (cat === 'converted' ? 'converted' : ''),
         totalPackageCost: '',
         tokenAmount: '',
       });
@@ -89,33 +85,20 @@ export default function AddFollowUpModal({
         ...emptyForm,
         lead: fixedLeadId || '',
         date: today,
+        status: normalizeLeadStatus(lead?.status || 'follow_up'),
+        temperature: lead?.temperature === 'vip' ? 'hot' : lead?.temperature || 'warm',
+        callOutcome: lead?.callOutcome || '',
       });
     }
   }, [editData, open, fixedLeadId, lead]);
 
-  const outcomeOptions = getOutcomesForCategory(form.category);
-
-  const applyCategoryDefaults = (nextCategory) => {
-    setForm((prev) => ({
-      ...prev,
-      category: nextCategory,
-      outcome: nextCategory === 'converted' ? 'converted' : '',
-      totalPackageCost: '',
-      tokenAmount: '',
-      // Converted has no next-follow-up — clear any Date/Time picked under Warm/Hot/Cold so a
-      // stale value never gets submitted once the status is switched to Converted.
-      date: nextCategory === 'converted' ? '' : prev.date || new Date().toISOString().split('T')[0],
-      time: nextCategory === 'converted' ? '' : (prev.time || '10:00'),
-    }));
-  };
-
-  const isConverted = form.category === 'converted';
+  const isBooked = form.status === 'booked' || isBookedStatus(form.status);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    if (!isConverted && !form.date) {
+    if (!isBooked && !form.date) {
       setError('Please select follow-up date');
       return;
     }
@@ -123,11 +106,15 @@ export default function AddFollowUpModal({
       setError('Please select a lead');
       return;
     }
-    if (!form.outcome) {
-      setError(`Please select a ${form.category} option`);
+    if (showLeadOutcome && form.status === 'lost' && !form.lostReason) {
+      setError('Select a lost reason');
       return;
     }
-    if (form.category === 'converted') {
+    if (showLeadOutcome && form.status === 'postponed' && !form.postponedReason.trim()) {
+      setError('Enter postponed reason');
+      return;
+    }
+    if (showLeadOutcome && isBooked) {
       const total = Number(form.totalPackageCost);
       if (!Number.isFinite(total) || total <= 0) {
         setError('Enter total package cost (₹)');
@@ -146,39 +133,46 @@ export default function AddFollowUpModal({
 
     setSaving(true);
     try {
-      const outcomeLabel = outcomeOptions.find((r) => r.value === form.outcome)?.label;
+      const statusLabel =
+        LEAD_PIPELINE_STATUSES.find((s) => s.value === form.status)?.label || form.status;
+      const tempLabel =
+        LEAD_TEMPERATURE_OPTIONS.find((t) => t.value === form.temperature)?.label || form.temperature;
       let remarks = form.remarks?.trim() || '';
-      const prefix =
-        form.category === 'warm'
-          ? `Warm — ${outcomeLabel}`
-          : form.category === 'hot'
-            ? `Hot — ${outcomeLabel}`
-            : form.category === 'converted'
-              ? `Converted — ${outcomeLabel}`
-              : `Cold — ${outcomeLabel}`;
+      const prefix = showLeadOutcome
+        ? `${statusLabel} · ${tempLabel}${form.callOutcome ? ` · ${form.callOutcome}` : ''}`
+        : `${tempLabel} follow-up`;
       remarks = remarks ? `${prefix}. ${remarks}` : prefix;
 
-      const statusUpdate = showLeadOutcome ? buildStatusFromCategory(form, lead) : null;
-      if (statusUpdate && form.category === 'converted') {
+      const statusUpdate = showLeadOutcome
+        ? buildPipelineStatusPayload({
+            status: form.status,
+            temperature: form.temperature,
+            callOutcome: form.callOutcome || undefined,
+            lostReason: form.status === 'lost' ? form.lostReason : undefined,
+            postponedReason: form.status === 'postponed' ? form.postponedReason : undefined,
+            postponedAt: form.status === 'postponed' ? form.postponedAt || undefined : undefined,
+            comment: form.remarks,
+          })
+        : null;
+
+      if (statusUpdate && isBooked) {
         statusUpdate.totalPackageCost = Number(form.totalPackageCost);
         statusUpdate.tokenAmount = Number(form.tokenAmount);
       }
 
+      // FollowUp document category stays temperature-based for legacy reports
+      const category = isBooked ? 'converted' : form.temperature || 'warm';
+
       await onSubmit({
         ...form,
         lead: fixedLeadId || form.lead,
-        // Converted is no longer in the follow-up lifecycle — never send an active
-        // next-follow-up date/time, even a stale one picked before switching to Converted.
-        date: isConverted ? null : form.date,
-        time: isConverted ? null : form.time,
-        scheduledAt: isConverted ? null : `${form.date}T${form.time}:00`,
+        date: isBooked ? null : form.date,
+        time: isBooked ? null : form.time,
+        scheduledAt: isBooked ? null : `${form.date}T${form.time}:00`,
         notes: remarks,
-        category: form.category,
-        coldReason: form.category === 'cold' ? form.outcome : undefined,
-        pickedOutcome: form.category === 'warm' || form.category === 'hot' ? form.outcome : undefined,
-        warmOutcome: form.category === 'warm' ? form.outcome : undefined,
-        hotOutcome: form.category === 'hot' ? form.outcome : undefined,
-        outcome: form.outcome,
+        category,
+        outcome: form.callOutcome || undefined,
+        callOutcome: form.callOutcome || undefined,
         statusUpdate,
       });
       if (!editData) {
@@ -197,17 +191,26 @@ export default function AddFollowUpModal({
     <AppModal open={open} onClose={onClose} size="lg" className="p-6">
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h3 className="text-lg font-bold text-content-primary">{editData ? 'Update Follow-up' : 'Lead follow up'}</h3>
+          <h3 className="text-lg font-bold text-content-primary">
+            {editData ? 'Update Follow-up' : 'Lead follow up'}
+          </h3>
           <p className="text-xs text-content-muted">
-            {fixedLeadName || 'Select Warm / Hot / Cold / Converted & option'}
+            {fixedLeadName ||
+              (showLeadOutcome
+                ? 'Status + Temperature + schedule'
+                : 'Schedule next follow-up')}
           </p>
         </div>
-        <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-surface-elevated"><X className="w-5 h-5" /></button>
+        <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-surface-elevated">
+          <X className="w-5 h-5" />
+        </button>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <p className="text-sm text-red-600 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">{error}</p>
+          <p className="text-sm text-red-600 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">
+            {error}
+          </p>
         )}
 
         {!editData && !fixedLeadId && (
@@ -221,162 +224,251 @@ export default function AddFollowUpModal({
             >
               <option value="">Select lead</option>
               {leads.map((l) => (
-                <option key={l._id} value={l._id}>{l.name} — {l.destination}</option>
+                <option key={l._id} value={l._id}>
+                  {l.name} — {l.destination}
+                </option>
               ))}
             </select>
           </div>
         )}
 
-        <div>
-          <label className="text-xs font-medium text-content-muted mb-1 block">Status * (Warm / Hot / Cold / Converted)</label>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {FOLLOWUP_CATEGORY_OPTIONS.map((c) => {
-              const active = form.category === c.value;
-              const tones = {
-                warm: active ? 'border-amber-500 bg-amber-500 text-white' : 'border-amber-200 bg-amber-50 text-amber-900',
-                hot: active ? 'border-rose-600 bg-rose-600 text-white' : 'border-rose-200 bg-rose-50 text-rose-900',
-                cold: active ? 'border-slate-600 bg-slate-600 text-white' : 'border-slate-200 bg-slate-50 text-slate-800',
-                converted: active ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-emerald-200 bg-emerald-50 text-emerald-900',
-              };
-              return (
-                <button
-                  key={c.value}
-                  type="button"
-                  onClick={() => applyCategoryDefaults(c.value)}
-                  className={`rounded-xl border px-2 py-2.5 text-xs font-bold transition-colors ${tones[c.value] || tones.warm}`}
-                >
-                  {c.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        {showLeadOutcome && (
+          <>
+            <div>
+              <label className="text-xs font-medium text-content-muted mb-1 block">Lead Status *</label>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {LEAD_PIPELINE_STATUSES.map((s) => (
+                  <button
+                    key={s.value}
+                    type="button"
+                    onClick={() => setForm((prev) => ({ ...prev, status: s.value }))}
+                    className={cn(
+                      'rounded-xl border px-2 py-2.5 text-xs font-bold transition-colors',
+                      form.status === s.value
+                        ? 'border-violet-500 bg-violet-500 text-white'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    )}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        <div className={`rounded-xl border p-3 space-y-3 ${
-          form.category === 'hot'
-            ? 'border-rose-200 bg-rose-50/80'
-            : form.category === 'cold'
-              ? 'border-sky-200 bg-sky-50/80'
-              : form.category === 'converted'
-                ? 'border-emerald-200 bg-emerald-50/80'
-                : 'border-amber-200 bg-amber-50/80'
-        }`}>
-          <p className={`text-xs font-semibold ${
-            form.category === 'hot'
-              ? 'text-rose-800'
-              : form.category === 'cold'
-                ? 'text-sky-800'
-                : form.category === 'converted'
-                  ? 'text-emerald-800'
-                  : 'text-amber-800'
-          }`}>
-            {form.category === 'warm' && 'Warm — select option'}
-            {form.category === 'hot' && 'Hot — select option'}
-            {form.category === 'cold' && 'Cold — select option'}
-            {form.category === 'converted' && 'Converted — select option'}
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {outcomeOptions.map((item) => (
-              <button
-                key={item.value}
-                type="button"
-                onClick={() => setForm((prev) => ({ ...prev, outcome: item.value }))}
-                className={`text-left px-3 py-2 rounded-xl border text-xs font-semibold transition-colors ${
-                  form.outcome === item.value
-                    ? form.category === 'hot'
-                      ? 'border-rose-500 bg-rose-100 text-rose-900'
-                      : form.category === 'cold'
-                        ? 'border-sky-500 bg-sky-100 text-sky-800'
-                        : form.category === 'converted'
-                          ? 'border-emerald-500 bg-emerald-100 text-emerald-900'
-                          : 'border-amber-500 bg-amber-100 text-amber-900'
-                    : 'border-subtle bg-white text-content-secondary hover:border-amber-300'
-                }`}
+            <div>
+              <label className="text-xs font-medium text-content-muted mb-1 block">Temperature *</label>
+              <div className="flex flex-wrap gap-2">
+                {LEAD_TEMPERATURE_OPTIONS.map((t) => (
+                  <button
+                    key={t.value}
+                    type="button"
+                    onClick={() => setForm((prev) => ({ ...prev, temperature: t.value }))}
+                    className={cn(
+                      'h-10 px-4 rounded-xl border text-sm font-bold transition',
+                      form.temperature === t.value
+                        ? t.value === 'hot'
+                          ? 'border-rose-400 bg-rose-50 text-rose-700'
+                          : t.value === 'warm'
+                            ? 'border-amber-400 bg-amber-50 text-amber-800'
+                            : 'border-sky-400 bg-sky-50 text-sky-800'
+                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    )}
+                  >
+                    {t.emoji} {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-content-muted mb-1 block">Call Outcome</label>
+              <select
+                value={form.callOutcome}
+                onChange={(e) => setForm((prev) => ({ ...prev, callOutcome: e.target.value }))}
+                className="input-premium w-full h-11 rounded-xl"
               >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
+                <option value="">Optional</option>
+                {CALL_OUTCOME_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        {form.category === 'converted' ? (
-          <div className="space-y-3 rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
-            <p className="text-xs font-medium text-emerald-900">
-              Converted starts the booking — enter the total package cost and token amount received.
-            </p>
-            <div>
-              <label className="text-xs font-medium text-content-muted mb-1 block">
-                Total package cost (₹) *
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={form.totalPackageCost}
-                onChange={(e) => setForm((prev) => ({ ...prev, totalPackageCost: e.target.value }))}
-                placeholder="e.g. 50000"
-                className="input-premium w-full h-11 rounded-xl"
-              />
+            {form.status === 'lost' && (
+              <div>
+                <label className="text-xs font-medium text-content-muted mb-1 block">Lost Reason *</label>
+                <select
+                  required
+                  value={form.lostReason}
+                  onChange={(e) => setForm((prev) => ({ ...prev, lostReason: e.target.value }))}
+                  className="input-premium w-full h-11 rounded-xl"
+                >
+                  <option value="">Select reason</option>
+                  {LOST_REASON_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {form.status === 'postponed' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-content-muted mb-1 block">Postponed date</label>
+                  <input
+                    type="date"
+                    value={form.postponedAt}
+                    onChange={(e) => setForm((prev) => ({ ...prev, postponedAt: e.target.value }))}
+                    className="input-premium w-full h-11 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-content-muted mb-1 block">Reason *</label>
+                  <input
+                    required
+                    value={form.postponedReason}
+                    onChange={(e) => setForm((prev) => ({ ...prev, postponedReason: e.target.value }))}
+                    className="input-premium w-full h-11 rounded-xl"
+                    placeholder="Travel later…"
+                  />
+                </div>
+              </div>
+            )}
+
+            {isBooked ? (
+              <div className="space-y-3 rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
+                <p className="text-xs font-medium text-emerald-900">
+                  Booked starts the booking — enter total package cost and token amount received.
+                </p>
+                <div>
+                  <label className="text-xs font-medium text-content-muted mb-1 block">
+                    Total package cost (₹) *
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={form.totalPackageCost}
+                    onChange={(e) => setForm((prev) => ({ ...prev, totalPackageCost: e.target.value }))}
+                    placeholder="e.g. 50000"
+                    className="input-premium w-full h-11 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-content-muted mb-1 block">
+                    Token amount received (₹) *
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={form.tokenAmount}
+                    onChange={(e) => setForm((prev) => ({ ...prev, tokenAmount: e.target.value }))}
+                    placeholder="e.g. 10000"
+                    className="input-premium w-full h-11 rounded-xl"
+                  />
+                </div>
+                <p className="text-xs font-semibold text-emerald-900">
+                  Remaining amount: ₹
+                  {Math.max(
+                    0,
+                    (Number(form.totalPackageCost) || 0) - (Number(form.tokenAmount) || 0)
+                  ).toLocaleString('en-IN')}
+                </p>
+              </div>
+            ) : null}
+          </>
+        )}
+
+        {!showLeadOutcome && (
+          <div>
+            <label className="text-xs font-medium text-content-muted mb-1 block">Temperature</label>
+            <div className="flex flex-wrap gap-2">
+              {LEAD_TEMPERATURE_OPTIONS.map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => setForm((prev) => ({ ...prev, temperature: t.value }))}
+                  className={cn(
+                    'h-10 px-4 rounded-xl border text-sm font-bold transition',
+                    form.temperature === t.value
+                      ? t.value === 'hot'
+                        ? 'border-rose-400 bg-rose-50 text-rose-700'
+                        : t.value === 'warm'
+                          ? 'border-amber-400 bg-amber-50 text-amber-800'
+                          : 'border-sky-400 bg-sky-50 text-sky-800'
+                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                  )}
+                >
+                  {t.emoji} {t.label}
+                </button>
+              ))}
             </div>
-            <div>
-              <label className="text-xs font-medium text-content-muted mb-1 block">
-                Token amount received (₹) *
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={form.tokenAmount}
-                onChange={(e) => setForm((prev) => ({ ...prev, tokenAmount: e.target.value }))}
-                placeholder="e.g. 10000"
-                className="input-premium w-full h-11 rounded-xl"
-              />
-            </div>
-            <p className="text-xs font-semibold text-emerald-900">
-              Remaining amount: ₹{Math.max(
-                0,
-                (Number(form.totalPackageCost) || 0) - (Number(form.tokenAmount) || 0)
-              ).toLocaleString('en-IN')}
-            </p>
           </div>
-        ) : null}
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-xs font-medium text-content-muted mb-1 block">Type</label>
-            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="input-premium w-full h-11 rounded-xl">
+            <select
+              value={form.type}
+              onChange={(e) => setForm({ ...form, type: e.target.value })}
+              className="input-premium w-full h-11 rounded-xl"
+            >
               {FOLLOWUP_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
               ))}
             </select>
           </div>
           <div>
             <label className="text-xs font-medium text-content-muted mb-1 block">Intent</label>
-            <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} className="input-premium w-full h-11 rounded-xl">
+            <select
+              value={form.priority}
+              onChange={(e) => setForm({ ...form, priority: e.target.value })}
+              className="input-premium w-full h-11 rounded-xl"
+            >
               {FOLLOWUP_PRIORITIES.map((p) => (
-                <option key={p.value} value={p.value}>{p.label}</option>
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
               ))}
             </select>
           </div>
         </div>
 
-        {!isConverted && (
+        {!isBooked && (
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-content-muted mb-1 block">Date *</label>
-              <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required className="input-premium w-full h-11 rounded-xl" />
+              <input
+                type="date"
+                value={form.date}
+                onChange={(e) => setForm({ ...form, date: e.target.value })}
+                required
+                className="input-premium w-full h-11 rounded-xl"
+              />
             </div>
             <div>
               <label className="text-xs font-medium text-content-muted mb-1 block">Time *</label>
-              <input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} required className="input-premium w-full h-11 rounded-xl" />
+              <input
+                type="time"
+                value={form.time}
+                onChange={(e) => setForm({ ...form, time: e.target.value })}
+                required
+                className="input-premium w-full h-11 rounded-xl"
+              />
             </div>
           </div>
         )}
 
         <div>
-          <label className="text-xs font-medium text-content-muted mb-1 block">
-            Comments (optional)
-          </label>
+          <label className="text-xs font-medium text-content-muted mb-1 block">Comments (optional)</label>
           <textarea
             value={form.remarks}
             onChange={(e) => setForm({ ...form, remarks: e.target.value })}

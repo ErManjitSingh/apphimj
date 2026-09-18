@@ -10,6 +10,7 @@ import AddFollowUpModal from '../followups/AddFollowUpModal';
 import { createExecutiveFollowUp, buildFollowUpPayload } from '../followups/followupApi';
 import { isLeadStatusLocked } from '../../utils/leadUtils';
 import PostConvertCommercialModal from '../leads/PostConvertCommercialModal';
+import LeadPipelineUpdateModal from '../leads/LeadPipelineUpdateModal';
 
 export default function ExecutiveLeadDetailPage() {
   const { id } = useParams();
@@ -20,6 +21,8 @@ export default function ExecutiveLeadDetailPage() {
   const [flashMessage, setFlashMessage] = useState(location.state?.message || '');
   const [highlightQuotationId] = useState(location.state?.quotationId || null);
   const [followUpModalOpen, setFollowUpModalOpen] = useState(false);
+  const [pipelineModalOpen, setPipelineModalOpen] = useState(false);
+  const [pipelineSaving, setPipelineSaving] = useState(false);
   const [markingCallDone, setMarkingCallDone] = useState(false);
   const [commercialOpen, setCommercialOpen] = useState(false);
 
@@ -178,11 +181,31 @@ export default function ExecutiveLeadDetailPage() {
         highlightQuotationId={highlightQuotationId}
         onCreateQuote={() => navigate(`/sales-executive/quotations/new?leadId=${id}`)}
         onScheduleFollowUp={() => setFollowUpModalOpen(true)}
+        onChangeStatus={() => setPipelineModalOpen(true)}
         onContactLogged={loadLead}
         onEmailSent={loadLead}
         canEditLead
         editHref={`/sales-executive/leads/${id}/edit`}
       />
+
+      {pipelineModalOpen ? (
+        <LeadPipelineUpdateModal
+          open={pipelineModalOpen}
+          onClose={() => setPipelineModalOpen(false)}
+          lead={lead}
+          saving={pipelineSaving}
+          onSave={async (payload) => {
+            setPipelineSaving(true);
+            try {
+              await API.put(`/sales-executive/leads/${id}`, payload);
+              toast.success('Lead updated');
+              await loadLead({ silent: true });
+            } finally {
+              setPipelineSaving(false);
+            }
+          }}
+        />
+      ) : null}
 
       {followUpModalOpen ? (
         <AddFollowUpModal

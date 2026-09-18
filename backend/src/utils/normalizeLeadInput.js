@@ -1,6 +1,12 @@
 const mongoose = require('mongoose');
 const { resolveLeadSourceKey, leadSourceLabel, LEAD_SOURCE_KEYS } = require('../constants/leadSources');
 const { REFERRAL_RELATIONSHIPS } = require('../models/Lead');
+const {
+  normalizeLeadStatus,
+  normalizeTemperature,
+  normalizeCallOutcome,
+  LEAD_STATUSES,
+} = require('../constants/leadPipeline');
 
 const LEAD_SOURCES = LEAD_SOURCE_KEYS;
 
@@ -158,10 +164,9 @@ function normalizeLeadInput(body = {}, { isUpdate = false } = {}) {
     }
   }
 
-  if (body.temperature && ['hot', 'warm', 'cold', 'vip'].includes(body.temperature)) {
-    normalized.temperature = body.temperature;
-    if (body.temperature === 'hot') normalized.isHot = true;
-    if (body.temperature !== 'hot') normalized.isHot = false;
+  if (body.temperature) {
+    normalized.temperature = normalizeTemperature(body.temperature);
+    normalized.isHot = normalized.temperature === 'hot';
   }
 
   if (body.coldReason !== undefined) {
@@ -173,6 +178,24 @@ function normalizeLeadInput(body = {}, { isUpdate = false } = {}) {
     normalized.coldCallReminderAt = undefined;
   }
 
+  if (body.callOutcome !== undefined) {
+    normalized.callOutcome = normalizeCallOutcome(body.callOutcome);
+  }
+  if (body.lostReason !== undefined) {
+    normalized.lostReason = String(body.lostReason || '').trim();
+  }
+  if (body.postponedReason !== undefined) {
+    normalized.postponedReason = String(body.postponedReason || '').trim();
+  }
+  if (body.postponedAt) {
+    const d = new Date(body.postponedAt);
+    if (!Number.isNaN(d.getTime())) normalized.postponedAt = d;
+  }
+  if (body.bookingDate) {
+    const d = new Date(body.bookingDate);
+    if (!Number.isNaN(d.getTime())) normalized.bookingDate = d;
+  }
+
   const assignedTo = toObjectId(body.assignedTo) || toObjectId(body.assignedExecutive);
   const assignedManager = toObjectId(body.assignedManager);
   const assignedTeamLeader = toObjectId(body.assignedTeamLeader);
@@ -182,7 +205,12 @@ function normalizeLeadInput(body = {}, { isUpdate = false } = {}) {
   if (assignedTeamLeader) normalized.assignedTeamLeader = assignedTeamLeader;
   if (body.assigneeRole) normalized.assigneeRole = String(body.assigneeRole).trim();
 
-  if (body.status) normalized.status = body.status;
+  if (body.status) {
+    normalized.status = normalizeLeadStatus(body.status);
+    if (!LEAD_STATUSES.includes(normalized.status)) {
+      normalized.status = 'new_lead';
+    }
+  }
 
   return normalized;
 }
@@ -299,9 +327,9 @@ function normalizeLeadUpdateInput(body = {}) {
 
   if (hasOwn(body, 'isHot')) normalized.isHot = Boolean(body.isHot);
 
-  if (hasOwn(body, 'temperature') && ['hot', 'warm', 'cold', 'vip'].includes(body.temperature)) {
-    normalized.temperature = body.temperature;
-    normalized.isHot = body.temperature === 'hot';
+  if (hasOwn(body, 'temperature')) {
+    normalized.temperature = normalizeTemperature(body.temperature);
+    normalized.isHot = normalized.temperature === 'hot';
   }
 
   if (body.coldCallDone === true || body.coldCallDone === 'true') {
@@ -309,7 +337,27 @@ function normalizeLeadUpdateInput(body = {}) {
     normalized.coldCallReminderAt = undefined;
   }
 
-  if (hasOwn(body, 'status')) normalized.status = body.status;
+  if (hasOwn(body, 'callOutcome')) {
+    normalized.callOutcome = normalizeCallOutcome(body.callOutcome);
+  }
+  if (hasOwn(body, 'lostReason')) {
+    normalized.lostReason = String(body.lostReason || '').trim();
+  }
+  if (hasOwn(body, 'postponedReason')) {
+    normalized.postponedReason = String(body.postponedReason || '').trim();
+  }
+  if (hasOwn(body, 'postponedAt') && body.postponedAt) {
+    const d = new Date(body.postponedAt);
+    if (!Number.isNaN(d.getTime())) normalized.postponedAt = d;
+  }
+  if (hasOwn(body, 'bookingDate') && body.bookingDate) {
+    const d = new Date(body.bookingDate);
+    if (!Number.isNaN(d.getTime())) normalized.bookingDate = d;
+  }
+
+  if (hasOwn(body, 'status')) {
+    normalized.status = normalizeLeadStatus(body.status);
+  }
 
   const assignedTo = toObjectId(body.assignedTo) || toObjectId(body.assignedExecutive);
   const assignedManager = toObjectId(body.assignedManager);

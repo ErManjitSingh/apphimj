@@ -4,11 +4,13 @@ import { Button } from '../ui/button';
 import { addCallNote } from '../../services/leadEnterpriseApi';
 import { useAuth } from '../../context/AuthContext';
 import { CALL_OUTCOMES } from './PostCallFollowUpModal';
+import { LEAD_TEMPERATURE_OPTIONS } from '../../lib/leadPipeline';
 
 export default function CallNoteModal({ open, onClose, leadId, onSaved }) {
   const { user } = useAuth();
   const canEditDuration = !['sales_executive', 'team_leader'].includes(user?.role);
-  const [outcome, setOutcome] = useState('interested');
+  const [outcome, setOutcome] = useState('connected');
+  const [temperature, setTemperature] = useState('warm');
   const [notes, setNotes] = useState('');
   const [mins, setMins] = useState('');
   const [secs, setSecs] = useState('');
@@ -24,6 +26,8 @@ export default function CallNoteModal({ open, onClose, leadId, onSaved }) {
         : 0;
       await addCallNote(leadId, {
         outcome,
+        callOutcome: outcome,
+        temperature,
         notes: notes.trim(),
         durationSeconds,
         scheduleNextCall: true,
@@ -49,7 +53,7 @@ export default function CallNoteModal({ open, onClose, leadId, onSaved }) {
         </div>
 
         <div>
-          <label className="text-xs font-medium text-content-muted uppercase tracking-wide">Outcome *</label>
+          <label className="text-xs font-medium text-content-muted uppercase tracking-wide">Call Outcome *</label>
           <select
             value={outcome}
             onChange={(e) => setOutcome(e.target.value)}
@@ -57,6 +61,19 @@ export default function CallNoteModal({ open, onClose, leadId, onSaved }) {
           >
             {CALL_OUTCOMES.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="text-xs font-medium text-content-muted uppercase tracking-wide">Temperature</label>
+          <select
+            value={temperature}
+            onChange={(e) => setTemperature(e.target.value)}
+            className="mt-1.5 w-full rounded-xl border border-subtle bg-surface px-3 py-2.5 text-sm"
+          >
+            {LEAD_TEMPERATURE_OPTIONS.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
             ))}
           </select>
         </div>

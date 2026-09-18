@@ -54,8 +54,8 @@ async function persistQuotation({
     quotation.approvedAt = new Date();
   }
   await quotation.save();
-  if (status === 'pending_approval' && lead.status === 'new') {
-    lead.status = 'quotation_sent';
+  if (status === 'pending_approval' && ['new', 'new_lead', 'not_reachable', 'qualified'].includes(lead.status)) {
+    lead.status = 'package_sent';
     await lead.save();
   }
 

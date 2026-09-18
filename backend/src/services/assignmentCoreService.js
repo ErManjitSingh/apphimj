@@ -5,17 +5,7 @@ const AssignmentRoundRobin = require('../models/AssignmentRoundRobin');
 const { startOfCalendarDay } = require('./attendanceService');
 const { invalidateExecutiveLeadIdsCache } = require('./executiveScopeService');
 const { stampPendingAcceptance } = require('./leadExecutiveStallService');
-
-const ACTIVE_LEAD_STATUSES = [
-  'new',
-  'contacted',
-  'working_progress',
-  'qualified',
-  'follow_up',
-  'quotation_sent',
-  'negotiation',
-  'reactivated',
-];
+const { ACTIVE_LEAD_STATUSES } = require('../constants/leadPipeline');
 
 async function countActiveLeadsForUser(userId, branchId) {
   return Lead.countDocuments({

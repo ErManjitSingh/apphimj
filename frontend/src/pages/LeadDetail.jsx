@@ -25,6 +25,8 @@ import LeadEmailHistory from '../components/email/LeadEmailHistory';
 import AddFollowUpModal from '../components/followups/AddFollowUpModal';
 import { createExecutiveFollowUp, buildFollowUpPayload } from '../components/followups/followupApi';
 import MobileLeadDetailSummary from '../components/lead-detail/MobileLeadDetailSummary';
+import LeadPipelineUpdateModal from '../components/leads/LeadPipelineUpdateModal';
+import { toast } from '../context/ToastContext';
 
 export default function LeadDetail() {
   const { id } = useParams();
@@ -39,6 +41,8 @@ export default function LeadDetail() {
   const canEditLead = can('leads', 'edit');
 
   const [followUpModalOpen, setFollowUpModalOpen] = useState(false);
+  const [pipelineModalOpen, setPipelineModalOpen] = useState(false);
+  const [pipelineSaving, setPipelineSaving] = useState(false);
   const [reactivationMode, setReactivationMode] = useState('');
   const [reactivationExecs, setReactivationExecs] = useState([]);
   const [callNoteOpen, setCallNoteOpen] = useState(false);
@@ -138,11 +142,11 @@ export default function LeadDetail() {
           Reactivate Lead
         </Button>
       )}
-      {lead.status === 'reactivated' && (
+      {lead.status === 'reactivated' || lead?.reactivation?.isReactivated ? (
         <Button type="button" variant="outline" className="w-full rounded-xl" onClick={() => setReactivationMode('reassign')}>
           Reassign Reactivated Lead
         </Button>
-      )}
+      ) : null}
       {lead?.reactivation?.isReactivated && (
         <Button type="button" variant="outline" className="w-full rounded-xl" onClick={() => setReactivationMode('stage')}>
           Update Reactivation Stage
@@ -178,6 +182,7 @@ export default function LeadDetail() {
             : undefined
         }
         onScheduleFollowUp={canCreateFollowUp ? () => setFollowUpModalOpen(true) : undefined}
+        onChangeStatus={canEditLead ? () => setPipelineModalOpen(true) : undefined}
         onContactLogged={refreshLead}
         onEmailSent={refreshLead}
         onLogCallNote={() => setCallNoteOpen(true)}
@@ -219,6 +224,25 @@ export default function LeadDetail() {
             await createExecutiveFollowUp(buildFollowUpPayload({ ...data, lead: lead._id }));
             setFollowUpModalOpen(false);
             refreshLead();
+          }}
+        />
+      ) : null}
+
+      {pipelineModalOpen ? (
+        <LeadPipelineUpdateModal
+          open={pipelineModalOpen}
+          onClose={() => setPipelineModalOpen(false)}
+          lead={lead}
+          saving={pipelineSaving}
+          onSave={async (payload) => {
+            setPipelineSaving(true);
+            try {
+              await API.put(`/leads/${id}`, payload);
+              toast.success('Lead updated');
+              refreshLead();
+            } finally {
+              setPipelineSaving(false);
+            }
           }}
         />
       ) : null}

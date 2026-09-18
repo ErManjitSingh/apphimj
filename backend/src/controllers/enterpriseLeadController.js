@@ -198,6 +198,10 @@ const listCallNotes = asyncHandler(async (req, res) => {
 const addCallNote = asyncHandler(async (req, res) => {
   const {
     outcome,
+    callOutcome: bodyCallOutcome,
+    temperature: bodyTemperature,
+    status: bodyStatus,
+    lostReason: bodyLostReason,
     notes,
     duration,
     durationSeconds,
@@ -207,7 +211,19 @@ const addCallNote = asyncHandler(async (req, res) => {
     category: bodyCategory,
     statusReason: bodyStatusReason,
   } = req.body;
-  if (!outcome) throw new ApiError(400, 'Call outcome / reason is required');
+
+  const {
+    CALL_OUTCOMES,
+    NOT_REACHABLE_CALL_OUTCOMES,
+    TERMINAL_LOST_REASONS,
+    normalizeCallOutcome,
+    normalizeTemperature,
+    normalizeLeadStatus,
+    isLockedStatus,
+  } = require('../constants/leadPipeline');
+
+  const rawOutcome = String(bodyCallOutcome || outcome || '').trim();
+  if (!rawOutcome) throw new ApiError(400, 'Call outcome / reason is required');
 
   const noteText = String(notes || '').trim();
   const lead = await Lead.findOne({
@@ -217,45 +233,46 @@ const addCallNote = asyncHandler(async (req, res) => {
   });
   if (!lead) throw new ApiError(404, 'Lead not found');
 
-  // Safety net: a call being captured here means the executive accessed this lead's protected
-  // phone number, so it must count as Opened — regardless of whether the frontend's pre-dial
-  // authorizeLeadCallAccess request ever reached the backend (offline, race, older client, …).
-  // markLeadViewedByExecutive no-ops for non-assigned users and only ever sets firstOpenedAt
-  // once, so this never creates a duplicate open event or misattributes an already-opened lead.
+  // Safety net: dial logging counts as Opened even if authorizeLeadCallAccess never landed.
   const { markLeadViewedByExecutive } = require('../services/leadExecutiveStallService');
   await markLeadViewedByExecutive(lead._id, req.user._id).catch(() => {});
 
-  // Category <-> outcome integrity check. The backend, not the client, is authoritative here:
-  // a raw API call must never be able to save an outcome under a category it doesn't belong to
-  // (e.g. category:'cold' + outcome:'ready_to_book'), regardless of what the client claims.
-  // This must run BEFORE any mutation below (CallNote.create, Lead.save, FollowUp, activity/audit
-  // logging) so an invalid combination is rejected atomically with zero side effects.
-  const outcomeKey = String(outcome || '');
-  const ALLOWED_CATEGORIES = ['warm', 'hot', 'cold'];
-  const hasBodyCategory = bodyCategory !== undefined && bodyCategory !== null && String(bodyCategory).trim() !== '';
-  if (hasBodyCategory && !ALLOWED_CATEGORIES.includes(String(bodyCategory))) {
-    throw new ApiError(400, `Invalid status category "${bodyCategory}" — must be one of: warm, hot, cold`);
-  }
+  const mappedOutcome = normalizeCallOutcome(rawOutcome);
+  const isCanonicalCallOutcome = CALL_OUTCOMES.includes(mappedOutcome);
 
-  // Resolve the outcome's REAL category from the admin-configurable Lead Status config — the
-  // same source of truth the frontend's option lists are built from — never a hardcoded list.
-  const { getOptionKeysByCategory } = require('../services/leadStatusConfigService');
-  const authoritativeKeys = await getOptionKeysByCategory();
   let category = null;
-  if (authoritativeKeys.hot.includes(outcomeKey)) category = 'hot';
-  else if (authoritativeKeys.cold.includes(outcomeKey)) category = 'cold';
-  else if (authoritativeKeys.warm.includes(outcomeKey)) category = 'warm';
+  let outcomeKey = rawOutcome;
 
-  if (!category) {
-    // Unknown outcome (not configured under any category) — never guess, never default to warm.
-    throw new ApiError(400, `Unknown call outcome "${outcomeKey}"`);
-  }
-  if (hasBodyCategory && String(bodyCategory) !== category) {
-    // The client's category disagrees with the outcome's authoritative category — reject.
-    throw new ApiError(
-      400,
-      `Invalid outcome for category: "${outcomeKey}" does not belong to "${bodyCategory}" (it belongs to "${category}")`
-    );
+  if (isCanonicalCallOutcome) {
+    outcomeKey = mappedOutcome;
+    const tempHint =
+      bodyTemperature ||
+      (NOT_REACHABLE_CALL_OUTCOMES.includes(mappedOutcome) ? 'cold' : 'warm');
+    category = normalizeTemperature(tempHint);
+  } else {
+    // Legacy Warm/Hot/Cold outcome keys — validate against admin config
+    const ALLOWED_CATEGORIES = ['warm', 'hot', 'cold'];
+    const hasBodyCategory =
+      bodyCategory !== undefined && bodyCategory !== null && String(bodyCategory).trim() !== '';
+    if (hasBodyCategory && !ALLOWED_CATEGORIES.includes(String(bodyCategory))) {
+      throw new ApiError(400, `Invalid status category "${bodyCategory}" — must be one of: warm, hot, cold`);
+    }
+
+    const { getOptionKeysByCategory } = require('../services/leadStatusConfigService');
+    const authoritativeKeys = await getOptionKeysByCategory();
+    if (authoritativeKeys.hot.includes(outcomeKey)) category = 'hot';
+    else if (authoritativeKeys.cold.includes(outcomeKey)) category = 'cold';
+    else if (authoritativeKeys.warm.includes(outcomeKey)) category = 'warm';
+
+    if (!category) {
+      throw new ApiError(400, `Unknown call outcome "${outcomeKey}"`);
+    }
+    if (hasBodyCategory && String(bodyCategory) !== category) {
+      throw new ApiError(
+        400,
+        `Invalid outcome for category: "${outcomeKey}" does not belong to "${bodyCategory}" (it belongs to "${category}")`
+      );
+    }
   }
 
   const startMs = startedAt ? new Date(startedAt).getTime() : NaN;
@@ -267,7 +284,6 @@ const addCallNote = asyncHandler(async (req, res) => {
 
   const role = req.user?.role;
   const isExecLike = role === 'sales_executive' || role === 'team_leader';
-  // Executives cannot set/edit duration manually — only tracked dial→return window
   let seconds = 0;
   if (fromTimestamps != null) {
     seconds = Math.max(0, fromTimestamps);
@@ -279,8 +295,8 @@ const addCallNote = asyncHandler(async (req, res) => {
     leadId: lead._id,
     branchId: lead.branchId,
     userId: req.user._id,
-    outcome,
-    notes: noteText || `Call outcome: ${String(outcome).replace(/_/g, ' ')}`,
+    outcome: outcomeKey,
+    notes: noteText || `Call outcome: ${String(outcomeKey).replace(/_/g, ' ')}`,
     duration: seconds,
     startedAt: startedAt ? new Date(startedAt) : undefined,
     endedAt: endedAt ? new Date(endedAt) : new Date(),
@@ -295,7 +311,7 @@ const addCallNote = asyncHandler(async (req, res) => {
   const prevRecent = Array.isArray(lead.callStats?.recent) ? [...lead.callStats.recent] : [];
   prevRecent.push({
     n: nextCount,
-    outcome: String(outcome || ''),
+    outcome: String(outcomeKey || ''),
     duration: seconds,
     at: now,
   });
@@ -305,39 +321,54 @@ const addCallNote = asyncHandler(async (req, res) => {
     lastCallAt: now,
     recent: prevRecent.slice(-12),
   };
+  lead.callAttempts = nextCount;
 
-  // category / outcomeKey are already validated and set above (before CallNote.create()).
+  if (mappedOutcome) lead.callOutcome = mappedOutcome;
 
   const prevStatus = lead.status;
   const reasonStamp = String(bodyStatusReason || '').trim() || outcomeKey;
+  const locked = isLockedStatus(lead.status);
 
-  if (category === 'hot') {
-    if (!['converted', 'lost', 'booked_from_another_company'].includes(lead.status)) {
-      lead.status = 'negotiation';
-    }
-    lead.temperature = 'hot';
-    lead.isHot = true;
-    lead.coldReason = undefined;
-    lead.statusReason = reasonStamp;
-  } else if (category === 'cold') {
-    if (!['converted', 'lost', 'booked_from_another_company'].includes(lead.status)) {
-      lead.status = 'follow_up';
-    }
-    lead.temperature = 'cold';
-    lead.isHot = false;
+  const nextTemp = normalizeTemperature(bodyTemperature || category || lead.temperature || 'warm');
+  lead.temperature = nextTemp;
+  lead.isHot = nextTemp === 'hot';
+  lead.statusReason = reasonStamp;
+
+  if (nextTemp === 'cold' && TERMINAL_LOST_REASONS.includes(outcomeKey) && !locked) {
+    lead.status = 'lost';
+    lead.lostReason = bodyLostReason || outcomeKey;
     lead.coldReason = outcomeKey;
-    lead.statusReason = reasonStamp;
+  } else if (nextTemp === 'cold') {
+    lead.coldReason = outcomeKey;
   } else {
-    if (!['converted', 'lost', 'booked_from_another_company'].includes(lead.status)) {
-      lead.status = outcomeKey === 'cnp_same_day' ? 'follow_up' : 'contacted';
-    }
-    lead.temperature = 'warm';
-    lead.isHot = false;
     lead.coldReason = undefined;
-    lead.statusReason = reasonStamp;
   }
+
+  // Auto: not picked on New Lead → not_reachable. Connected does not auto-qualify.
+  if (
+    !locked &&
+    (['new_lead', 'new'].includes(String(lead.status)) || lead.status === 'not_reachable') &&
+    (NOT_REACHABLE_CALL_OUTCOMES.includes(mappedOutcome) ||
+      outcomeKey === 'cnp_same_day' ||
+      mappedOutcome === 'not_picked')
+  ) {
+    lead.status = 'not_reachable';
+  }
+
+  if (!locked && bodyStatus) {
+    const nextStatus = normalizeLeadStatus(bodyStatus);
+    lead.status = nextStatus;
+    if (nextStatus === 'lost') {
+      lead.lostReason = bodyLostReason || lead.lostReason || 'other';
+      lead.temperature = 'cold';
+      lead.isHot = false;
+    }
+  }
+
   lead.statusReasonUpdatedAt = new Date();
-  const callConnected = category !== 'cold' || !['invalid_number'].includes(outcomeKey);
+  const callConnected =
+    mappedOutcome === 'connected' ||
+    (category !== 'cold' && !['invalid_number', 'wrong_number'].includes(outcomeKey));
 
   await applyLeadMetrics(lead);
   await lead.save();
@@ -394,11 +425,12 @@ const addCallNote = asyncHandler(async (req, res) => {
     leadId: lead._id,
     branchId: lead.branchId,
     type: 'call_note_added',
-    description: `Call (${seconds}s): ${outcome.replace(/_/g, ' ')}${noteText ? ` — ${noteText.slice(0, 100)}` : ''}`,
+    description: `Call (${seconds}s): ${String(outcomeKey).replace(/_/g, ' ')}${noteText ? ` — ${noteText.slice(0, 100)}` : ''}`,
     actor: req.user,
     meta: {
       callNoteId: callNote._id,
-      outcome,
+      outcome: outcomeKey,
+      callOutcome: mappedOutcome || outcomeKey,
       durationSeconds: seconds,
       statusFrom: prevStatus,
       statusTo: lead.status,
@@ -413,7 +445,7 @@ const addCallNote = asyncHandler(async (req, res) => {
     action: 'lead.call_note_added',
     actor: req.user,
     ip: getClientIp(req),
-    meta: { outcome, durationSeconds: seconds, status: lead.status, callConnected },
+    meta: { outcome: outcomeKey, durationSeconds: seconds, status: lead.status, callConnected },
   });
 
   const populated = await CallNote.findById(callNote._id).populate('userId', 'name role').lean();

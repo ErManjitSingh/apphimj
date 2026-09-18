@@ -65,24 +65,32 @@ const INTERESTED_STATUSES = [
   'contacted',
   'working_progress',
   'qualified',
-  'quotation_sent',
+  'quotation_sent', 'package_sent',
   'follow_up',
   'reactivated',
+  'not_reachable',
 ];
 const LOST_STATUSES = ['lost', 'booked_from_another_company'];
 /**
  * Connected = only status `contacted` (call picked).
  * WIP / qualified / quote / follow-up / converted are separate KPIs — must match list filter status=contacted.
  */
-const CONNECTED_STATUSES = ['contacted'];
+const CONNECTED_STATUSES = ['contacted', 'qualified'];
 const QUALIFIED_FUNNEL_STATUSES = [
   'qualified',
-  'quotation_sent',
+  'quotation_sent', 'package_sent',
   'follow_up',
   'negotiation',
-  'converted',
+  'converted', 'booked',
 ];
-const QUOTATION_FUNNEL_STATUSES = ['quotation_sent', 'follow_up', 'negotiation', 'converted'];
+const QUOTATION_FUNNEL_STATUSES = ['quotation_sent', 'package_sent', 'follow_up', 'negotiation', 'converted', 'booked'];
+
+function bookedCount(statusCounts = {}) {
+  return (statusCounts.converted || 0) + (statusCounts.booked || 0);
+}
+function packageSentCount(statusCounts = {}) {
+  return (statusCounts.quotation_sent || 0) + (statusCounts.package_sent || 0);
+}
 
 function sumStatusCounts(statusCounts = {}, keys = []) {
   return keys.reduce((sum, key) => sum + (statusCounts[key] || 0), 0);
@@ -152,7 +160,7 @@ async function buildDestinationWiseStats(leadScope, period = 'all', rangeOverrid
         destination: { $first: '$destinationName' },
         total: { $sum: 1 },
         converted: {
-          $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] },
+          $sum: { $cond: [{ $in: ['$status', ['converted', 'booked']] }, 1, 0] },
         },
         active: {
           $sum: {
@@ -287,8 +295,8 @@ function mapStatusBucket(statusCounts) {
   const qualified = sumStatusCounts(statusCounts, QUALIFIED_FUNNEL_STATUSES);
   const quotations = sumStatusCounts(statusCounts, QUOTATION_FUNNEL_STATUSES);
   const lost = LOST_STATUSES.reduce((s, k) => s + (statusCounts[k] || 0), 0);
-  const conversions = statusCounts.converted || 0;
-  const workingProgress = statusCounts.working_progress || 0;
+  const conversions = bookedCount(statusCounts);
+  const workingProgress = (statusCounts.working_progress || 0) + (statusCounts.follow_up || 0);
   return {
     fresh,
     followUpPending,
@@ -372,7 +380,7 @@ function buildExclusiveStatusDistribution(statusCounts = {}) {
     { name: 'Follow-up', key: 'follow_up', color: '#8B5CF6', pick: (c) => c.follow_up || 0 },
     { name: 'Negotiation', key: 'negotiation', color: '#F59E0B', pick: (c) => c.negotiation || 0 },
     { name: 'Reactivated', key: 'reactivated', color: '#14B8A6', pick: (c) => c.reactivated || 0 },
-    { name: 'Booking', key: 'converted', color: '#059669', pick: (c) => c.converted || 0 },
+    { name: 'Booking', key: 'converted', color: '#059669', pick: (c) => (c.converted || 0) + (c.booked || 0) },
     {
       name: 'Lost',
       key: 'lost',
@@ -595,7 +603,7 @@ async function buildAdminDashboard(options = {}) {
     Lead.countDocuments(
       activeLeadScope({ createdAt: { $gte: yesterdayStart, $lte: yesterdayEnd } }, branchId)
     ),
-    Lead.countDocuments(activeLeadScope({ status: 'converted' }, branchId)),
+    Lead.countDocuments(activeLeadScope({ status: { $in: ['converted', 'booked'] } }, branchId)),
     Lead.countDocuments(activeLeadScope({ status: { $in: LOST_STATUSES } }, branchId)),
     FollowUp.countDocuments(withBranch({ status: 'pending' }, branchId)),
     FollowUp.countDocuments({
@@ -615,7 +623,7 @@ async function buildAdminDashboard(options = {}) {
             },
           },
           bookings: {
-            $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] },
+            $sum: { $cond: [{ $in: ['$status', ['converted', 'booked']] }, 1, 0] },
           },
         },
       },
@@ -650,7 +658,7 @@ async function buildAdminDashboard(options = {}) {
       .limit(5)
       .lean(),
     Lead.aggregate([
-      { $match: withBranch({ status: 'converted', assignedTo: { $ne: null } }, branchId) },
+      { $match: withBranch({ status: { $in: ['converted', 'booked'] }, assignedTo: { $ne: null } }, branchId) },
       {
         $group: {
           _id: '$assignedTo',
@@ -687,7 +695,7 @@ async function buildAdminDashboard(options = {}) {
             },
           },
           bookings: {
-            $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] },
+            $sum: { $cond: [{ $in: ['$status', ['converted', 'booked']] }, 1, 0] },
           },
         },
       },
@@ -713,7 +721,7 @@ async function buildAdminDashboard(options = {}) {
       {
         $match: activeLeadScope(
           {
-            status: 'converted',
+            status: { $in: ['converted', 'booked'] },
             createdAt: { $gte: trendStart, $lte: periodEnd },
             ...sourceFilter,
           },
@@ -807,7 +815,7 @@ async function buildAdminDashboard(options = {}) {
           name: { $first: '$destination' },
           queries: { $sum: 1 },
           conversions: {
-            $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] },
+            $sum: { $cond: [{ $in: ['$status', ['converted', 'booked']] }, 1, 0] },
           },
         },
       },
@@ -898,10 +906,10 @@ async function buildAdminDashboard(options = {}) {
                     'contacted',
                     'working_progress',
                     'qualified',
-                    'quotation_sent',
+                    'quotation_sent', 'package_sent',
                     'follow_up',
                     'negotiation',
-                    'converted',
+                    'converted', 'booked',
                   ],
                 ],
               },
@@ -916,7 +924,7 @@ async function buildAdminDashboard(options = {}) {
               {
                 $in: [
                   '$status',
-                  ['qualified', 'quotation_sent', 'follow_up', 'negotiation', 'converted'],
+                  ['qualified', 'quotation_sent', 'package_sent', 'follow_up', 'negotiation', 'converted', 'booked'],
                 ],
               },
               1,
@@ -927,14 +935,14 @@ async function buildAdminDashboard(options = {}) {
         quotationLeads: {
           $sum: {
             $cond: [
-              { $in: ['$status', ['quotation_sent', 'follow_up', 'negotiation', 'converted']] },
+              { $in: ['$status', ['quotation_sent', 'package_sent', 'follow_up', 'negotiation', 'converted', 'booked']] },
               1,
               0,
             ],
           },
         },
         convertedLeads: {
-          $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] },
+          $sum: { $cond: [{ $in: ['$status', ['converted', 'booked']] }, 1, 0] },
         },
       },
     },
@@ -1467,13 +1475,13 @@ async function buildExecutiveDashboard(userId, options = {}) {
         ...leadScope,
         isDeleted: { $ne: true },
         isRepeatCustomer: { $ne: true },
-        status: { $nin: ['lost', 'booked_from_another_company', 'converted'] },
+        status: { $nin: ['lost', 'booked_from_another_company', 'converted', 'booked'] },
       }
     : {
         ...leadScope,
         isDeleted: { $ne: true },
         isRepeatCustomer: { $ne: true },
-        status: { $nin: ['lost', 'booked_from_another_company', 'converted'] },
+        status: { $nin: ['lost', 'booked_from_another_company', 'converted', 'booked'] },
         ...periodTouch,
       };
   const freshLeadScope = isAllTime
@@ -1492,19 +1500,19 @@ async function buildExecutiveDashboard(userId, options = {}) {
     ? {
         ...leadScope,
         isHot: true,
-        status: { $nin: ['converted', 'lost', 'booked_from_another_company'] },
+        status: { $nin: ['converted', 'booked', 'lost', 'booked_from_another_company'] },
       }
     : {
         ...leadScope,
         isHot: true,
-        status: { $nin: ['converted', 'lost', 'booked_from_another_company'] },
+        status: { $nin: ['converted', 'booked', 'lost', 'booked_from_another_company'] },
         ...periodTouch,
       };
   const convertedScope = isAllTime
-    ? { ...leadScope, status: 'converted' }
+    ? { ...leadScope, status: { $in: ['converted', 'booked'] } }
     : {
         ...leadScope,
-        status: 'converted',
+        status: { $in: ['converted', 'booked'] },
         $or: [
           { convertedAt: { $gte: periodStart, $lte: periodEnd } },
           {
@@ -1659,7 +1667,7 @@ async function buildExecutiveDashboard(userId, options = {}) {
     Lead.countDocuments({
       ...leadScope,
       isHot: true,
-      status: { $nin: ['converted', 'lost', 'booked_from_another_company'] },
+      status: { $nin: ['converted', 'booked', 'lost', 'booked_from_another_company'] },
       ...prevTouch,
     }),
     Quotation.countDocuments({
@@ -1669,7 +1677,7 @@ async function buildExecutiveDashboard(userId, options = {}) {
     }),
     Lead.countDocuments({
       ...leadScope,
-      status: 'converted',
+      status: { $in: ['converted', 'booked'] },
       $or: [
         { convertedAt: { $gte: prevStart, $lte: prevEnd } },
         {
@@ -1696,7 +1704,7 @@ async function buildExecutiveDashboard(userId, options = {}) {
       {
         $match: {
           ...leadScope,
-          status: 'converted',
+          status: { $in: ['converted', 'booked'] },
           $or: [
             { convertedAt: { $gte: chartStart, $lte: periodEnd } },
             {
@@ -1739,7 +1747,7 @@ async function buildExecutiveDashboard(userId, options = {}) {
     Lead.find({
       ...leadScope,
       coldCallPending: true,
-      status: { $nin: ['lost', 'booked_from_another_company', 'converted'] },
+      status: { $nin: ['lost', 'booked_from_another_company', 'converted', 'booked'] },
     })
       .select('leadId name phone destination assignedTo coldReason coldCallReminderAt coldCallFollowUpId')
       .sort({ coldCallReminderAt: 1 })
@@ -1951,7 +1959,7 @@ async function buildSalesManagerDashboard(options = {}) {
     Lead.countDocuments(withBranch({}, branchId)),
     Lead.countDocuments(withBranch({ createdAt: { $gte: todayStart, $lte: todayEnd } }, branchId)),
     FollowUp.countDocuments(withBranch({ status: 'pending' }, branchId)),
-    Lead.countDocuments(withBranch({ status: 'converted' }, branchId)),
+    Lead.countDocuments(withBranch({ status: { $in: ['converted', 'booked'] } }, branchId)),
     Lead.countDocuments(withBranch({ status: 'working_progress' }, branchId)),
     Quotation.find(withBranch({ status: { $in: ['sent', 'negotiation', 'pending_approval'] } }, branchId))
       .populate('lead', 'name destination')
@@ -1984,7 +1992,7 @@ async function buildSalesManagerDashboard(options = {}) {
     executives.map(async (ex) => {
       const [exLeads, exConverted, exRevenue] = await Promise.all([
         Lead.countDocuments({ assignedTo: ex._id }),
-        Lead.countDocuments({ assignedTo: ex._id, status: 'converted' }),
+        Lead.countDocuments({ assignedTo: ex._id, status: { $in: ['converted', 'booked'] } }),
         sumConvertedPackageRevenue({ assigneeId: ex._id, branchId }),
       ]);
       return {
@@ -2047,7 +2055,7 @@ async function buildSalesManagerDashboard(options = {}) {
         _id: { month: { $month: '$createdAt' } },
         total: { $sum: 1 },
         converted: {
-          $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] },
+          $sum: { $cond: [{ $in: ['$status', ['converted', 'booked']] }, 1, 0] },
         },
       },
     },
@@ -2161,7 +2169,7 @@ async function buildTeamRevenueWeekSeries({ branchId } = {}) {
     { $unwind: '$leadDoc' },
     {
       $match: {
-        'leadDoc.status': 'converted',
+        'leadDoc.status': { $in: ['converted', 'booked'] },
         updatedAt: { $gte: monday, $lte: sundayEnd },
         ...(branchId ? { 'leadDoc.branchId': branchId } : {}),
       },
@@ -2215,7 +2223,7 @@ async function buildTeamLeaderDashboard(leaderId, options = {}) {
             { $match: { status: { $nin: ['lost', 'booked_from_another_company'] } } },
             { $count: 'n' },
           ],
-          converted: [{ $match: { status: 'converted' } }, { $count: 'n' }],
+          converted: [{ $match: { status: { $in: ['converted', 'booked'] } } }, { $count: 'n' }],
           workingProgress: [{ $match: { status: 'working_progress' } }, { $count: 'n' }],
           new: [{ $match: { status: 'new' } }, { $count: 'n' }],
           contacted: [{ $match: { status: 'contacted' } }, { $count: 'n' }],
@@ -2223,13 +2231,13 @@ async function buildTeamLeaderDashboard(leaderId, options = {}) {
             { $match: { status: { $in: ['follow_up', 'negotiation'] } } },
             { $count: 'n' },
           ],
-          quotation: [{ $match: { status: 'quotation_sent' } }, { $count: 'n' }],
+          quotation: [{ $match: { status: { $in: ['quotation_sent', 'package_sent'] } } }, { $count: 'n' }],
           byAssignee: [
             {
               $group: {
                 _id: '$assignedTo',
                 assignedLeads: { $sum: 1 },
-                conversions: { $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] } },
+                conversions: { $sum: { $cond: [{ $in: ['$status', ['converted', 'booked']] }, 1, 0] } },
               },
             },
           ],
@@ -2248,7 +2256,7 @@ async function buildTeamLeaderDashboard(leaderId, options = {}) {
 
   const facet = facetResult[0] || {};
   const totalLeads = facetCount(facet, 'total');
-  const convertedCount = facetCount(facet, 'converted');
+  const convertedCount = facetCount(facet, 'converted') + facetCount(facet, 'booked');
   const activeLeads = facetCount(facet, 'active');
   const leadIds = (facet.leadIds || []).map((l) => l._id);
   const conversionRate = totalLeads
@@ -2313,7 +2321,7 @@ async function buildTeamLeaderDashboard(leaderId, options = {}) {
         count: facetCount(facet, 'quotation'),
         fill: '#0EA5E9',
       },
-      { stage: 'Converted', count: convertedCount, fill: '#10B981' },
+      { stage: 'converted', count: convertedCount, fill: '#10B981' },
     ],
     leadSources: sourceAgg.map((s) => ({
       source: s._id || 'Other',
@@ -2333,7 +2341,7 @@ async function buildReportsAnalytics(options = {}) {
   const leadDate = isAllTime ? {} : { createdAt: { $gte: periodStart, $lte: periodEnd } };
   const payDate = isAllTime ? {} : { paidAt: { $gte: periodStart, $lte: periodEnd } };
   const leadScope = withBranch({ ...leadDate }, branchId);
-  const convertedScope = withBranch({ ...leadDate, status: 'converted' }, branchId);
+  const convertedScope = withBranch({ ...leadDate, status: { $in: ['converted', 'booked'] } }, branchId);
   const payScope = withBranch({ status: { $in: ['paid', 'partial'] }, ...payDate }, branchId);
   const [
     totalLeads,
@@ -2359,10 +2367,10 @@ async function buildReportsAnalytics(options = {}) {
           _id: '$source',
           leads: { $sum: 1 },
           conversions: {
-            $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] },
+            $sum: { $cond: [{ $in: ['$status', ['converted', 'booked']] }, 1, 0] },
           },
           revenue: {
-            $sum: { $cond: [{ $eq: ['$status', 'converted'] }, '$budget', 0] },
+            $sum: { $cond: [{ $in: ['$status', ['converted', 'booked']] }, '$budget', 0] },
           },
         },
       },
@@ -2375,10 +2383,10 @@ async function buildReportsAnalytics(options = {}) {
           _id: '$destination',
           leads: { $sum: 1 },
           conversions: {
-            $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] },
+            $sum: { $cond: [{ $in: ['$status', ['converted', 'booked']] }, 1, 0] },
           },
           revenue: {
-            $sum: { $cond: [{ $eq: ['$status', 'converted'] }, '$budget', 0] },
+            $sum: { $cond: [{ $in: ['$status', ['converted', 'booked']] }, '$budget', 0] },
           },
         },
       },
@@ -2408,7 +2416,7 @@ async function buildReportsAnalytics(options = {}) {
       const [assignedLeads, followUpsDone, conversions, revenue] = await Promise.all([
         Lead.countDocuments({ assignedTo: ex._id, ...leadDate }),
         FollowUp.countDocuments({ assignedTo: ex._id, status: 'completed' }),
-        Lead.countDocuments({ assignedTo: ex._id, status: 'converted', ...leadDate }),
+        Lead.countDocuments({ assignedTo: ex._id, status: { $in: ['converted', 'booked'] }, ...leadDate }),
         sumConvertedPackageRevenue({ assigneeId: ex._id, branchId }),
       ]);
       const rev = revenue;
@@ -2430,27 +2438,36 @@ async function buildReportsAnalytics(options = {}) {
   const statusMap = Object.fromEntries(statusAgg.map((s) => [s._id, s.count]));
   const funnelStages = [
     { stage: 'Lead Created', key: null },
-    { stage: 'Connected', key: 'contacted' },
+    { stage: 'Qualified', key: 'qualified' },
     { stage: 'Follow Up', key: 'follow_up' },
-    { stage: 'Quotation Sent', key: 'quotation_sent' },
-    { stage: 'Converted', key: 'converted' },
+    { stage: 'Package Sent', key: 'package_sent' },
+    { stage: 'Booked', key: 'booked' },
   ];
 
   const funnel = funnelStages.map((f) => {
     let count = totalLeads;
-    if (f.key === 'contacted') {
+    if (f.key === 'qualified') {
       count =
+        (statusMap.qualified || 0) +
         (statusMap.contacted || 0) +
         (statusMap.follow_up || 0) +
         (statusMap.quotation_sent || 0) +
+        (statusMap.package_sent || 0) +
         (statusMap.negotiation || 0) +
         convertedLeads;
     } else if (f.key === 'follow_up') {
       count =
-        (statusMap.follow_up || 0) + (statusMap.negotiation || 0) + convertedLeads;
-    } else if (f.key === 'quotation_sent') {
-      count = (statusMap.quotation_sent || 0) + (statusMap.negotiation || 0) + convertedLeads;
-    } else if (f.key === 'converted') {
+        (statusMap.follow_up || 0) +
+        (statusMap.negotiation || 0) +
+        (statusMap.package_sent || 0) +
+        (statusMap.quotation_sent || 0) +
+        convertedLeads;
+    } else if (f.key === 'package_sent') {
+      count =
+        (statusMap.package_sent || 0) +
+        (statusMap.quotation_sent || 0) +
+        convertedLeads;
+    } else if (f.key === 'booked' || f.key === 'converted') {
       count = convertedLeads;
     }
     return {
@@ -2543,7 +2560,7 @@ async function buildTeamPerformance(options = {}) {
     executives.map(async (ex) => {
       const [assigned, converted, followUps, revenue] = await Promise.all([
         Lead.countDocuments({ assignedTo: ex._id }),
-        Lead.countDocuments({ assignedTo: ex._id, status: 'converted' }),
+        Lead.countDocuments({ assignedTo: ex._id, status: { $in: ['converted', 'booked'] } }),
         FollowUp.countDocuments({ assignedTo: ex._id, status: 'pending' }),
         sumConvertedPackageRevenue({ assigneeId: ex._id, branchId }),
       ]);
@@ -2634,7 +2651,7 @@ async function buildDestinationInsight(options = {}) {
         leads: {
           $sum: {
             $cond: [
-              { $in: ['$status', ['lost', 'booked_from_another_company', 'converted']] },
+              { $in: ['$status', ['lost', 'booked_from_another_company', 'converted', 'booked']] },
               0,
               1,
             ],
@@ -2709,7 +2726,7 @@ async function buildExecutiveInsight(options = {}) {
           leads: {
             $sum: {
               $cond: [
-                { $in: ['$status', ['lost', 'booked_from_another_company', 'converted']] },
+                { $in: ['$status', ['lost', 'booked_from_another_company', 'converted', 'booked']] },
                 0,
                 1,
               ],

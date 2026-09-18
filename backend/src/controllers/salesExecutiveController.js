@@ -65,7 +65,26 @@ const {
   findScopedQuotationsPaginated,
 } = require('../repositories/roleScopedRepository');
 
-const LEAD_FILTER_KEYS = ['new', 'contacted', 'working-progress', 'follow-up', 'hot', 'converted', 'lost', 'reactivated', 'all', 'package-shared', 'duplicates', 'repeated'];
+const LEAD_FILTER_KEYS = [
+  'new',
+  'new_lead',
+  'not_reachable',
+  'qualified',
+  'package_sent',
+  'package-shared',
+  'contacted',
+  'working-progress',
+  'follow-up',
+  'hot',
+  'converted',
+  'booked',
+  'postponed',
+  'lost',
+  'reactivated',
+  'all',
+  'duplicates',
+  'repeated',
+];
 
 const {
   hasExtraDiscountRequest,
@@ -113,7 +132,7 @@ function assertResubmissionReasonIfNeeded(status, reason, pricing = null) {
 }
 
 function buildExecutiveLeadFilter(filter) {
-  if (filter === 'new') {
+  if (filter === 'new' || filter === 'new_lead') {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
     const end = new Date();
@@ -122,14 +141,26 @@ function buildExecutiveLeadFilter(filter) {
       $or: [
         { createdAt: { $gte: start, $lte: end } },
         { assignedAt: { $gte: start, $lte: end } },
+        { status: { $in: ['new', 'new_lead'] } },
       ],
     };
   }
-  if (filter === 'contacted') return { status: 'contacted' };
-  if (filter === 'working-progress' || filter === 'working_progress') return { status: 'working_progress' };
+  if (filter === 'not_reachable') return { status: 'not_reachable' };
+  if (filter === 'qualified') return { status: { $in: ['qualified', 'contacted'] } };
+  if (filter === 'contacted') return { status: { $in: ['contacted', 'qualified'] } };
+  if (filter === 'working-progress' || filter === 'working_progress') {
+    return { status: { $in: ['working_progress', 'follow_up'] } };
+  }
   if (filter === 'follow-up') return { status: { $in: ['follow_up', 'negotiation'] } };
-  if (filter === 'converted') return { status: 'converted' };
+  if (filter === 'package_sent' || filter === 'package-shared') {
+    return { status: { $in: ['package_sent', 'quotation_sent'] } };
+  }
+  if (filter === 'converted' || filter === 'booked') {
+    return { status: { $in: ['booked', 'converted'] } };
+  }
+  if (filter === 'postponed') return { status: 'postponed' };
   if (filter === 'lost') return { status: { $in: ['lost', 'booked_from_another_company'] } };
+  if (filter === 'reactivated') return { 'reactivation.isReactivated': true };
   return {};
 }
 
@@ -358,7 +389,7 @@ const updateLead = asyncHandler(async (req, res) => {
         );
       }
     }
-    if (status === 'converted') {
+    if (status === 'converted' || status === 'booked') {
       // Sales Executive conversion no longer requires payment proof — just the deal numbers.
       // Remaining amount is always derived server-side (totalCost - token), never trusted from
       // the client.
@@ -382,21 +413,29 @@ const updateLead = asyncHandler(async (req, res) => {
     const prevTemperature = String(lead.temperature || '').toLowerCase();
     const prevReason = String(lead.statusReason || '').trim();
 
-    const nextStatus = status;
+    const { normalizeLeadStatus } = require('../constants/leadPipeline');
+    const nextStatus = normalizeLeadStatus(status);
     const nextReason = trimmedReason;
 
     lead.status = nextStatus;
-    if (nextStatus === 'converted' && prevStatus !== 'converted' && !lead.convertedAt) {
+    if (
+      (nextStatus === 'converted' || nextStatus === 'booked') &&
+      prevStatus !== 'converted' &&
+      prevStatus !== 'booked' &&
+      !lead.convertedAt
+    ) {
       lead.convertedAt = new Date();
+      lead.bookingDate = lead.convertedAt;
     }
 
-    if (['lost', 'booked_from_another_company'].includes(nextStatus)) {
+    if (['lost', 'booked_from_another_company'].includes(nextStatus) || nextStatus === 'lost') {
       const { assertValidLostReason, lostReasonLabel } = require('../services/salesSopService');
       const reasonValue = assertValidLostReason(
-        nextReason || (nextStatus === 'booked_from_another_company' ? 'booked_elsewhere' : ''),
+        nextReason || lead.lostReason || (nextStatus === 'booked_from_another_company' ? 'booked_elsewhere' : ''),
         { requireComment: true }
       );
       lead.statusReason = reasonValue;
+      lead.lostReason = reasonValue;
       req._lostReasonLabel = lostReasonLabel(reasonValue);
     } else {
       lead.statusReason = nextReason;
@@ -412,13 +451,25 @@ const updateLead = asyncHandler(async (req, res) => {
       lead.temperature = 'hot';
       lead.isHot = true;
       lead.coldReason = undefined;
-    } else if (req.body.temperature === 'warm' || nextStatus === 'working_progress') {
+    } else if (req.body.temperature === 'warm') {
       lead.temperature = 'warm';
       lead.isHot = false;
       lead.coldReason = undefined;
     } else if (typeof req.body.isHot === 'boolean') {
       lead.isHot = req.body.isHot;
     }
+
+    if (req.body.callOutcome) {
+      const { normalizeCallOutcome } = require('../constants/leadPipeline');
+      lead.callOutcome = normalizeCallOutcome(req.body.callOutcome) || req.body.callOutcome;
+    }
+    if (req.body.lostReason) lead.lostReason = String(req.body.lostReason).trim();
+    if (req.body.postponedReason) lead.postponedReason = String(req.body.postponedReason).trim();
+    if (req.body.postponedAt) {
+      const d = new Date(req.body.postponedAt);
+      if (!Number.isNaN(d.getTime())) lead.postponedAt = d;
+    }
+    if (nextStatus === 'postponed' && !lead.postponedAt) lead.postponedAt = new Date();
 
     await lead.save();
 
@@ -427,7 +478,9 @@ const updateLead = asyncHandler(async (req, res) => {
         lost: 'lead_lost',
         booked_from_another_company: 'lead_lost',
         converted: 'lead_converted',
+        booked: 'lead_converted',
         quotation_sent: 'quotation_sent',
+        package_sent: 'quotation_sent',
         reactivated: 'lead_reactivated',
         working_progress: 'status_changed',
       };
@@ -831,7 +884,7 @@ const createQuotation = asyncHandler(async (req, res) => {
   await quotation.save();
 
   if ((status === 'pending_approval' || status === 'approved') && lead.status === 'new') {
-    lead.status = 'quotation_sent';
+    lead.status = 'package_sent';
     await lead.save();
   }
 
@@ -1114,8 +1167,8 @@ const listCustomers = asyncHandler(async (req, res) => {
       destination: l.destination,
       trips: l.isRepeatCustomer ? 2 : 1,
       totalSpent: l.budget,
-      packageShared: l.status === 'quotation_sent' || sharedIds.some((id) => String(id) === String(l._id)),
-      converted: l.status === 'converted',
+      packageShared: ['package_sent', 'quotation_sent'].includes(l.status) || sharedIds.some((id) => String(id) === String(l._id)),
+      converted: l.status === 'converted' || l.status === 'booked',
     }))
   );
 });

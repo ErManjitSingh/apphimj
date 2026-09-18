@@ -26,7 +26,7 @@ async function countHotLeads(extra = {}, branchId = null) {
   return Lead.countDocuments({
     ...withBranch(extra, branchId),
     isHot: true,
-    status: { $nin: ['converted', 'lost', 'booked_from_another_company'] },
+    status: { $nin: ['converted', 'booked', 'lost', 'booked_from_another_company'] },
   });
 }
 

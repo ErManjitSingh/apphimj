@@ -1,23 +1,23 @@
 export const LEAD_STATUSES = [
-  { value: 'warm', label: 'Warm', meaning: 'Package discussed / callback / CNP / negotiation' },
-  { value: 'hot', label: 'Hot', meaning: 'Ready to Book' },
-  { value: 'cold', label: 'Cold', meaning: 'Not converting / language / budget / invalid' },
-  { value: 'converted', label: 'Converted', meaning: 'Customer confirmed / paid — booking started' },
+  { value: 'hot', label: 'Hot', meaning: 'Booking ke close' },
+  { value: 'warm', label: 'Warm', meaning: 'Interested, decision pending' },
+  { value: 'cold', label: 'Cold', meaning: 'Low intent / unclear timeline' },
 ];
 
-/** Internal pipeline values still stored on Lead.status (do not show in UI pickers) */
+/** Sales pipeline stages (Lead.status) — independent of temperature */
 export const PIPELINE_LEAD_STATUSES = [
-  { value: 'new', label: 'New' },
-  { value: 'contacted', label: 'Contacted' },
-  { value: 'working_progress', label: 'Working in Progress' },
+  { value: 'new_lead', label: 'New Lead' },
+  { value: 'not_reachable', label: 'Not Reachable' },
   { value: 'qualified', label: 'Qualified' },
-  { value: 'quotation_sent', label: 'Quotation' },
+  { value: 'package_sent', label: 'Package Sent' },
   { value: 'follow_up', label: 'Follow-up' },
-  { value: 'converted', label: 'Converted' },
+  { value: 'booked', label: 'Booked' },
+  { value: 'postponed', label: 'Postponed' },
   { value: 'lost', label: 'Lost' },
-  { value: 'negotiation', label: 'Negotiation' },
-  { value: 'reactivated', label: 'Reactivated' },
-  { value: 'booked_from_another_company', label: 'Booked Elsewhere' },
+  // legacy aliases (filters may still receive these before migrate)
+  { value: 'new', label: 'New Lead' },
+  { value: 'converted', label: 'Booked' },
+  { value: 'quotation_sent', label: 'Package Sent' },
 ];
 
 /** Stored source keys — display uses short labels via getLeadSourceShortLabel */
@@ -62,7 +62,7 @@ export const pageConfig = {
   '/leads/inbox/new': {
     title: 'New Leads',
     subtitle: 'Fresh inquiries awaiting first contact',
-    status: 'new',
+    status: 'new_lead',
     assignee: '',
   },
   '/leads/new-leads': { title: "Today's Leads", subtitle: 'Inquiries received today', status: '', assignee: '', todayOnly: true },
@@ -87,15 +87,15 @@ export const pageConfig = {
     assignee: 'unassigned',
   },
   '/leads/assigned': { title: 'Assigned Leads', subtitle: 'Leads assigned to team members', status: '', assignee: 'assigned' },
-  '/leads/converted': { title: 'Bookings', subtitle: 'Confirmed / paid customers', status: 'converted', assignee: '' },
+  '/leads/converted': { title: 'Bookings', subtitle: 'Confirmed / paid customers', status: 'booked', assignee: '' },
   '/leads/arrivals': {
     title: 'Arrivals',
-    subtitle: 'Converted leads by travel / arrival date',
-    status: 'converted',
+    subtitle: 'Booked leads by travel / arrival date',
+    status: 'booked',
     assignee: '',
     listFilter: 'arrivals',
   },
-  '/leads/lost': { title: 'Cold Leads', subtitle: 'Not converting', status: '', assignee: '', listFilter: '', listStatus: 'cold' },
+  '/leads/lost': { title: 'Lost Leads', subtitle: 'Closed as lost', status: 'lost', assignee: '', listFilter: '', listStatus: '' },
   '/leads/duplicates': {
     title: 'Repeated Leads',
     subtitle: 'Leads sharing the same phone number',

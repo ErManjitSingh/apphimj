@@ -2,7 +2,7 @@ const Lead = require('../models/Lead');
 const { computeFirstContactDeadline } = require('./salesSopService');
 
 const STALL_MINUTES = 20;
-const TERMINAL_STATUSES = ['lost', 'booked_from_another_company', 'converted'];
+const TERMINAL_STATUSES = ['lost', 'booked_from_another_company', 'booked', 'converted'];
 
 function stampExecutiveAssignment(target = {}) {
   const now = new Date();

@@ -21,6 +21,7 @@ import {
 import { setLeadStatusOptionsFromApi } from '../../lib/leadStatusOptionsStore';
 import { toast } from '../../context/ToastContext';
 import { cn } from '../../lib/utils';
+import { LEAD_PIPELINE_STATUSES } from '../../lib/leadPipeline';
 
 const CATEGORIES = [
   {
@@ -212,9 +213,9 @@ export default function LeadStatusesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Lead Status Control"
-        description="Add, rename, reorder, or disable Warm / Hot / Cold options. Changes apply across CRM, WhatsApp, and follow-ups."
-        breadcrumbs={['Settings', 'Lead Status']}
+        title="Lead Temperature Labels"
+        description="Temperature outcome labels (Hot / Warm / Cold). Pipeline stages are separate: New Lead → Booked."
+        breadcrumbs={['Settings', 'Lead Temperature']}
         actions={(
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="ghost" onClick={handleReset} disabled={saving || loading}>
@@ -228,6 +229,16 @@ export default function LeadStatusesPage() {
           </div>
         )}
       />
+
+      <div className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
+        <p className="font-bold">Pipeline statuses (system)</p>
+        <p className="mt-1 text-violet-800/90">
+          {LEAD_PIPELINE_STATUSES.map((s) => s.label).join(' → ')}
+        </p>
+        <p className="mt-1 text-xs text-violet-700">
+          This page only manages temperature outcome labels. Agents set Status + Temperature separately on each lead.
+        </p>
+      </div>
 
       <div className="rounded-2xl border border-orange-200/80 bg-orange-50/50 px-4 py-3 text-sm text-orange-900">
         <p className="font-semibold inline-flex items-center gap-2">
