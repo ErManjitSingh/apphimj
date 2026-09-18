@@ -455,9 +455,6 @@ export default function Leads() {
           onSubmit={handleBulkStatus}
         />
       )}
-
-      {isAdmin && (
-      )}
     </div>
   );
 }
