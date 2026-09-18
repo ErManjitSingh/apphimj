@@ -32,6 +32,7 @@ import {
   WhatsAppLeads,
   Packages,
   HotelControlPage,
+  HotelEditPage,
   Quotations,
   Reports,
   Team,
@@ -259,6 +260,8 @@ function App() {
                   />
                   <Route path="packages" element={<Packages />} />
                   <Route path="hotel-control" element={<HotelControlPage />} />
+                  <Route path="hotel-control/new" element={<HotelEditPage />} />
+                  <Route path="hotel-control/:id/edit" element={<HotelEditPage />} />
                   <Route
                     path="customers"
                     element={<ExecutiveCustomersPage />}
@@ -916,6 +919,22 @@ function App() {
                     element={
                       <PermissionRoute module="packages">
                         <HotelControlPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="hotel-control/new"
+                    element={
+                      <PermissionRoute module="packages">
+                        <HotelEditPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="hotel-control/:id/edit"
+                    element={
+                      <PermissionRoute module="packages">
+                        <HotelEditPage />
                       </PermissionRoute>
                     }
                   />

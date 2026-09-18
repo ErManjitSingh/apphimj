@@ -1,10 +1,33 @@
 const mongoose = require('mongoose');
 
+const mealRateSchema = new mongoose.Schema(
+  {
+    ep: { type: Number, default: 0 },
+    cp: { type: Number, default: 0 },
+    map: { type: Number, default: 0 },
+    ap: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
 const roomTypeSchema = new mongoose.Schema(
   {
     name: { type: String, trim: true, required: true },
     maxOccupancy: { type: Number, default: 2 },
     baseRate: { type: Number, default: 0 },
+    bedType: { type: String, trim: true, default: '' },
+    mealPlan: { type: String, trim: true, default: '' },
+    rates: {
+      ep: { type: Number, default: 0 },
+      cp: { type: Number, default: 0 },
+      map: { type: Number, default: 0 },
+      ap: { type: Number, default: 0 },
+      onSeason: { type: mealRateSchema, default: () => ({}) },
+      offSeason: { type: mealRateSchema, default: () => ({}) },
+    },
+    extraBedRate: { type: Number, default: 0 },
+    images: { type: [String], default: [] },
+    sourceRoomId: { type: String, default: null },
   },
   { _id: false }
 );

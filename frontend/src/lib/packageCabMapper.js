@@ -74,16 +74,18 @@ export function resolvePackageCabs(source = {}) {
   );
 }
 
-/** Absolute trip fare for a package cab. */
+/** Absolute trip fare for a package cab (manual fareOverride wins). */
 export function resolveCabAbsoluteFare(cab = null, packageCabs = []) {
   const cabs = Array.isArray(packageCabs) ? packageCabs : [];
   const defaultCab = cabs.find((c) => c.isDefault) || cabs[0] || null;
   const fare = Math.max(
     0,
     Number(
-      cab?.absoluteFare ??
+      cab?.fareOverride ??
+        cab?.absoluteFare ??
         cab?.totalAmount ??
         cab?.cost ??
+        defaultCab?.fareOverride ??
         defaultCab?.absoluteFare ??
         defaultCab?.totalAmount ??
         0

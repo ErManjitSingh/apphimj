@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   BedDouble,
   Building2,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   Heart,
   ImageIcon,
@@ -23,13 +26,10 @@ import {
   Waves,
   Coffee,
   Mountain,
-  X,
 } from 'lucide-react';
 import API from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { canAccess } from '../lib/permissions';
-import { Button } from '../components/ui/button';
-import AppModal from '../components/ui/AppModal';
 import {
   DropdownMenuRoot,
   DropdownMenuTrigger,
@@ -37,24 +37,27 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from '../components/ui/dropdown-menu';
-import { HOTEL_CATEGORIES, MEAL_PLANS } from '../components/quotations/constants';
 import { formatINR } from '../components/quotations/quotationUtils';
 import { cn } from '../lib/utils';
 
-const EMPTY_FORM = {
-  name: '',
-  destination: '',
-  location: '',
-  category: '4 Star',
-  starRating: '4',
-  roomType: 'Deluxe',
-  mealPlan: 'MAP (Breakfast + Dinner)',
-  price: '',
-  coverImage: '',
-  amenities: '',
-  status: 'active',
-  specialNotes: '',
-};
+const PAGE_SIZE = 10;
+
+function normalizeHotelRooms(hotel) {
+  const list = Array.isArray(hotel?.roomTypes) ? hotel.roomTypes.filter((r) => r?.name) : [];
+  if (list.length) return list;
+  if (hotel?.roomType) {
+    return [
+      {
+        name: hotel.roomType,
+        maxOccupancy: 2,
+        baseRate: hotelPrice(hotel),
+        mealPlan: hotel.mealPlan || '',
+        bedType: '',
+      },
+    ];
+  }
+  return [];
+}
 
 const AMENITY_ICONS = [
   { match: /wifi|wi-fi/i, icon: Wifi, label: 'Free WiFi' },
@@ -74,6 +77,19 @@ function hotelStars(hotel) {
 
 function hotelPrice(hotel) {
   return Number(hotel.displayPrice ?? hotel.absolutePerNight ?? hotel.price ?? 0);
+}
+
+function roomMapRate(room, season = 'onSeason') {
+  const seasonal = room?.rates?.[season];
+  return Number(
+    seasonal?.map ||
+      seasonal?.cp ||
+      seasonal?.ep ||
+      room?.rates?.map ||
+      room?.rates?.cp ||
+      room?.baseRate ||
+      0
+  );
 }
 
 function hotelImage(hotel) {
@@ -146,6 +162,172 @@ function StatCard({ label, value, icon: Icon, tone, hint }) {
   );
 }
 
+function HotelActionsMenu({ hotel, onEdit, onToggleStatus, onDelete, canEdit, canDelete, active }) {
+  return (
+    <DropdownMenuRoot>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50"
+          aria-label="More actions"
+        >
+          <MoreVertical className="h-4 w-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44">
+        <DropdownMenuItem onSelect={() => onEdit(hotel)}>
+          <Pencil className="h-4 w-4" />
+          Edit hotel
+        </DropdownMenuItem>
+        {canEdit ? (
+          <DropdownMenuItem onSelect={() => onToggleStatus(hotel)}>
+            <Clock3 className="h-4 w-4" />
+            Mark {active ? 'inactive' : 'active'}
+          </DropdownMenuItem>
+        ) : null}
+        {canDelete ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-rose-600 focus:text-rose-600"
+              onSelect={() => onDelete(hotel)}
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
+          </>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenuRoot>
+  );
+}
+
+function HotelListRow({ hotel, onEdit, onToggleStatus, onDelete, canEdit, canDelete }) {
+  const image = hotelImage(hotel);
+  const price = hotelPrice(hotel);
+  const stars = hotelStars(hotel);
+  const active = hotel.status !== 'inactive';
+  const rooms = normalizeHotelRooms(hotel);
+
+  return (
+    <article className="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm transition hover:border-orange-200 hover:shadow-md sm:flex-row sm:items-center sm:gap-4 sm:p-3.5">
+      <div className="relative h-28 w-full shrink-0 overflow-hidden rounded-xl bg-slate-100 sm:h-20 sm:w-28">
+        {image ? (
+          <img src={image} alt={hotel.name} className="h-full w-full object-cover" loading="lazy" />
+        ) : (
+          <div className="flex h-full items-center justify-center text-slate-300">
+            <ImageIcon className="h-8 w-8" />
+          </div>
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="truncate text-[15px] font-bold text-slate-900">{hotel.name}</h3>
+          {stars > 0 ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-600">
+              <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
+              {stars.toFixed(1)}
+            </span>
+          ) : null}
+          <span
+            className={cn(
+              'rounded-full px-2 py-0.5 text-[10px] font-bold uppercase',
+              active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+            )}
+          >
+            {active ? 'Active' : 'Inactive'}
+          </span>
+        </div>
+        <p className="mt-1 flex items-center gap-1 truncate text-[12px] text-slate-500">
+          <MapPin className="h-3.5 w-3.5 shrink-0 text-orange-400" />
+          {hotelCity(hotel)}
+        </p>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <span className="rounded-md bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700">
+            {hotel.category || 'Hotel'}
+          </span>
+          <span className="rounded-md bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700">
+            {hotel.roomType || rooms[0]?.name || 'Deluxe'}
+          </span>
+          <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+            {shortMeal(hotel.mealPlan)}
+          </span>
+          {rooms.length > 0 ? (
+            <span className="rounded-md bg-orange-50 px-2 py-0.5 text-[10px] font-semibold text-orange-700">
+              {rooms.length} room categor{rooms.length === 1 ? 'y' : 'ies'}
+            </span>
+          ) : null}
+        </div>
+        {rooms.length > 0 ? (
+          <div className="mt-2.5 space-y-1.5">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Room categories</p>
+            <div className="flex flex-wrap gap-1.5">
+              {rooms.slice(0, 6).map((room) => (
+                <span
+                  key={room.name}
+                  className="inline-flex max-w-full flex-wrap items-center gap-1.5 rounded-lg border border-slate-100 bg-slate-50 px-2 py-1 text-[11px] text-slate-700"
+                >
+                  {room.images?.[0] ? (
+                    <img
+                      src={room.images[0]}
+                      alt=""
+                      className="h-5 w-6 rounded object-cover"
+                    />
+                  ) : (
+                    <BedDouble className="h-3 w-3 text-orange-500" />
+                  )}
+                  <span className="font-semibold">{room.name}</span>
+                  <span className="font-bold tabular-nums text-amber-700">
+                    On MAP {formatINR(roomMapRate(room, 'onSeason'))}
+                  </span>
+                  <span className="font-bold tabular-nums text-sky-700">
+                    Off MAP {formatINR(roomMapRate(room, 'offSeason'))}
+                  </span>
+                  {room.maxOccupancy ? (
+                    <span className="text-slate-400">· {room.maxOccupancy} pax</span>
+                  ) : null}
+                </span>
+              ))}
+              {rooms.length > 6 ? (
+                <span className="rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-500">
+                  +{rooms.length - 6} more
+                </span>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="flex shrink-0 items-center justify-between gap-3 sm:flex-col sm:items-end sm:justify-center">
+        <div className="text-left sm:text-right">
+          <p className="text-lg font-bold tabular-nums text-emerald-600">{formatINR(price)}</p>
+          <p className="text-[11px] text-slate-400">Per night</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onEdit(hotel)}
+            className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-orange-500 px-3.5 text-sm font-semibold text-white shadow-sm shadow-orange-500/25 transition hover:bg-orange-600"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            View / Edit
+          </button>
+          <HotelActionsMenu
+            hotel={hotel}
+            onEdit={onEdit}
+            onToggleStatus={onToggleStatus}
+            onDelete={onDelete}
+            canEdit={canEdit}
+            canDelete={canDelete}
+            active={active}
+          />
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function HotelCard({ hotel, onEdit, onToggleStatus, onDelete, canEdit, canDelete, favorited, onToggleFavorite }) {
   const image = hotelImage(hotel);
   const price = hotelPrice(hotel);
@@ -200,14 +382,53 @@ function HotelCard({ hotel, onEdit, onToggleStatus, onDelete, canEdit, canDelete
             {hotel.category || 'Hotel'}
           </span>
           <span className="rounded-md bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700">
-            {hotel.roomType || 'Deluxe'}
+            {hotel.roomType || normalizeHotelRooms(hotel)[0]?.name || 'Deluxe'}
           </span>
           <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
             {shortMeal(hotel.mealPlan)}
           </span>
+          {normalizeHotelRooms(hotel).length > 0 ? (
+            <span className="rounded-md bg-orange-50 px-2 py-0.5 text-[10px] font-semibold text-orange-700">
+              {normalizeHotelRooms(hotel).length} rooms
+            </span>
+          ) : null}
         </div>
 
-        <AmenityRow amenities={hotel.amenities} />
+        {normalizeHotelRooms(hotel).length > 0 ? (
+          <div className="space-y-1">
+            {normalizeHotelRooms(hotel).slice(0, 3).map((room) => (
+              <div
+                key={room.name}
+                className="rounded-lg bg-slate-50 px-2 py-1.5 text-[11px]"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex min-w-0 items-center gap-1.5 truncate font-semibold text-slate-700">
+                    {room.images?.[0] ? (
+                      <img src={room.images[0]} alt="" className="h-5 w-6 shrink-0 rounded object-cover" />
+                    ) : null}
+                    <span className="truncate">{room.name}</span>
+                  </span>
+                </div>
+                <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px]">
+                  <span className="font-bold tabular-nums text-amber-700">
+                    On MAP {formatINR(roomMapRate(room, 'onSeason'))}
+                  </span>
+                  <span className="font-bold tabular-nums text-sky-700">
+                    Off MAP {formatINR(roomMapRate(room, 'offSeason'))}
+                  </span>
+                  <span className="tabular-nums text-slate-500">
+                    CP {formatINR(Number(room.rates?.onSeason?.cp || room.rates?.cp || 0))}
+                  </span>
+                  <span className="tabular-nums text-slate-500">
+                    EP {formatINR(Number(room.rates?.onSeason?.ep || room.rates?.ep || 0))}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <AmenityRow amenities={hotel.amenities} />
+        )}
 
         <div className="flex items-end justify-between gap-2 pt-1">
           <div>
@@ -225,218 +446,28 @@ function HotelCard({ hotel, onEdit, onToggleStatus, onDelete, canEdit, canDelete
             <Pencil className="h-3.5 w-3.5" />
             View / Edit
           </button>
-          <DropdownMenuRoot>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50"
-                aria-label="More actions"
-              >
-                <MoreVertical className="h-4 w-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem onSelect={() => onEdit(hotel)}>
-                <Pencil className="h-4 w-4" />
-                Edit hotel
-              </DropdownMenuItem>
-              {canEdit ? (
-                <DropdownMenuItem onSelect={() => onToggleStatus(hotel)}>
-                  <Clock3 className="h-4 w-4" />
-                  Mark {active ? 'inactive' : 'active'}
-                </DropdownMenuItem>
-              ) : null}
-              {canDelete ? (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="text-rose-600 focus:text-rose-600"
-                    onSelect={() => onDelete(hotel)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Delete
-                  </DropdownMenuItem>
-                </>
-              ) : null}
-            </DropdownMenuContent>
-          </DropdownMenuRoot>
+          <HotelActionsMenu
+            hotel={hotel}
+            onEdit={onEdit}
+            onToggleStatus={onToggleStatus}
+            onDelete={onDelete}
+            canEdit={canEdit}
+            canDelete={canDelete}
+            active={active}
+          />
         </div>
       </div>
     </article>
   );
 }
 
-function HotelFormModal({ open, onClose, form, setForm, onSubmit, saving, isEdit }) {
-  return (
-    <AppModal open={open} onClose={onClose} size="lg" className="p-6">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-bold text-slate-900">{isEdit ? 'Edit Hotel' : 'Add Hotel'}</h3>
-          <p className="text-xs text-slate-500">Prices, photos, amenities and inventory status</p>
-        </div>
-        <button type="button" onClick={onClose} className="rounded-lg p-2 hover:bg-slate-100">
-          <X className="h-5 w-5" />
-        </button>
-      </div>
-      <form onSubmit={onSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="sm:col-span-2">
-          <label className="mb-1 block text-xs font-medium text-slate-500">Hotel Name *</label>
-          <input
-            required
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="input-premium h-11 w-full rounded-xl"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-slate-500">Destination</label>
-          <input
-            value={form.destination}
-            onChange={(e) => setForm({ ...form, destination: e.target.value })}
-            className="input-premium h-11 w-full rounded-xl"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-slate-500">Location *</label>
-          <input
-            required
-            value={form.location}
-            onChange={(e) => setForm({ ...form, location: e.target.value })}
-            className="input-premium h-11 w-full rounded-xl"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-slate-500">Category</label>
-          <select
-            value={form.category}
-            onChange={(e) => setForm({ ...form, category: e.target.value })}
-            className="input-premium h-11 w-full rounded-xl"
-          >
-            {HOTEL_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-slate-500">Star Rating</label>
-          <select
-            value={form.starRating}
-            onChange={(e) => setForm({ ...form, starRating: e.target.value })}
-            className="input-premium h-11 w-full rounded-xl"
-          >
-            {[0, 1, 2, 3, 4, 5].map((n) => (
-              <option key={n} value={String(n)}>
-                {n === 0 ? 'Not set' : `${n} Star`}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-slate-500">Room Type</label>
-          <input
-            value={form.roomType}
-            onChange={(e) => setForm({ ...form, roomType: e.target.value })}
-            className="input-premium h-11 w-full rounded-xl"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-slate-500">Meal Plan</label>
-          <select
-            value={form.mealPlan}
-            onChange={(e) => setForm({ ...form, mealPlan: e.target.value })}
-            className="input-premium h-11 w-full rounded-xl"
-          >
-            {MEAL_PLANS.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-slate-500">Price / Night (₹)</label>
-          <input
-            type="number"
-            min={0}
-            value={form.price}
-            onChange={(e) => setForm({ ...form, price: e.target.value })}
-            className="input-premium h-11 w-full rounded-xl"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-slate-500">Status</label>
-          <select
-            value={form.status}
-            onChange={(e) => setForm({ ...form, status: e.target.value })}
-            className="input-premium h-11 w-full rounded-xl"
-          >
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-        </div>
-        <div className="sm:col-span-2">
-          <label className="mb-1 block text-xs font-medium text-slate-500">Photo URL</label>
-          <input
-            value={form.coverImage}
-            onChange={(e) => setForm({ ...form, coverImage: e.target.value })}
-            placeholder="https://..."
-            className="input-premium h-11 w-full rounded-xl"
-          />
-        </div>
-        <div className="sm:col-span-2">
-          <label className="mb-1 block text-xs font-medium text-slate-500">
-            Amenities (comma separated)
-          </label>
-          <input
-            value={form.amenities}
-            onChange={(e) => setForm({ ...form, amenities: e.target.value })}
-            placeholder="Free WiFi, Parking, Restaurant"
-            className="input-premium h-11 w-full rounded-xl"
-          />
-        </div>
-        <div className="sm:col-span-2">
-          <label className="mb-1 block text-xs font-medium text-slate-500">Notes</label>
-          <textarea
-            value={form.specialNotes}
-            onChange={(e) => setForm({ ...form, specialNotes: e.target.value })}
-            rows={2}
-            className="input-premium w-full rounded-xl py-2"
-          />
-        </div>
-        <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-          <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={saving} className="bg-orange-500 hover:bg-orange-600">
-            {saving ? 'Saving...' : isEdit ? 'Save Changes' : 'Save Hotel'}
-          </Button>
-        </div>
-      </form>
-    </AppModal>
-  );
-}
-
-function hotelToForm(hotel) {
-  return {
-    name: hotel.name || '',
-    destination: hotel.destination || hotel.displayCity || '',
-    location: hotel.location || hotel.destination || '',
-    category: hotel.category || '4 Star',
-    starRating: String(hotelStars(hotel) || 0),
-    roomType: hotel.roomType || 'Deluxe',
-    mealPlan: hotel.mealPlan || 'MAP (Breakfast + Dinner)',
-    price: String(hotelPrice(hotel) || ''),
-    coverImage: hotelImage(hotel),
-    amenities: Array.isArray(hotel.amenities) ? hotel.amenities.join(', ') : '',
-    status: hotel.status || 'active',
-    specialNotes: hotel.specialNotes || '',
-  };
-}
-
 export default function HotelControlPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const hotelBase = pathname.includes('/sales-executive')
+    ? '/sales-executive/hotel-control'
+    : '/hotel-control';
   const canCreate = canAccess(user, 'packages', 'create') || canAccess(user, 'operations', 'create') || user?.role === 'admin';
   const canEdit = canAccess(user, 'packages', 'edit') || canAccess(user, 'operations', 'edit') || user?.role === 'admin';
   const canDelete = canAccess(user, 'packages', 'delete') || canAccess(user, 'operations', 'delete') || user?.role === 'admin';
@@ -458,12 +489,9 @@ export default function HotelControlPage() {
     status: '',
   });
   const [sortBy, setSortBy] = useState('latest');
-  const [viewMode, setViewMode] = useState('grid');
+  const [viewMode, setViewMode] = useState('list');
+  const [page, setPage] = useState(1);
   const [favorites, setFavorites] = useState(() => new Set());
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingHotel, setEditingHotel] = useState(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [saving, setSaving] = useState(false);
 
   const fetchHotels = useCallback(async () => {
     setLoading(true);
@@ -558,56 +586,23 @@ export default function HotelControlPage() {
     return list;
   }, [hotels, applied, sortBy]);
 
-  const openCreate = () => {
-    setEditingHotel(null);
-    setForm(EMPTY_FORM);
-    setModalOpen(true);
-  };
+  const totalPages = Math.max(1, Math.ceil(filteredHotels.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageHotels = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredHotels.slice(start, start + PAGE_SIZE);
+  }, [filteredHotels, currentPage]);
 
-  const openEdit = (hotel) => {
-    setEditingHotel(hotel);
-    setForm(hotelToForm(hotel));
-    setModalOpen(true);
-  };
+  useEffect(() => {
+    setPage(1);
+  }, [applied, sortBy]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    const amenities = String(form.amenities || '')
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const payload = {
-      name: form.name.trim(),
-      destination: form.destination.trim(),
-      location: form.location.trim() || form.destination.trim(),
-      category: form.category,
-      starRating: Number(form.starRating) || 0,
-      roomType: form.roomType,
-      mealPlan: form.mealPlan,
-      price: Number(form.price) || 0,
-      absolutePerNight: Number(form.price) || 0,
-      coverImage: form.coverImage.trim(),
-      images: form.coverImage.trim() ? [form.coverImage.trim()] : [],
-      amenities,
-      status: form.status || 'active',
-      specialNotes: form.specialNotes || '',
-      sourceType: editingHotel?.sourceType || 'manual',
-    };
-    try {
-      if (editingHotel?._id) {
-        await API.put(`/hotels/${editingHotel._id}`, payload);
-      } else {
-        await API.post('/hotels', payload);
-      }
-      setModalOpen(false);
-      setEditingHotel(null);
-      setForm(EMPTY_FORM);
-      await fetchHotels();
-    } finally {
-      setSaving(false);
-    }
-  };
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  const openCreate = () => navigate(`${hotelBase}/new`);
+  const openEdit = (hotel) => navigate(`${hotelBase}/${hotel._id}/edit`);
 
   const handleToggleStatus = async (hotel) => {
     const next = hotel.status === 'inactive' ? 'active' : 'inactive';
@@ -625,6 +620,19 @@ export default function HotelControlPage() {
     setImporting(true);
     try {
       await API.post('/packages/import-hotels-from-catalog');
+      await API.post('/hotels/sync-rooms');
+      await fetchHotels();
+    } catch {
+      /* toast handled by axios */
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleSyncRooms = async () => {
+    setImporting(true);
+    try {
+      await API.post('/hotels/sync-rooms');
       await fetchHotels();
     } catch {
       /* toast handled by axios */
@@ -635,6 +643,7 @@ export default function HotelControlPage() {
 
   const applyFilters = (e) => {
     e?.preventDefault?.();
+    setPage(1);
     setApplied({
       search: searchInput,
       destination,
@@ -650,6 +659,7 @@ export default function HotelControlPage() {
     setStarFilter('');
     setMealFilter('');
     setStatusFilter('');
+    setPage(1);
     setApplied({ search: '', destination: '', star: '', meal: '', status: '' });
   };
 
@@ -704,6 +714,17 @@ export default function HotelControlPage() {
                 >
                   <Upload className={cn('h-4 w-4', importing && 'animate-pulse')} />
                   {importing ? 'Importing...' : 'Import Hotels'}
+                </button>
+              ) : null}
+              {canEdit ? (
+                <button
+                  type="button"
+                  onClick={handleSyncRooms}
+                  disabled={importing}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/40 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur hover:bg-white/20 disabled:opacity-60"
+                >
+                  <RefreshCw className={cn('h-4 w-4', importing && 'animate-spin')} />
+                  {importing ? 'Syncing...' : 'Sync Rooms'}
                 </button>
               ) : null}
             </div>
@@ -853,9 +874,9 @@ export default function HotelControlPage() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {[...Array(8)].map((_, i) => (
-            <div key={i} className="h-80 animate-pulse rounded-2xl border border-slate-100 bg-slate-100" />
+        <div className="space-y-3">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="h-24 animate-pulse rounded-2xl border border-slate-100 bg-slate-100" />
           ))}
         </div>
       ) : filteredHotels.length === 0 ? (
@@ -875,41 +896,108 @@ export default function HotelControlPage() {
           ) : null}
         </div>
       ) : (
-        <div
-          className={cn(
-            viewMode === 'grid'
-              ? 'grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'
-              : 'grid grid-cols-1 gap-3'
+        <>
+          {viewMode === 'list' ? (
+            <div className="space-y-3">
+              {pageHotels.map((hotel) => (
+                <HotelListRow
+                  key={hotel._id}
+                  hotel={hotel}
+                  onEdit={openEdit}
+                  onToggleStatus={handleToggleStatus}
+                  onDelete={handleDelete}
+                  canEdit={canEdit}
+                  canDelete={canDelete}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              {pageHotels.map((hotel) => (
+                <HotelCard
+                  key={hotel._id}
+                  hotel={hotel}
+                  onEdit={openEdit}
+                  onToggleStatus={handleToggleStatus}
+                  onDelete={handleDelete}
+                  canEdit={canEdit}
+                  canDelete={canDelete}
+                  favorited={favorites.has(hotel._id)}
+                  onToggleFavorite={toggleFavorite}
+                />
+              ))}
+            </div>
           )}
-        >
-          {filteredHotels.map((hotel) => (
-            <HotelCard
-              key={hotel._id}
-              hotel={hotel}
-              onEdit={openEdit}
-              onToggleStatus={handleToggleStatus}
-              onDelete={handleDelete}
-              canEdit={canEdit}
-              canDelete={canDelete}
-              favorited={favorites.has(hotel._id)}
-              onToggleFavorite={toggleFavorite}
-            />
-          ))}
-        </div>
-      )}
 
-      <HotelFormModal
-        open={modalOpen}
-        onClose={() => {
-          setModalOpen(false);
-          setEditingHotel(null);
-        }}
-        form={form}
-        setForm={setForm}
-        onSubmit={handleSubmit}
-        saving={saving}
-        isEdit={!!editingHotel}
-      />
+          {filteredHotels.length > PAGE_SIZE ? (
+            <div className="flex flex-col items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-sm sm:flex-row">
+              <p className="text-sm text-slate-500">
+                Showing{' '}
+                <span className="font-semibold text-slate-800">
+                  {(currentPage - 1) * PAGE_SIZE + 1}
+                  –
+                  {Math.min(currentPage * PAGE_SIZE, filteredHotels.length)}
+                </span>{' '}
+                of <span className="font-semibold text-slate-800">{filteredHotels.length}</span> hotels
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage <= 1}
+                  className="inline-flex h-9 items-center gap-1 rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Prev
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((p) => {
+                      if (totalPages <= 7) return true;
+                      if (p === 1 || p === totalPages) return true;
+                      return Math.abs(p - currentPage) <= 1;
+                    })
+                    .reduce((acc, p, idx, arr) => {
+                      if (idx > 0 && p - arr[idx - 1] > 1) acc.push('…');
+                      acc.push(p);
+                      return acc;
+                    }, [])
+                    .map((item, idx) =>
+                      item === '…' ? (
+                        <span key={`e-${idx}`} className="px-1 text-slate-400">
+                          …
+                        </span>
+                      ) : (
+                        <button
+                          key={item}
+                          type="button"
+                          onClick={() => setPage(item)}
+                          className={cn(
+                            'flex h-9 min-w-9 items-center justify-center rounded-xl px-2.5 text-sm font-semibold transition',
+                            currentPage === item
+                              ? 'bg-orange-500 text-white'
+                              : 'text-slate-600 hover:bg-slate-50'
+                          )}
+                        >
+                          {item}
+                        </button>
+                      )
+                    )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage >= totalPages}
+                  className="inline-flex h-9 items-center gap-1 rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </>
+      )}
     </motion.div>
   );
 }

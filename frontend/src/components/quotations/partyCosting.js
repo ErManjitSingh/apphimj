@@ -235,7 +235,9 @@ export function buildWebsiteAlignedQuoteCosts({
     const extraCost = round2(
       (Array.isArray(extraCabs) ? extraCabs : []).reduce((sum, cab) => {
         const fare =
-          Number(cab?.absoluteFare ?? cab?.totalAmount ?? cab?.cost ?? 0) || 0;
+          Number(
+            cab?.fareOverride ?? cab?.absoluteFare ?? cab?.totalAmount ?? cab?.cost ?? 0
+          ) || 0;
         return sum + fare;
       }, 0)
     );

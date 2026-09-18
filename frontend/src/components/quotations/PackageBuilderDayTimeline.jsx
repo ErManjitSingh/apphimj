@@ -300,17 +300,43 @@ function CabCard({
   packageCab,
   onChangeCab,
   onAddCab,
+  onCabFareChange,
+  onExtraCabFareChange,
+  onRemoveExtraCab,
   cabCount = 1,
   cabHint = null,
   extraCabs = [],
 }) {
-  if (!packageCab) return null;
+  if (!packageCab) {
+    return (
+      <div className="rounded-xl border border-dashed border-sky-300 bg-sky-50/80 p-4 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-sky-700">Transport</p>
+            <p className="text-sm font-semibold text-slate-900">No cab selected</p>
+            <p className="text-[11px] text-sky-800/70 mt-0.5">Pick a package cab or search catalog vehicles</p>
+          </div>
+          {onChangeCab && (
+            <button
+              type="button"
+              onClick={onChangeCab}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-sky-600 text-xs font-bold text-white hover:bg-sky-500 shrink-0"
+            >
+              <Car className="w-3.5 h-3.5" />
+              Select cab
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   const upgradeFare = Number(
     packageCab.upgradePrice ?? packageCab.priceDelta ?? packageCab.cost ?? 0
   ) || 0;
   const isDefault = Boolean(packageCab.isDefault) || upgradeFare <= 0;
   const unitFare = Number(
-    packageCab.absoluteFare ?? packageCab.totalAmount ?? packageCab.cost ?? 0
+    packageCab.fareOverride ?? packageCab.absoluteFare ?? packageCab.totalAmount ?? packageCab.cost ?? 0
   ) || 0;
   const rawTotal = unitFare * Math.max(1, Number(cabCount) || 1);
   const displayTotal = Math.round(rawTotal * 100) / 100;
@@ -338,6 +364,18 @@ function CabCard({
               .filter(Boolean)
               .join(' · ')}
           </p>
+          {onCabFareChange && (
+            <label className="mt-2 flex items-center gap-2 text-[11px] text-sky-800/80">
+              <span className="font-semibold shrink-0">Fare ₹</span>
+              <input
+                type="number"
+                min={0}
+                value={unitFare || ''}
+                onChange={(e) => onCabFareChange(e.target.value)}
+                className="h-8 w-28 rounded-lg border border-sky-200 bg-white px-2 text-sm font-bold text-sky-900 outline-none focus:ring-2 focus:ring-sky-400/30"
+              />
+            </label>
+          )}
         </div>
         <div className="flex flex-col items-end gap-1.5 shrink-0">
           {displayTotal > 0 && (
@@ -345,12 +383,15 @@ function CabCard({
               {formatINR(displayTotal)}
             </p>
           )}
-          {isDefault && displayTotal > 0 && (
+          {isDefault && displayTotal > 0 && !packageCab.fareOverride && (
             <p className="text-[10px] font-semibold text-sky-600">Included in package</p>
+          )}
+          {packageCab.fareOverride != null && packageCab.fareOverride !== '' && (
+            <p className="text-[10px] font-semibold text-amber-700">Manual fare</p>
           )}
           <div className="flex flex-col gap-1.5">
             {onChangeCab && <ChangeBtn onClick={onChangeCab} label="Change cab" />}
-            {cabHint?.needsAction && onAddCab && (
+            {onAddCab && (
               <button
                 type="button"
                 onClick={onAddCab}
@@ -366,22 +407,48 @@ function CabCard({
       </div>
       {extraCabs.length > 0 && (
         <div className="border-t border-sky-100 px-3 py-2 space-y-1.5">
-          {extraCabs.map((cab, idx) => (
-            <div
-              key={cab.id || cab.slug || idx}
-              className="flex items-center justify-between gap-2 rounded-lg bg-white/80 border border-sky-100 px-2.5 py-2 text-[11px]"
-            >
-              <span className="font-semibold text-sky-800">
-                Cab {idx + 2}: {cab.name}
-                {cab.seatingCapacity ? ` · ${cab.seatingCapacity} seats` : ''}
-              </span>
-              {(cab.absoluteFare ?? cab.totalAmount ?? cab.cost) > 0 && (
-                <span className="font-bold text-sky-700">
-                  {formatINR(Number(cab.absoluteFare ?? cab.totalAmount ?? cab.cost ?? 0))}
+          {extraCabs.map((cab, idx) => {
+            const extraFare =
+              Number(cab.fareOverride ?? cab.absoluteFare ?? cab.totalAmount ?? cab.cost ?? 0) || 0;
+            return (
+              <div
+                key={cab.id || cab.slug || idx}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/80 border border-sky-100 px-2.5 py-2 text-[11px]"
+              >
+                <span className="font-semibold text-sky-800">
+                  Cab {idx + 2}: {cab.name}
+                  {cab.seatingCapacity ? ` · ${cab.seatingCapacity} seats` : ''}
                 </span>
-              )}
-            </div>
-          ))}
+                <div className="flex items-center gap-2">
+                  {onExtraCabFareChange ? (
+                    <label className="inline-flex items-center gap-1">
+                      <span className="text-sky-700/80">₹</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={extraFare || ''}
+                        onChange={(e) => onExtraCabFareChange(idx, e.target.value)}
+                        className="h-7 w-24 rounded-md border border-sky-200 bg-white px-1.5 text-[11px] font-bold text-sky-900 outline-none"
+                      />
+                    </label>
+                  ) : (
+                    extraFare > 0 && (
+                      <span className="font-bold text-sky-700">{formatINR(extraFare)}</span>
+                    )
+                  )}
+                  {onRemoveExtraCab && (
+                    <button
+                      type="button"
+                      onClick={() => onRemoveExtraCab(idx)}
+                      className="h-7 px-2 rounded-md border border-rose-200 text-rose-600 font-bold hover:bg-rose-50"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -443,6 +510,9 @@ function SortableDayCard({
   onChangeRoomMattresses,
   onChangeCab,
   onAddCab,
+  onCabFareChange,
+  onExtraCabFareChange,
+  onRemoveExtraCab,
   extraCabs = [],
   renderHotelActions,
   canRemove,
@@ -652,11 +722,14 @@ function SortableDayCard({
             )}
           />
           {renderHotelActions?.(day)}
-          {packageCab && day.day === 1 && (
+          {day.day === 1 && (
             <CabCard
               packageCab={packageCab}
               onChangeCab={onChangeCab}
               onAddCab={onAddCab}
+              onCabFareChange={onCabFareChange}
+              onExtraCabFareChange={onExtraCabFareChange}
+              onRemoveExtraCab={onRemoveExtraCab}
               cabCount={cabCount}
               cabHint={cabHint}
               extraCabs={extraCabs}
@@ -835,6 +908,9 @@ export default function PackageBuilderDayTimeline({
   onChangeRoomMattresses,
   onChangeCab,
   onAddCab,
+  onCabFareChange,
+  onExtraCabFareChange,
+  onRemoveExtraCab,
   extraCabs = [],
   renderHotelActions,
   destination = 'Destination',
@@ -929,6 +1005,9 @@ export default function PackageBuilderDayTimeline({
                   onChangeRoomMattresses={onChangeRoomMattresses}
                   onChangeCab={onChangeCab}
                   onAddCab={onAddCab}
+                  onCabFareChange={onCabFareChange}
+                  onExtraCabFareChange={onExtraCabFareChange}
+                  onRemoveExtraCab={onRemoveExtraCab}
                   extraCabs={extraCabs}
                   renderHotelActions={renderHotelActions}
                   canRemove={itinerary.length > 1}

@@ -180,6 +180,7 @@ function normalizeLeadInput(body = {}, { isUpdate = false } = {}) {
   if (assignedTo) normalized.assignedTo = assignedTo;
   if (assignedManager) normalized.assignedManager = assignedManager;
   if (assignedTeamLeader) normalized.assignedTeamLeader = assignedTeamLeader;
+  if (body.assigneeRole) normalized.assigneeRole = String(body.assigneeRole).trim();
 
   if (body.status) normalized.status = body.status;
 

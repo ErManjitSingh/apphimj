@@ -68,7 +68,7 @@ export function hydrateCabsFromQuote(quote = {}, packageDetail = null) {
 
   const mapRow = (snap) => {
     if (!snap) return null;
-    const unit = Number(snap.absoluteFare ?? snap.unitCost ?? snap.totalAmount ?? snap.cost ?? 0) || 0;
+    const unit = Number(snap.fareOverride ?? snap.absoluteFare ?? snap.unitCost ?? snap.totalAmount ?? snap.cost ?? 0) || 0;
     const upgrade = Number(snap.upgradePrice ?? snap.priceDelta ?? 0) || 0;
     const count = Math.max(1, Number(snap.vehicleCount) || 1);
     return {
@@ -89,6 +89,7 @@ export function hydrateCabsFromQuote(quote = {}, packageDetail = null) {
       isPackageCab: Boolean(snap.isPackageCab || snap.packageCabId),
       isDefault: Boolean(snap.isDefault),
       absoluteFare: unit,
+      fareOverride: snap.fareOverride != null ? Number(snap.fareOverride) || unit : undefined,
       cost: upgrade,
       totalAmount: unit,
       priceDelta: upgrade,

@@ -161,6 +161,16 @@ export function wizardValuesToPayload(values) {
     specialRequirements: values.requirements || undefined,
     status: 'new',
     ...(values.branchId ? { branchId: values.branchId } : {}),
+    // Admin / lead_provider create: stay unassigned unless an assignee is chosen
+    ...(values.assignmentMode === 'assign' && values.assignedTo
+      ? {
+          assignedTo: values.assignedTo,
+          assignedExecutive: values.assignedTo,
+          assigneeRole: values.assigneeRole || 'sales_executive',
+        }
+      : values.assignmentMode === 'unassigned' || !values.assignedTo
+        ? { skipAutoAssign: true }
+        : {}),
   };
 }
 

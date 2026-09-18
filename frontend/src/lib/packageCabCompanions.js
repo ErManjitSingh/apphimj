@@ -8,10 +8,16 @@ export function mergeRawCabSources(source = {}) {
     ? source.packageCabs
     : Array.isArray(source.package_cabs)
       ? source.package_cabs
-      : [];
+      : Array.isArray(source.fullData?.packageCabs)
+        ? source.fullData.packageCabs
+        : Array.isArray(source.fullData?.package_cabs)
+          ? source.fullData.package_cabs
+          : [];
   const rawFromApi = Array.isArray(source._apiRaw?.dayOptions?.cabs)
     ? source._apiRaw.dayOptions.cabs
-    : [];
+    : Array.isArray(source.fullData?._apiRaw?.dayOptions?.cabs)
+      ? source.fullData._apiRaw.dayOptions.cabs
+      : [];
 
   if (!mapped.length) return rawFromApi;
   if (!rawFromApi.length) return mapped;

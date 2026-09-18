@@ -17,7 +17,8 @@ const {
   applyMarginToPackage,
   applyMarginToPackages,
 } = require('../services/destinationMarginService');
-const { importHotelsFromPackages } = require('../services/localHotelCatalogService');
+const { importHotelsFromPackages, syncHotelRoomsFromUno, enrichHotelDocumentFromUno } = require('../services/localHotelCatalogService');
+const { saveHotelImageBase64 } = require('../services/hotelImageUploadService');
 
 function mapUnoDetailToPackageDoc(detail, userId) {
   const plain = toPlain(detail);
@@ -65,8 +66,15 @@ function internalSourceType(value) {
 function sanitizePackageForClient(pkg) {
   if (!pkg || typeof pkg !== 'object') return pkg;
   const { rawUno, ...rest } = pkg;
+  const packageCabs =
+    Array.isArray(rest.packageCabs) && rest.packageCabs.length
+      ? rest.packageCabs
+      : Array.isArray(rest.fullData?.packageCabs)
+        ? rest.fullData.packageCabs
+        : [];
   return {
     ...rest,
+    packageCabs,
     sourceType: publicSourceType(pkg.sourceType),
     externalSource:
       rest.externalSource === 'uno_hotels' || rest.externalSource === 'uno_hotels_public'
@@ -109,18 +117,50 @@ const getPackage = asyncHandler(async (req, res) => {
 const createPackage = asyncHandler(async (req, res) => {
   const body = { ...req.body };
   delete body.rawUno;
+  // packageCabs is not a first-class schema field — keep on fullData and flatten for clients
+  const packageCabs = Array.isArray(body.packageCabs) ? body.packageCabs : body.fullData?.packageCabs;
+  if (Array.isArray(packageCabs) && packageCabs.length) {
+    body.fullData = { ...(body.fullData || {}), packageCabs };
+  }
+  delete body.packageCabs;
   const pkg = await Package.create({
     ...body,
     sourceType: body.sourceType === 'uno_clone' ? 'uno_clone' : 'local',
     createdBy: req.user._id,
   });
-  res.status(201).json(sanitizePackageForClient(pkg.toObject()));
+  const plain = pkg.toObject();
+  res.status(201).json(
+    sanitizePackageForClient({
+      ...plain,
+      packageCabs: plain.fullData?.packageCabs || [],
+    })
+  );
 });
 
 const updatePackage = asyncHandler(async (req, res) => {
-  const pkg = await Package.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+  const body = { ...req.body };
+  const packageCabs = Array.isArray(body.packageCabs) ? body.packageCabs : undefined;
+  if (Array.isArray(packageCabs)) {
+    delete body.packageCabs;
+  }
+  const existing = Array.isArray(packageCabs)
+    ? await Package.findById(req.params.id).select('fullData').lean()
+    : null;
+  if (!existing && Array.isArray(packageCabs)) {
+    throw new ApiError(404, 'Package not found');
+  }
+  if (Array.isArray(packageCabs)) {
+    body.fullData = { ...(existing.fullData || {}), ...(body.fullData || {}), packageCabs };
+  }
+  const pkg = await Package.findByIdAndUpdate(req.params.id, body, { new: true, runValidators: true });
   if (!pkg) throw new ApiError(404, 'Package not found');
-  res.json(sanitizePackageForClient(pkg.toObject()));
+  const plain = pkg.toObject();
+  res.json(
+    sanitizePackageForClient({
+      ...plain,
+      packageCabs: plain.fullData?.packageCabs || [],
+    })
+  );
 });
 
 const deletePackage = asyncHandler(async (req, res) => {
@@ -186,6 +226,23 @@ const importHotelsFromCatalog = asyncHandler(async (_req, res) => {
   res.json({ message: 'Hotels imported from packages', ...result });
 });
 
+const syncHotelsRooms = asyncHandler(async (req, res) => {
+  const limit = Number(req.query.limit) || 0;
+  const onlyThin = String(req.query.onlyThin || 'false') === 'true';
+  const result = await syncHotelRoomsFromUno({ limit, onlyThin });
+  res.json({ message: 'Hotel rooms synced from API', ...result });
+});
+
+const uploadHotelImage = asyncHandler(async (req, res) => {
+  const { base64, name, hotelId } = req.body || {};
+  const saved = saveHotelImageBase64({
+    base64,
+    originalName: name || 'hotel-photo.jpg',
+    hotelId: hotelId || req.params?.id || 'hotel',
+  });
+  res.status(201).json(saved);
+});
+
 const listHotels = asyncHandler(async (req, res) => {
   const filter = {};
   if (req.query.status) filter.status = req.query.status;
@@ -200,6 +257,8 @@ const listHotels = asyncHandler(async (req, res) => {
       displayPrice: hotel.absolutePerNight || hotel.price || 0,
       displayCity: hotel.destination || hotel.location,
       coverImage: hotel.coverImage || hotel.images?.[0] || '',
+      roomTypes: Array.isArray(hotel.roomTypes) ? hotel.roomTypes : [],
+      roomCount: Array.isArray(hotel.roomTypes) ? hotel.roomTypes.length : 0,
     }))
   );
 });
@@ -215,6 +274,33 @@ const createHotel = asyncHandler(async (req, res) => {
   }
   const hotel = await Hotel.create({ ...body, createdBy: req.user?._id });
   res.status(201).json(hotel);
+});
+
+const getHotel = asyncHandler(async (req, res) => {
+  let hotel = await Hotel.findById(req.params.id);
+  if (!hotel) throw new ApiError(404, 'Hotel not found');
+
+  const rooms = Array.isArray(hotel.roomTypes) ? hotel.roomTypes : [];
+  const thin =
+    rooms.length <= 1 || !rooms.some((r) => Array.isArray(r.images) && r.images.length > 0);
+  if (thin && (hotel.sourceSlug || hotel.name)) {
+    try {
+      await enrichHotelDocumentFromUno(hotel);
+      hotel = await Hotel.findById(req.params.id);
+    } catch (err) {
+      console.warn('[getHotel] room enrich failed:', err?.message || err);
+    }
+  }
+
+  const plain = hotel.toObject ? hotel.toObject() : hotel;
+  res.json({
+    ...plain,
+    displayPrice: plain.absolutePerNight || plain.price || 0,
+    displayCity: plain.destination || plain.location,
+    coverImage: plain.coverImage || plain.images?.[0] || '',
+    roomTypes: Array.isArray(plain.roomTypes) ? plain.roomTypes : [],
+    roomCount: Array.isArray(plain.roomTypes) ? plain.roomTypes.length : 0,
+  });
 });
 
 const updateHotel = asyncHandler(async (req, res) => {
@@ -294,7 +380,10 @@ module.exports = {
   catalogStatus,
   importUnoCatalog,
   importHotelsFromCatalog,
+  syncHotelsRooms,
+  uploadHotelImage,
   listHotels,
+  getHotel,
   createHotel,
   updateHotel,
   deleteHotel,

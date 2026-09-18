@@ -21,6 +21,11 @@ import AppDrawer from '../ui/AppDrawer';
 import API from '../../api/axios';
 import { formatINR } from './quotationUtils';
 import {
+  mapLocalHotelToCatalogOption,
+  mapLocalHotelToCatalogDetail,
+  isLikelyMongoId,
+} from '../../lib/localHotelCatalog';
+import {
   ensureMealPlanOptions,
   mealPlanNightlyRate,
   normalizeMealPlanKey,
@@ -30,6 +35,7 @@ import {
   resolveExtraBedNightRate,
 } from '../../lib/mealPlanDefaults';
 import { cn } from '../../lib/utils';
+import CatalogCabSelector from './CatalogCabSelector';
 
 const HOTEL_STEPS = [
   { key: 'hotel', label: 'Hotel', hint: 'Select your hotel' },
@@ -562,44 +568,50 @@ function resolveCity(option, destination) {
 }
 
 async function fetchHotelDetailForOption(option, destination, stayQuery = {}) {
-  let city = resolveCity(option, destination);
-  let slug = option.slug || option.hotel_slug || option.raw?.slug || option.raw?.hotel_slug || '';
-  const dateParams = {
-    ...(stayQuery.checkIn ? { check_in: stayQuery.checkIn } : {}),
-    ...(stayQuery.checkOut ? { check_out: stayQuery.checkOut } : {}),
-    ...(stayQuery.rooms ? { rooms: stayQuery.rooms } : {}),
-    ...(stayQuery.adults ? { adults: stayQuery.adults } : {}),
-  };
+  const localId =
+    option?.localHotelId ||
+    option?._id ||
+    (isLikelyMongoId(option?.id) ? option.id : null);
 
-  if (city && slug) {
-    const res = await API.get('/catalog-hotels/detail', {
-      params: { city, slug, ...dateParams },
-      skipErrorToast: true,
-    });
-    return res.data;
+  if (localId) {
+    const res = await API.get(`/hotels/${localId}`, { skipErrorToast: true });
+    return mapLocalHotelToCatalogDetail(res.data);
   }
 
-  const searchRes = await API.get('/catalog-hotels', {
+  const searchRes = await API.get('/hotels', {
     params: {
-      destination: city || destination || '',
-      search: option.name,
-      limit: 8,
+      status: 'active',
+      search: option?.name || '',
+      ...(destination ? { destination } : {}),
     },
     skipErrorToast: true,
   });
-  const items = searchRes.data?.items || [];
+  const items = Array.isArray(searchRes.data) ? searchRes.data : [];
+  const needle = String(option?.name || '').toLowerCase();
   const hit =
-    items.find((h) => String(h.id) === String(option.id || option.hotelId)) ||
-    items.find((h) => String(h.name).toLowerCase() === String(option.name || '').toLowerCase()) ||
+    items.find((h) => String(h._id) === String(option?.id || option?.hotelId)) ||
+    items.find((h) => String(h.name || '').toLowerCase() === needle) ||
+    items.find((h) => String(h.name || '').toLowerCase().includes(needle)) ||
     items[0];
 
-  if (!hit?.city || !hit?.slug) throw new Error('Hotel catalog detail unavailable');
+  if (hit?._id) {
+    const detailRes = await API.get(`/hotels/${hit._id}`, { skipErrorToast: true });
+    return mapLocalHotelToCatalogDetail(detailRes.data);
+  }
 
-  const detailRes = await API.get('/catalog-hotels/detail', {
-    params: { city: hit.city, slug: hit.slug, ...dateParams },
-    skipErrorToast: true,
-  });
-  return detailRes.data;
+  // Last resort: keep package option rooms if local catalog has no match
+  if (option?.rooms?.length || option?.roomTypes?.length) {
+    return mapLocalHotelToCatalogDetail({
+      ...option,
+      _id: option.id,
+      roomTypes: option.roomTypes || option.rooms,
+      coverImage: option.image || option.images?.[0],
+      displayCity: option.city || option.location,
+      displayPrice: option.absolutePerNight || option.startingPrice,
+    });
+  }
+
+  throw new Error('Hotel not found in Hotel Control catalog');
 }
 
 function buildFallbackRooms(option) {
@@ -662,6 +674,8 @@ export default function PackageResourcePickerDrawer({
   /** When set (e.g. Add room), skip hotel list and open rooms for this hotel. */
   initialHotel = null,
   lockHotel = false,
+  lead = null,
+  pkg = null,
 }) {
   const [query, setQuery] = useState('');
   const [starFilter, setStarFilter] = useState(0); // 0 = all, 1-5 = star rating
@@ -672,6 +686,8 @@ export default function PackageResourcePickerDrawer({
   const [selectedMealPlan, setSelectedMealPlan] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detailError, setDetailError] = useState('');
+  const [localCatalogOptions, setLocalCatalogOptions] = useState([]);
+  const [loadingCatalog, setLoadingCatalog] = useState(false);
   const isCab = mode === 'cab';
   const stayNights = Math.max(1, Number(nights) || 1);
   const locationLabel = resolveCity(options[0], destination) || destination || 'Destination';
@@ -688,6 +704,7 @@ export default function PackageResourcePickerDrawer({
       setSelectedMealPlan(null);
       setLoadingDetail(false);
       setDetailError('');
+      setLocalCatalogOptions([]);
       return;
     }
     if (initialHotel && !isCab) {
@@ -695,9 +712,52 @@ export default function PackageResourcePickerDrawer({
     }
   }, [open, isCab, initialHotel?.id, initialHotel?.hotelId, initialHotel?.name]);
 
+  useEffect(() => {
+    if (!open || isCab) return undefined;
+    let cancelled = false;
+    setLoadingCatalog(true);
+    const cityHint = String(destination || '')
+      .split(/→|->|,|\|/)[0]
+      .trim();
+
+    const load = async () => {
+      try {
+        const res = await API.get('/hotels', {
+          params: {
+            status: 'active',
+            ...(cityHint ? { destination: cityHint } : {}),
+          },
+          skipErrorToast: true,
+        });
+        let list = Array.isArray(res.data) ? res.data : [];
+        if (!list.length && cityHint) {
+          const allRes = await API.get('/hotels', {
+            params: { status: 'active' },
+            skipErrorToast: true,
+          });
+          list = Array.isArray(allRes.data) ? allRes.data : [];
+        }
+        if (!cancelled) {
+          setLocalCatalogOptions(list.map(mapLocalHotelToCatalogOption).filter(Boolean));
+        }
+      } catch {
+        if (!cancelled) setLocalCatalogOptions([]);
+      } finally {
+        if (!cancelled) setLoadingCatalog(false);
+      }
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, isCab, destination]);
+
+  const catalogOptions = localCatalogOptions.length ? localCatalogOptions : options;
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return options.filter((opt) => {
+    return catalogOptions.filter((opt) => {
       if (starFilter > 0) {
         const stars = Number(opt.starRating || opt.starCategory || 0);
         if (Math.round(stars) !== starFilter) return false;
@@ -709,7 +769,7 @@ export default function PackageResourcePickerDrawer({
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [options, query, starFilter]);
+  }, [catalogOptions, query, starFilter]);
 
   const rooms = (hotelDetail?.rooms?.length
     ? hotelDetail.rooms
@@ -796,7 +856,7 @@ export default function PackageResourcePickerDrawer({
         thumbnailUrl: option.image,
         rooms: buildFallbackRooms(option),
       });
-      setDetailError('Showing package room options (catalog rooms unavailable)');
+      setDetailError('Showing available room options (Hotel Control rooms unavailable)');
     } finally {
       setLoadingDetail(false);
     }
@@ -965,18 +1025,36 @@ export default function PackageResourcePickerDrawer({
             </p>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3 bg-slate-50">
-            {filtered.map((cab) => {
-              const id = cab.id || cab.packageCabId || cab.name;
-              return (
-                <CabOptionCard
-                  key={id}
-                  cab={cab}
-                  selected={selectedId != null && selectedId === id}
-                  onSelect={onSelect}
-                  basePrice={basePrice}
+            {filtered.length > 0 ? (
+              filtered.map((cab) => {
+                const id = cab.id || cab.packageCabId || cab.name;
+                return (
+                  <CabOptionCard
+                    key={id}
+                    cab={cab}
+                    selected={selectedId != null && selectedId === id}
+                    onSelect={onSelect}
+                    basePrice={basePrice}
+                  />
+                );
+              })
+            ) : (
+              <div className="rounded-2xl border border-emerald-100 bg-white p-4">
+                <p className="text-sm font-semibold text-slate-800 mb-1">No package cabs attached</p>
+                <p className="text-xs text-slate-500 mb-3">
+                  Search catalog cabs below, or add cabs when creating the package.
+                </p>
+                <CatalogCabSelector
+                  lead={lead}
+                  pkg={pkg}
+                  packageCabs={options}
+                  value={null}
+                  onChange={(cab) => {
+                    if (cab) onSelect?.(cab);
+                  }}
                 />
-              );
-            })}
+              </div>
+            )}
           </div>
         </>
       ) : (
@@ -1039,11 +1117,17 @@ export default function PackageResourcePickerDrawer({
                     </p>
                   </div>
 
-                  {filtered.length === 0 ? (
+                  {loadingCatalog ? (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-5 py-14 text-center">
+                      <Loader2 className="mx-auto mb-2 h-8 w-8 animate-spin text-orange-500" />
+                      <p className="text-sm font-semibold text-slate-800">Loading Hotel Control…</p>
+                      <p className="mt-1 text-xs text-slate-500">Fetching hotels for this destination</p>
+                    </div>
+                  ) : filtered.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-5 py-14 text-center">
                       <Hotel className="w-8 h-8 mx-auto text-slate-300 mb-2" />
                       <p className="text-sm font-semibold text-slate-800">No hotels match</p>
-                      <p className="text-xs text-slate-500 mt-1">Try a different search.</p>
+                      <p className="text-xs text-slate-500 mt-1">Try a different search or sync rooms in Hotel Control.</p>
                     </div>
                   ) : (
                     <div className="space-y-3">

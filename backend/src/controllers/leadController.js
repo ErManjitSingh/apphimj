@@ -372,6 +372,11 @@ const createLead = asyncHandler(async (req, res) => {
     data.assignedTo = req.user._id;
     data.assigneeRole = 'sales_executive';
     stampPendingAcceptance(data, data);
+  } else if (data.assignedTo && !data.assigneeRole) {
+    data.assigneeRole = req.body.assigneeRole || 'sales_executive';
+    stampPendingAcceptance(data, data);
+  } else if (data.assignedTo) {
+    stampPendingAcceptance(data, data);
   }
 
   const prior = await findDuplicateLeads({

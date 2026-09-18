@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ExternalLink, Search } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, ExternalLink, Plus, Search } from 'lucide-react';
 import API from '../../api/axios';
 import { Button } from '../ui/button';
 import Avatar from '../ui/Avatar';
@@ -27,7 +27,10 @@ import { hydrateWizardFromQuote } from './quotationHydrate';
 import { unwrapList } from '../../utils/apiHelpers';
 import PackageBuilderWorkspace from './PackageBuilderWorkspace';
 import PackageBuilderOpeningOverlay from './PackageBuilderOpeningOverlay';
+import PackageFormModal from '../packages/PackageFormModal';
 import { cn } from '../../lib/utils';
+import { useAuth } from '../../context/AuthContext';
+import { canAccess } from '../../lib/permissions';
 import {
   invalidateLeadDetail,
   invalidateLeadLists,
@@ -121,6 +124,7 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
   const config = CONFIG_BY_MODE[mode] || EXECUTIVE_CONFIG;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { id: routeQuoteId } = useParams();
   const [searchParams] = useSearchParams();
   const initialLeadId = searchParams.get('leadId');
@@ -153,7 +157,12 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
   const [editMeta, setEditMeta] = useState({ quoteNumber: '', status: '' });
   const [resubmissionReason, setResubmissionReason] = useState('');
   const [needsResubmissionReason, setNeedsResubmissionReason] = useState(false);
+  const [createPackageOpen, setCreatePackageOpen] = useState(false);
+  const [creatingPackage, setCreatingPackage] = useState(false);
   const hydratedEditRef = useRef(false);
+
+  const canCreatePackage =
+    canAccess(user, 'packages', 'create') || user?.role === 'admin' || mode === 'executive';
 
   const isMongoPackageId = (id) => id && /^[a-fA-F0-9]{24}$/.test(String(id));
 
@@ -658,6 +667,37 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
     } finally {
       setLoadingPackageDetail(false);
       setStep(3);
+    }
+  };
+
+  const handleCreatePackageSubmit = async (data) => {
+    if (creatingPackage) return;
+    setCreatingPackage(true);
+    try {
+      const packageCabs = Array.isArray(data.packageCabs) ? data.packageCabs : [];
+      const res = await API.post('/packages', {
+        ...data,
+        sourceType: 'local',
+        destination: data.destination || selectedLead?.destination || '',
+        packageCabs,
+        fullData: {
+          ...data,
+          itinerary: data.itinerary || [],
+          packageCabs,
+        },
+      });
+      const created = {
+        ...res.data,
+        catalogSource: 'custom',
+        _id: res.data._id || res.data.id,
+      };
+      setCreatePackageOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ['quotation-packages'] });
+      await selectPackage(created);
+    } catch {
+      /* axios toast */
+    } finally {
+      setCreatingPackage(false);
     }
   };
 
@@ -1179,13 +1219,28 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
             )}
             {step === 2 && (
               <div className="space-y-3">
-                <h2 className="text-base font-bold sm:text-lg">Select Package</h2>
-                <p className="text-xs text-content-muted">
-                  Packages related to lead destination (state and its cities)
-                  {selectedLead?.destination ? (
-                    <> — <span className="font-medium text-content-primary">{selectedLead.destination}</span></>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="text-base font-bold sm:text-lg">Select Package</h2>
+                    <p className="text-xs text-content-muted">
+                      Packages related to lead destination (state and its cities)
+                      {selectedLead?.destination ? (
+                        <> — <span className="font-medium text-content-primary">{selectedLead.destination}</span></>
+                      ) : null}
+                    </p>
+                  </div>
+                  {canCreatePackage ? (
+                    <Button
+                      type="button"
+                      className="shrink-0 gap-1.5 rounded-xl"
+                      onClick={() => setCreatePackageOpen(true)}
+                      disabled={creatingPackage || loadingPackageDetail}
+                    >
+                      <Plus className="h-4 w-4" />
+                      Create new package
+                    </Button>
                   ) : null}
-                </p>
+                </div>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" />
                   <input
@@ -1205,11 +1260,24 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
                 <>
                 <div className="max-h-[min(50dvh,420px)] space-y-2 overflow-y-auto">
                   {filteredPackages.length === 0 ? (
-                    <p className="py-8 text-center text-sm text-content-muted">
-                      {packages.length === 0
-                        ? 'No packages found for this lead destination.'
-                        : 'No packages match your search. Try another keyword from the package name.'}
-                    </p>
+                    <div className="rounded-2xl border border-dashed border-subtle bg-surface-elevated/40 px-4 py-10 text-center">
+                      <p className="text-sm text-content-muted">
+                        {packages.length === 0
+                          ? 'No packages found for this lead destination.'
+                          : 'No packages match your search. Try another keyword from the package name.'}
+                      </p>
+                      {canCreatePackage ? (
+                        <Button
+                          type="button"
+                          className="mt-4 gap-1.5 rounded-xl"
+                          onClick={() => setCreatePackageOpen(true)}
+                          disabled={creatingPackage || loadingPackageDetail}
+                        >
+                          <Plus className="h-4 w-4" />
+                          Create new package
+                        </Button>
+                      ) : null}
+                    </div>
                   ) : pagedPackages.map((p) => (
                     <button
                       key={`${p.catalogSource || 'pkg'}-${p._id}`}
@@ -1335,6 +1403,20 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
         packageName={openingPackageMeta.name}
         destination={openingPackageMeta.destination}
       />
+
+      {canCreatePackage ? (
+        <PackageFormModal
+          open={createPackageOpen}
+          onClose={() => {
+            if (creatingPackage) return;
+            setCreatePackageOpen(false);
+          }}
+          onSubmit={handleCreatePackageSubmit}
+          editPackage={null}
+          isCreate
+          defaultDestination={selectedLead?.destination || ''}
+        />
+      ) : null}
     </div>
   );
 }

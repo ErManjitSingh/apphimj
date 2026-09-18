@@ -416,7 +416,7 @@ export function buildSelectedCabSnapshot(cab, { vehicleCount = 1, travelers, ext
   const rows = [];
   if (cab) {
     const count = Math.max(1, Number(vehicleCount) || 1);
-    const unit = Number(cab.absoluteFare ?? cab.totalAmount ?? cab.cost ?? 0) || 0;
+    const unit = Number(cab.fareOverride ?? cab.absoluteFare ?? cab.totalAmount ?? cab.cost ?? 0) || 0;
     const upgrade = Number(cab.upgradePrice ?? cab.priceDelta ?? 0) || 0;
     const total = Math.round(unit * count * 100) / 100;
     rows.push({
@@ -442,6 +442,7 @@ export function buildSelectedCabSnapshot(cab, { vehicleCount = 1, travelers, ext
       isPackageCab: Boolean(cab.isPackageCab),
       isDefault: Boolean(cab.isDefault),
       absoluteFare: unit,
+      fareOverride: cab.fareOverride != null ? unit : undefined,
       unitCost: unit,
       cost: total,
       totalAmount: total,
@@ -455,7 +456,7 @@ export function buildSelectedCabSnapshot(cab, { vehicleCount = 1, travelers, ext
 
   for (const extra of Array.isArray(extraCabs) ? extraCabs : []) {
     if (!extra) continue;
-    const unit = Number(extra.absoluteFare ?? extra.totalAmount ?? extra.cost ?? 0) || 0;
+    const unit = Number(extra.fareOverride ?? extra.absoluteFare ?? extra.totalAmount ?? extra.cost ?? 0) || 0;
     const upgrade = Number(extra.upgradePrice ?? extra.priceDelta ?? 0) || 0;
     rows.push({
       _id: extra.id || extra.slug || extra.packageCabId,
@@ -479,6 +480,7 @@ export function buildSelectedCabSnapshot(cab, { vehicleCount = 1, travelers, ext
       isPackageCab: Boolean(extra.isPackageCab),
       isDefault: Boolean(extra.isDefault),
       absoluteFare: unit,
+      fareOverride: extra.fareOverride != null ? unit : undefined,
       unitCost: unit,
       cost: unit,
       totalAmount: unit,

@@ -954,6 +954,28 @@ export default function PackageBuilderWorkspace({
               onChangeRoomMattresses={handleSetRoomMattresses}
               onChangeCab={() => openCabPicker('change')}
               onAddCab={() => openCabPicker('add')}
+              onCabFareChange={(value) => {
+                if (!selectedPackageCab) return;
+                const fare = Math.max(0, Number(value) || 0);
+                onCabChange?.({
+                  ...selectedPackageCab,
+                  fareOverride: fare,
+                  absoluteFare: fare,
+                  totalAmount: fare,
+                });
+              }}
+              onExtraCabFareChange={(index, value) => {
+                const fare = Math.max(0, Number(value) || 0);
+                const next = (extraCabs || []).map((cab, i) =>
+                  i === index
+                    ? { ...cab, fareOverride: fare, absoluteFare: fare, totalAmount: fare }
+                    : cab
+                );
+                onExtraCabsChange?.(next);
+              }}
+              onRemoveExtraCab={(index) => {
+                onExtraCabsChange?.((extraCabs || []).filter((_, i) => i !== index));
+              }}
               extraCabs={extraCabs}
               destination={hotelDestination || pkg?.destination || 'Destination'}
               embedded
@@ -1117,6 +1139,8 @@ export default function PackageBuilderWorkspace({
         selectedId={cabSelectedId}
         onSelect={selectCab}
         basePrice={cabBasePrice}
+        lead={lead}
+        pkg={pkg}
       />
 
       <PackageResourcePickerDrawer

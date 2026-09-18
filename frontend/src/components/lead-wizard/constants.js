@@ -250,4 +250,8 @@ export const defaultWizardValues = {
   previousDestination: '',
   previousTravelDate: '',
   referralNotes: '',
+  // Create-lead assignment (admin / lead_provider / manager) — default unassigned
+  assignmentMode: 'unassigned',
+  assignedTo: '',
+  assigneeRole: 'sales_executive',
 };

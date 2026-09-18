@@ -21,6 +21,10 @@ import {
   mealPlanNightlyRate,
   pickPreferredMealPlan,
 } from '../../lib/mealPlanDefaults';
+import {
+  mapLocalHotelToCatalogOption,
+  mapLocalHotelToCatalogDetail,
+} from '../../lib/localHotelCatalog';
 import { cn } from '../../lib/utils';
 
 const SUB_STEPS = [
@@ -327,17 +331,21 @@ export default function CatalogHotelSelector({
   useEffect(() => {
     let cancelled = false;
     setLoadingHotels(true);
-    API.get('/catalog-hotels', {
+    API.get('/hotels', {
       params: {
-        destination,
-        limit: debouncedSearch ? 50 : 24,
+        status: 'active',
+        ...(destination ? { destination } : {}),
         ...(debouncedSearch ? { search: debouncedSearch } : {}),
-        ...(starFilter > 0 ? { star_category: starFilter } : {}),
       },
       skipErrorToast: true,
     })
       .then((res) => {
-        if (!cancelled) setHotels(res.data?.items || []);
+        if (cancelled) return;
+        let list = Array.isArray(res.data) ? res.data : [];
+        if (starFilter > 0) {
+          list = list.filter((h) => Math.round(Number(h.starRating) || 0) === starFilter);
+        }
+        setHotels(list.map(mapLocalHotelToCatalogOption).filter(Boolean));
       })
       .catch(() => {
         if (!cancelled) setHotels([]);
@@ -355,19 +363,11 @@ export default function CatalogHotelSelector({
     setHotelDetail(null);
     onChange(null);
     try {
-      const res = await API.get('/catalog-hotels/detail', {
-        params: {
-          city: hotel.city,
-          slug: hotel.slug,
-          ...(checkIn ? { check_in: checkIn } : {}),
-          ...(checkOut ? { check_out: checkOut } : {}),
-          ...(roomCount ? { rooms: roomCount } : {}),
-          ...(adults ? { adults } : {}),
-        },
-        skipErrorToast: true,
-      });
-      setHotelDetail(res.data);
-      onChange({ hotel: res.data, room: null, mealPlan: null, nights, totalCost: 0 });
+      const localId = hotel.localHotelId || hotel._id || hotel.id;
+      const res = await API.get(`/hotels/${localId}`, { skipErrorToast: true });
+      const detail = mapLocalHotelToCatalogDetail(res.data);
+      setHotelDetail(detail);
+      onChange({ hotel: detail, room: null, mealPlan: null, nights, totalCost: 0 });
       setSubStep('room');
     } catch {
       setHotelDetail(hotel);

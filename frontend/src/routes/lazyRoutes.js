@@ -20,6 +20,7 @@ export const LeadAuditLog = lazy(() => import('../pages/LeadAuditLog'));
 export const WhatsAppLeads = lazy(() => import('../pages/WhatsAppLeads'));
 export const Packages = lazy(() => import('../pages/Packages'));
 export const HotelControlPage = lazy(() => import('../pages/HotelControlPage'));
+export const HotelEditPage = lazy(() => import('../pages/HotelEditPage'));
 export const Quotations = lazy(() => import('../pages/Quotations'));
 export const Reports = lazy(() => import('../pages/Reports'));
 export const Team = lazy(() => import('../pages/Team'));

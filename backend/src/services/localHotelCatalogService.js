@@ -28,6 +28,150 @@ function starCategory(starRating) {
   return 'Hotel';
 }
 
+function normalizeMealRates(raw = {}, fallback = {}) {
+  return {
+    ep: toNumber(raw.ep ?? fallback.ep, 0),
+    cp: toNumber(raw.cp ?? fallback.cp, 0),
+    map: toNumber(raw.map ?? fallback.map, 0),
+    ap: toNumber(raw.ap ?? fallback.ap, 0),
+  };
+}
+
+function normalizeRoomRates(raw = {}) {
+  const flat = normalizeMealRates(raw);
+  const onSeason = normalizeMealRates(raw.onSeason, flat);
+  const offSeason = normalizeMealRates(raw.offSeason, flat);
+  return {
+    ...flat,
+    onSeason,
+    offSeason,
+  };
+}
+
+function maxMealRates(a = {}, b = {}) {
+  return {
+    ep: Math.max(toNumber(a.ep, 0), toNumber(b.ep, 0)),
+    cp: Math.max(toNumber(a.cp, 0), toNumber(b.cp, 0)),
+    map: Math.max(toNumber(a.map, 0), toNumber(b.map, 0)),
+    ap: Math.max(toNumber(a.ap, 0), toNumber(b.ap, 0)),
+  };
+}
+
+function mergeRoomTypes(...lists) {
+  const map = new Map();
+  for (const list of lists) {
+    for (const room of list || []) {
+      const name = String(room?.name || '').trim();
+      if (!name) continue;
+      const sourceId = String(room.sourceRoomId || '').trim();
+      const key = sourceId ? `id:${sourceId}` : `name:${name.toLowerCase()}`;
+      const rates = normalizeRoomRates(room.rates || {});
+      const images = uniqueStrings(room.images || []);
+      const incoming = {
+        name,
+        maxOccupancy: toNumber(room.maxOccupancy, 2) || 2,
+        baseRate: toNumber(room.baseRate, 0),
+        bedType: String(room.bedType || '').trim(),
+        mealPlan: String(room.mealPlan || '').trim(),
+        rates,
+        extraBedRate: toNumber(room.extraBedRate, 0),
+        images,
+        sourceRoomId: sourceId || null,
+      };
+      const prev = map.get(key);
+      if (!prev) {
+        map.set(key, incoming);
+        continue;
+      }
+      const mergedFlat = maxMealRates(prev.rates, incoming.rates);
+      map.set(key, {
+        name: prev.name || incoming.name,
+        maxOccupancy: Math.max(prev.maxOccupancy || 2, incoming.maxOccupancy || 2),
+        baseRate: Math.max(prev.baseRate || 0, incoming.baseRate || 0),
+        bedType: prev.bedType || incoming.bedType,
+        mealPlan: prev.mealPlan || incoming.mealPlan,
+        rates: {
+          ...mergedFlat,
+          onSeason: maxMealRates(prev.rates?.onSeason, incoming.rates?.onSeason),
+          offSeason: maxMealRates(prev.rates?.offSeason, incoming.rates?.offSeason),
+        },
+        extraBedRate: Math.max(prev.extraBedRate || 0, incoming.extraBedRate || 0),
+        images: uniqueStrings([...(prev.images || []), ...(incoming.images || [])]),
+        sourceRoomId: prev.sourceRoomId || incoming.sourceRoomId,
+      });
+    }
+  }
+  return [...map.values()];
+}
+
+function extractRoomTypes(meta = {}, fallbackPrice = 0) {
+  const rooms = [];
+
+  const pushRoom = (raw = {}, extras = {}) => {
+    if (!raw || typeof raw !== 'object') return;
+    const name = String(
+      raw.name || raw.tierName || raw.room_type || raw.roomType || extras.name || ''
+    ).trim();
+    if (!name) return;
+    const rates = normalizeRoomRates(raw.rates && typeof raw.rates === 'object' ? raw.rates : {});
+    const baseRate = toNumber(
+      raw.pricePerNight ??
+        raw.baseRate ??
+        raw.absolutePrice ??
+        raw.absolutePerNight ??
+        rates.map ??
+        rates.cp ??
+        extras.price ??
+        fallbackPrice,
+      0
+    );
+    rooms.push({
+      name,
+      maxOccupancy: toNumber(raw.maxOccupancy ?? raw.max_occupancy ?? extras.maxOccupancy, 2) || 2,
+      baseRate,
+      bedType: String(raw.bedType || raw.bed_type || extras.bedType || '').trim(),
+      mealPlan: String(raw.mealPlan || raw.meals || extras.mealPlan || '').trim(),
+      rates,
+      extraBedRate: toNumber(raw.extraBedRate ?? raw.extra_bed_rate ?? extras.extraBedRate, 0),
+      images: uniqueStrings([
+        ...(Array.isArray(raw.images) ? raw.images : []),
+        raw.image,
+        raw.image_url,
+        raw.thumbnail,
+        ...(Array.isArray(extras.images) ? extras.images : []),
+      ]),
+      sourceRoomId: String(raw.id || raw.roomTypeId || extras.roomTypeId || '').trim() || null,
+    });
+  };
+
+  if (meta.room) pushRoom(meta.room);
+  if (Array.isArray(meta.rooms)) meta.rooms.forEach((r) => pushRoom(r));
+  if (Array.isArray(meta.room_types)) meta.room_types.forEach((r) => pushRoom(r));
+  if (Array.isArray(meta.roomTypes)) meta.roomTypes.forEach((r) => pushRoom(r));
+
+  if (meta.tierName || meta.roomType || meta.room_type) {
+    pushRoom(
+      {
+        name: meta.tierName || meta.roomType || meta.room_type,
+        pricePerNight: meta.absolutePerNight ?? meta.includedRate ?? meta.startingPrice ?? meta.price,
+        maxOccupancy: meta.maxOccupancy,
+        mealPlan: meta.meals || meta.mealPlan,
+        id: meta.roomTypeId,
+        rates: meta.room?.rates,
+        extraBedRate: meta.extraBedPerNight ?? meta.room?.extraBedRate,
+        bedType: meta.room?.bedType,
+      },
+      {
+        price: fallbackPrice,
+        roomTypeId: meta.roomTypeId,
+        mealPlan: meta.meals || meta.mealPlan,
+      }
+    );
+  }
+
+  return mergeRoomTypes(rooms);
+}
+
 function collectHotelCandidates(pkg = {}) {
   const destination =
     pkg.destinationName ||
@@ -61,19 +205,24 @@ function collectHotelCandidates(pkg = {}) {
         meta.price_delta,
       0
     );
+    const roomTypes = extractRoomTypes(meta, price);
+    const primaryRoom = roomTypes[0];
     candidates.push({
       name,
       location,
       destination: String(destination || location).trim() || location,
       category: starCategory(meta.starRating || meta.star_rating || meta.stars),
       starRating: toNumber(meta.starRating || meta.star_rating || meta.stars, 0),
-      roomType: String(meta.tierName || meta.room_type || meta.roomType || 'Standard').trim() || 'Standard',
-      mealPlan: String(meta.meals || meta.mealPlan || meta.meal_plan || 'MAP').trim() || 'MAP',
+      roomType:
+        String(meta.tierName || meta.room_type || meta.roomType || primaryRoom?.name || 'Standard').trim() ||
+        'Standard',
+      mealPlan: String(meta.meals || meta.mealPlan || meta.meal_plan || primaryRoom?.mealPlan || 'MAP').trim() || 'MAP',
       price,
       absolutePerNight: price,
       coverImage: images[0] || '',
       images,
       amenities: Array.isArray(meta.amenities) ? meta.amenities.filter(Boolean) : [],
+      roomTypes,
       sourceHotelId: String(meta.hotelId || meta.hotel_id || meta.id || '').trim() || null,
       sourceSlug: String(meta.slug || meta.hotel_slug || '').trim() || null,
       packageId: pkg._id ? String(pkg._id) : null,
@@ -117,6 +266,7 @@ function collectHotelCandidates(pkg = {}) {
         slug: stay.hotel_slug || stay.slug,
         hotel_id: stay.hotel_id || stay.id,
         amenities: stay.amenities,
+        rooms: stay.rooms || stay.room_types,
       });
     }
     if (Array.isArray(stay?.hotel_options)) {
@@ -133,6 +283,7 @@ function mergeCandidate(a, b) {
     ...b,
     images: uniqueStrings([...(a.images || []), ...(b.images || [])]),
     amenities: uniqueStrings([...(a.amenities || []), ...(b.amenities || [])]),
+    roomTypes: mergeRoomTypes(a.roomTypes, b.roomTypes),
     price: Math.max(toNumber(a.price), toNumber(b.price)),
     absolutePerNight: Math.max(toNumber(a.absolutePerNight), toNumber(b.absolutePerNight)),
     starRating: Math.max(toNumber(a.starRating), toNumber(b.starRating)),
@@ -153,14 +304,20 @@ function mergeCandidate(a, b) {
 function buildHotelDoc(candidate) {
   const images = uniqueStrings(candidate.images || []);
   const price = toNumber(candidate.price || candidate.absolutePerNight, 0);
+  const roomTypes = mergeRoomTypes(
+    candidate.roomTypes,
+    candidate.roomType
+      ? [{ name: candidate.roomType, maxOccupancy: 2, baseRate: price, mealPlan: candidate.mealPlan || '' }]
+      : []
+  );
   return {
     name: candidate.name,
     destination: candidate.destination || candidate.location,
     location: candidate.location || candidate.destination || 'India',
     category: candidate.category || starCategory(candidate.starRating),
     starRating: toNumber(candidate.starRating, 0),
-    roomType: candidate.roomType || 'Standard',
-    mealPlan: candidate.mealPlan || 'MAP',
+    roomType: candidate.roomType || roomTypes[0]?.name || 'Standard',
+    mealPlan: candidate.mealPlan || roomTypes[0]?.mealPlan || 'MAP',
     price,
     absolutePerNight: toNumber(candidate.absolutePerNight || price, 0),
     coverImage: candidate.coverImage || images[0] || '',
@@ -170,9 +327,7 @@ function buildHotelDoc(candidate) {
     sourceSlug: candidate.sourceSlug || null,
     sourceType: 'catalog_import',
     packageRefs: uniqueStrings(candidate.packageRefs || [candidate.packageSlug, candidate.packageName]),
-    roomTypes: candidate.roomType
-      ? [{ name: candidate.roomType, maxOccupancy: 2, baseRate: price }]
-      : [],
+    roomTypes,
     status: 'active',
   };
 }
@@ -203,8 +358,17 @@ async function upsertHotelCandidate(candidate) {
     existing.sourceSlug = existing.sourceSlug || doc.sourceSlug;
     existing.sourceType = existing.sourceType || 'catalog_import';
     existing.packageRefs = uniqueStrings([...(existing.packageRefs || []), ...doc.packageRefs]);
-    if (!existing.roomTypes?.length && doc.roomTypes?.length) {
-      existing.roomTypes = doc.roomTypes;
+    const existingRich =
+      (existing.roomTypes || []).length > 1 ||
+      (existing.roomTypes || []).some((r) => (r.images || []).length || r.sourceRoomId);
+    const incomingThin =
+      (doc.roomTypes || []).length <= 1 &&
+      !(doc.roomTypes || []).some((r) => (r.images || []).length > 1 || ((r.images || []).length === 1 && r.sourceRoomId));
+    if (!(existingRich && incomingThin)) {
+      existing.roomTypes = mergeRoomTypes(existing.roomTypes, doc.roomTypes);
+    }
+    if (!existing.roomType && existing.roomTypes?.[0]?.name) {
+      existing.roomType = existing.roomTypes[0].name;
     }
     existing.status = 'active';
     await existing.save();
@@ -248,17 +412,212 @@ async function importHotelsFromPackages({ limit = 0 } = {}) {
     else updated += 1;
   }
 
+  const sync = await syncHotelRoomsFromUno();
   return {
-    packagesScanned: packages.length,
-    hotelsFound: byKey.size,
+    scanned: packages.length,
+    hotels: byKey.size,
     created,
     updated,
-    total: created + updated,
+    roomsSynced: sync.updated,
+    roomsFailed: sync.failed,
   };
 }
 
+function mapUnoRoomsToRoomTypes(rooms = []) {
+  return (rooms || [])
+    .map((room) => {
+      const name = String(room?.name || '').trim();
+      if (!name) return null;
+      const flat = normalizeMealRates(room.rates || {}, {
+        ep: room.epPrice,
+        map: room.pricePerNight,
+      });
+      const baseRate =
+        flat.map || flat.cp || flat.ep || flat.ap || toNumber(room.pricePerNight, 0);
+      const extraBed =
+        typeof room.extraBedRates === 'object'
+          ? toNumber(
+              room.extraBedRates?.map ||
+                room.extraBedRates?.cp ||
+                room.extraBedRates?.ep ||
+                0,
+              0
+            )
+          : toNumber(room.extraBedRate, 0);
+      return {
+        name,
+        maxOccupancy: toNumber(room.maxOccupancy, 2) || 2,
+        baseRate,
+        bedType: String(room.bedType || '').trim(),
+        mealPlan: 'MAP',
+        rates: {
+          ...flat,
+          onSeason: { ...flat },
+          offSeason: { ep: 0, cp: 0, map: 0, ap: 0 },
+        },
+        extraBedRate: extraBed,
+        images: uniqueStrings(room.images || []),
+        sourceRoomId: String(room.id || room._id || '').trim() || null,
+      };
+    })
+    .filter(Boolean);
+}
+
+function preserveManualSeasonRates(existingRooms = [], incomingRooms = []) {
+  const byId = new Map();
+  const byName = new Map();
+  for (const room of existingRooms || []) {
+    if (room?.sourceRoomId) byId.set(String(room.sourceRoomId), room);
+    if (room?.name) byName.set(String(room.name).toLowerCase(), room);
+  }
+  return (incomingRooms || []).map((room) => {
+    const prev = (room.sourceRoomId && byId.get(String(room.sourceRoomId))) || byName.get(String(room.name).toLowerCase());
+    if (!prev?.rates) return room;
+    const prevOff = prev.rates.offSeason || {};
+    const hasOff = ['ep', 'cp', 'map', 'ap'].some((k) => toNumber(prevOff[k], 0) > 0);
+    const prevOn = prev.rates.onSeason || {};
+    const hasOn = ['ep', 'cp', 'map', 'ap'].some((k) => toNumber(prevOn[k], 0) > 0);
+    return {
+      ...room,
+      rates: {
+        ...room.rates,
+        onSeason: hasOn ? normalizeMealRates(prevOn, room.rates?.onSeason) : room.rates.onSeason,
+        offSeason: hasOff ? normalizeMealRates(prevOff) : room.rates.offSeason,
+      },
+      // Keep manually typed rates if user already saved them for same room.
+      baseRate: toNumber(prev.baseRate, 0) > 0 && hasOn ? prev.baseRate : room.baseRate,
+    };
+  });
+}
+
+async function resolveUnoHotelDetail(hotel) {
+  const { getUnoHotelDetail, listUnoHotels } = require('./unoHotelsHotelService');
+  const { inferCityFromDestination } = require('../utils/destinationMatch');
+
+  const cityCandidates = uniqueStrings([
+    hotel.destination,
+    hotel.location,
+    inferCityFromDestination(hotel.destination || ''),
+    inferCityFromDestination(hotel.location || ''),
+    String(hotel.destination || '').split(',')[0],
+    String(hotel.location || '').split(',')[0],
+  ]).map((c) => inferCityFromDestination(c) || c);
+
+  const slug = String(hotel.sourceSlug || '').trim();
+  if (slug) {
+    for (const city of cityCandidates) {
+      if (!city) continue;
+      try {
+        const detail = await getUnoHotelDetail({ city, slug });
+        if (detail?.rooms?.length) return detail;
+      } catch {
+        // try next city
+      }
+    }
+  }
+
+  // Fallback: search by hotel name in destination city
+  const searchName = String(hotel.name || '').trim();
+  if (!searchName) return null;
+  for (const city of cityCandidates) {
+    try {
+      const result = await listUnoHotels({
+        city,
+        destination: city,
+        search: searchName,
+        limit: 8,
+      });
+      const items = result?.items || [];
+      const needle = searchName.toLowerCase();
+      const match =
+        items.find((h) => String(h.name || '').toLowerCase() === needle) ||
+        items.find((h) => String(h.name || '').toLowerCase().includes(needle)) ||
+        items.find((h) => needle.includes(String(h.name || '').toLowerCase())) ||
+        items[0];
+      if (!match?.slug) continue;
+      const detailCity = match.city || city;
+      const detail = await getUnoHotelDetail({ city: detailCity, slug: match.slug });
+      if (detail?.rooms?.length) {
+        return {
+          ...detail,
+          matchedSlug: match.slug,
+          matchedHotelId: match.id || match._id || null,
+        };
+      }
+    } catch {
+      // continue
+    }
+  }
+  return null;
+}
+
+async function enrichHotelDocumentFromUno(hotelDoc) {
+  const detail = await resolveUnoHotelDetail(hotelDoc);
+  if (!detail?.rooms?.length) return { updated: false, reason: 'no_rooms' };
+
+  const incoming = mapUnoRoomsToRoomTypes(detail.rooms);
+  if (!incoming.length) return { updated: false, reason: 'empty_rooms' };
+
+  const preserved = preserveManualSeasonRates(hotelDoc.roomTypes || [], incoming);
+  hotelDoc.roomTypes = preserved;
+  hotelDoc.roomType = preserved[0]?.name || hotelDoc.roomType;
+  hotelDoc.images = uniqueStrings([...(hotelDoc.images || []), ...(detail.images || [])]);
+  hotelDoc.coverImage = hotelDoc.coverImage || detail.images?.[0] || hotelDoc.images?.[0] || '';
+  if (detail.matchedSlug && !hotelDoc.sourceSlug) hotelDoc.sourceSlug = detail.matchedSlug;
+  if (detail.matchedHotelId && !hotelDoc.sourceHotelId) {
+    hotelDoc.sourceHotelId = String(detail.matchedHotelId);
+  }
+  if (detail.slug && !hotelDoc.sourceSlug) hotelDoc.sourceSlug = detail.slug;
+  if ((detail.id || detail._id) && !hotelDoc.sourceHotelId) {
+    hotelDoc.sourceHotelId = String(detail.id || detail._id);
+  }
+  const lowest = preserved
+    .map((r) => toNumber(r.baseRate, 0))
+    .filter((n) => n > 0);
+  if (lowest.length) {
+    const minRate = Math.min(...lowest);
+    hotelDoc.price = minRate;
+    hotelDoc.absolutePerNight = minRate;
+  }
+  await hotelDoc.save();
+  return { updated: true, rooms: preserved.length };
+}
+
+async function syncHotelRoomsFromUno({ limit = 0, onlyThin = false } = {}) {
+  const filter = { status: { $ne: 'inactive' } };
+  let query = Hotel.find(filter).sort({ updatedAt: -1 });
+  if (limit > 0) query = query.limit(limit);
+  const hotels = await query;
+  let updated = 0;
+  let failed = 0;
+  let skipped = 0;
+
+  for (const hotel of hotels) {
+    const roomCount = Array.isArray(hotel.roomTypes) ? hotel.roomTypes.length : 0;
+    const hasImages = (hotel.roomTypes || []).some((r) => Array.isArray(r.images) && r.images.length);
+    if (onlyThin && roomCount > 1 && hasImages) {
+      skipped += 1;
+      continue;
+    }
+    try {
+      const result = await enrichHotelDocumentFromUno(hotel);
+      if (result.updated) updated += 1;
+      else skipped += 1;
+    } catch (err) {
+      failed += 1;
+      console.warn(`[hotel-rooms-sync] ${hotel.name}:`, err?.message || err);
+    }
+  }
+
+  return { total: hotels.length, updated, failed, skipped };
+}
+
 module.exports = {
-  collectHotelCandidates,
   importHotelsFromPackages,
-  upsertHotelCandidate,
+  collectHotelCandidates,
+  mergeRoomTypes,
+  extractRoomTypes,
+  syncHotelRoomsFromUno,
+  enrichHotelDocumentFromUno,
+  mapUnoRoomsToRoomTypes,
 };

@@ -118,28 +118,7 @@ export default function SidebarAccountFooter() {
   }
 
   return (
-    <div className="mt-auto shrink-0 px-3 pb-3 pt-2">
-      <div
-        className="relative mb-3 overflow-hidden rounded-2xl border border-slate-100 shadow-sm"
-        style={{
-          backgroundImage:
-            "linear-gradient(180deg, rgba(15,23,42,0.15) 0%, rgba(15,23,42,0.55) 100%), url('/sidebar-afternoon.webp')",
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      >
-        <div className="flex min-h-[112px] flex-col justify-end px-3.5 py-3.5">
-          <p
-            className="text-[17px] font-bold leading-tight tracking-tight text-white"
-            style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
-          >
-            Travel More
-            <br />
-            Sell More
-          </p>
-        </div>
-      </div>
-
+    <div className="mt-auto shrink-0 border-t border-slate-100 px-3 pb-3 pt-3">
       <DropdownMenuRoot>
         <DropdownMenuTrigger asChild>
           <button

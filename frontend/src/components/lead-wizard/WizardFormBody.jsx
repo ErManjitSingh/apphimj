@@ -4,6 +4,15 @@ import { defaultLeadSourceForRole, defaultWizardValues } from './constants';
 import { useWizardForm } from './WizardFormContext';
 import { useAuth } from '../../context/AuthContext';
 import StepLeadForm from './steps/StepLeadForm';
+import LeadCreateAssignmentSection from './LeadCreateAssignmentSection';
+
+const CAN_CHOOSE_ASSIGNEE = new Set([
+  'admin',
+  'super_admin',
+  'lead_provider',
+  'sales_manager',
+  'team_leader',
+]);
 
 export default function WizardFormBody({
   isEdit,
@@ -14,6 +23,7 @@ export default function WizardFormBody({
 }) {
   const { reset } = useWizardForm();
   const { user } = useAuth();
+  const showAssignment = !isEdit && CAN_CHOOSE_ASSIGNEE.has(user?.role);
 
   const handleClear = () => {
     if (onClear) {
@@ -29,6 +39,8 @@ export default function WizardFormBody({
   return (
     <div className="space-y-5">
       <StepLeadForm isEdit={isEdit} leadId={leadId} />
+
+      {showAssignment && <LeadCreateAssignmentSection />}
 
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <button
