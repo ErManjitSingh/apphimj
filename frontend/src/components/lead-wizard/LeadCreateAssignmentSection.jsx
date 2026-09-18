@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { UserPlus, Users } from 'lucide-react';
-import API from '../../../api/axios';
-import Avatar from '../../ui/Avatar';
-import { useWizardForm } from '../WizardFormContext';
-import { cn } from '../../../lib/utils';
+import API from '../../api/axios';
+import Avatar from '../ui/Avatar';
+import { useWizardForm } from './WizardFormContext';
+import { cn } from '../../lib/utils';
 
 /**
  * Admin / lead_provider / manager create-lead assignment.
