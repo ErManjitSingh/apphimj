@@ -10,12 +10,20 @@ const {
   uploadHotelImage,
 } = require('../controllers/packageController');
 const { protect } = require('../middleware/auth');
+const { authorize } = require('../middleware/rbac');
 
 router.use(protect);
 
-router.route('/').get(listHotels).post(createHotel);
-router.post('/sync-rooms', syncHotelsRooms);
-router.post('/upload-image', uploadHotelImage);
-router.route('/:id').get(getHotel).put(updateHotel).delete(deleteHotel);
+// Catalog read: any authenticated user (quotations / package picker)
+router.get('/', listHotels);
+router.get('/:id', getHotel);
+
+// Hotel Control write: admin + sales manager only
+const hotelManagers = authorize('admin', 'sales_manager');
+router.post('/', hotelManagers, createHotel);
+router.post('/sync-rooms', hotelManagers, syncHotelsRooms);
+router.post('/upload-image', hotelManagers, uploadHotelImage);
+router.put('/:id', hotelManagers, updateHotel);
+router.delete('/:id', hotelManagers, deleteHotel);
 
 module.exports = router;

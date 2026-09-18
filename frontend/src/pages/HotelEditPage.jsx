@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft,
@@ -19,7 +19,6 @@ import {
 } from 'lucide-react';
 import API from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { canAccess } from '../lib/permissions';
 import { HOTEL_CATEGORIES, MEAL_PLANS } from '../components/quotations/constants';
 import { formatINR } from '../components/quotations/quotationUtils';
 import { cn } from '../lib/utils';
@@ -92,10 +91,8 @@ function emptyRoomRow() {
   };
 }
 
-function hotelBasePath(pathname = '') {
-  return pathname.includes('/sales-executive')
-    ? '/sales-executive/hotel-control'
-    : '/hotel-control';
+function hotelBasePath() {
+  return '/hotel-control';
 }
 
 function hotelToForm(hotel) {
@@ -195,14 +192,10 @@ const rateInputClass =
 export default function HotelEditPage() {
   const { id } = useParams();
   const isNew = !id || id === 'new';
-  const { pathname } = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const base = hotelBasePath(pathname);
-  const canSave =
-    canAccess(user, 'packages', isNew ? 'create' : 'edit') ||
-    canAccess(user, 'operations', isNew ? 'create' : 'edit') ||
-    user?.role === 'admin';
+  const base = hotelBasePath();
+  const canSave = user?.role === 'admin' || user?.role === 'sales_manager';
 
   const [form, setForm] = useState(EMPTY_FORM);
   const [loading, setLoading] = useState(!isNew);

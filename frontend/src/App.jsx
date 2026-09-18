@@ -259,9 +259,6 @@ function App() {
                     element={<ExecutiveQuotationsPage />}
                   />
                   <Route path="packages" element={<Packages />} />
-                  <Route path="hotel-control" element={<HotelControlPage />} />
-                  <Route path="hotel-control/new" element={<HotelEditPage />} />
-                  <Route path="hotel-control/:id/edit" element={<HotelEditPage />} />
                   <Route
                     path="customers"
                     element={<ExecutiveCustomersPage />}
@@ -917,25 +914,25 @@ function App() {
                   <Route
                     path="hotel-control"
                     element={
-                      <PermissionRoute module="packages">
+                      <RoleRoute roles={["admin", "sales_manager"]}>
                         <HotelControlPage />
-                      </PermissionRoute>
+                      </RoleRoute>
                     }
                   />
                   <Route
                     path="hotel-control/new"
                     element={
-                      <PermissionRoute module="packages">
+                      <RoleRoute roles={["admin", "sales_manager"]}>
                         <HotelEditPage />
-                      </PermissionRoute>
+                      </RoleRoute>
                     }
                   />
                   <Route
                     path="hotel-control/:id/edit"
                     element={
-                      <PermissionRoute module="packages">
+                      <RoleRoute roles={["admin", "sales_manager"]}>
                         <HotelEditPage />
-                      </PermissionRoute>
+                      </RoleRoute>
                     }
                   />
                   <Route

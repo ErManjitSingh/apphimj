@@ -194,7 +194,7 @@ export const mainNavItems = [
     path: "/hotel-control",
     label: "Hotel Control",
     icon: Building2,
-    permission: { module: "packages", action: "view" },
+    roles: ["admin", "sales_manager"],
   },
   {
     path: "/margin-control",

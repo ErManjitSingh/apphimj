@@ -18,7 +18,6 @@ import {
   Loader,
   Copy,
   Globe2,
-  Building2,
 } from 'lucide-react';
 
 export const salesExecutiveNavItems = [
@@ -45,7 +44,6 @@ export const salesExecutiveNavItems = [
   { path: '/sales-executive/follow-ups', label: 'Follow-ups', icon: CalendarClock, badgeKey: 'followups.due' },
   { path: '/sales-executive/quotations', label: 'Quotations', icon: FileText, countKey: 'quotations.total' },
   { path: '/sales-executive/packages', label: 'Packages', icon: Globe2 },
-  { path: '/sales-executive/hotel-control', label: 'Hotel Control', icon: Building2 },
   { path: '/sales-executive/customers', label: 'Customers', icon: UserCircle, countKey: 'customers' },
   { path: '/sales-executive/calendar', label: 'Calendar', icon: Calendar },
   { path: '/sales-executive/email-activity', label: 'Email Activity', icon: Mail },

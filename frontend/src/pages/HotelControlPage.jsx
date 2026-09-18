@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   BedDouble,
@@ -29,7 +29,6 @@ import {
 } from 'lucide-react';
 import API from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { canAccess } from '../lib/permissions';
 import {
   DropdownMenuRoot,
   DropdownMenuTrigger,
@@ -464,14 +463,12 @@ function HotelCard({ hotel, onEdit, onToggleStatus, onDelete, canEdit, canDelete
 export default function HotelControlPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { pathname } = useLocation();
-  const hotelBase = pathname.includes('/sales-executive')
-    ? '/sales-executive/hotel-control'
-    : '/hotel-control';
-  const canCreate = canAccess(user, 'packages', 'create') || canAccess(user, 'operations', 'create') || user?.role === 'admin';
-  const canEdit = canAccess(user, 'packages', 'edit') || canAccess(user, 'operations', 'edit') || user?.role === 'admin';
-  const canDelete = canAccess(user, 'packages', 'delete') || canAccess(user, 'operations', 'delete') || user?.role === 'admin';
-  const canImport = user?.role === 'admin' || canCreate;
+  const hotelBase = '/hotel-control';
+  const canManage = user?.role === 'admin' || user?.role === 'sales_manager';
+  const canCreate = canManage;
+  const canEdit = canManage;
+  const canDelete = canManage;
+  const canImport = canManage;
 
   const [hotels, setHotels] = useState([]);
   const [loading, setLoading] = useState(true);
