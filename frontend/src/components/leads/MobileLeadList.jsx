@@ -24,7 +24,7 @@ import { toast } from '../../context/ToastContext';
 import { openCrmWhatsApp } from '../../lib/openCrmWhatsApp';
 import {
   DESTINATIONS,
-  LEAD_STATUSES,
+  PIPELINE_LEAD_STATUSES,
   BUDGET_FILTER_OPTIONS,
   TRAVEL_MONTHS,
   PRIORITY_FILTER_OPTIONS,
@@ -244,19 +244,21 @@ export default function MobileLeadList({
               {showMoreFilters && (
                 <div className="grid grid-cols-2 gap-2 rounded-xl border border-violet-100 bg-violet-50/40 p-2">
                   <select
-                    value={filters.listStatus || ''}
+                    value={filters.status || ''}
                     onChange={(event) =>
                       onFiltersChange({
                         ...filters,
-                        listStatus: event.target.value,
-                        status: '',
+                        status: event.target.value,
+                        listStatus: '',
                         filter: '',
                       })
                     }
                     className="h-9 rounded-xl border border-slate-200 bg-white px-2 text-[9px] text-slate-600 outline-none"
                   >
                     <option value="">Lead Status</option>
-                    {LEAD_STATUSES.map((status) => (
+                    {PIPELINE_LEAD_STATUSES.filter((s) =>
+                      ['new_lead', 'not_reachable', 'qualified', 'package_sent', 'follow_up', 'booked', 'postponed', 'lost'].includes(s.value)
+                    ).map((status) => (
                       <option key={status.value} value={status.value}>{status.label}</option>
                     ))}
                   </select>

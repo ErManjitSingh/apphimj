@@ -1,74 +1,24 @@
 /**
- * Lead-list Warm / Hot / Cold filters.
- * Only matches leads that have a current status option selected (statusReason).
- * Keys come from admin Lead Status Control (with static fallback).
+ * Lead-list Warm / Hot / Cold filters — match Lead.temperature (independent of pipeline status).
  */
 
-const FALLBACK = {
-  cold: [
-    'booked_elsewhere',
-    'language_barrier',
-    'not_interested',
-    'invalid_number',
-    'budget_issues',
-    'budget_issue',
-  ],
-  warm: [
-    'discussed_package',
-    'requested_callback',
-    'cnp_same_day',
-    'price_negotiation',
-  ],
-  hot: ['ready_to_book'],
-};
-
-function resolveKeys(bucket) {
-  try {
-    const { getCachedKeysByCategory } = require('../services/leadStatusConfigService');
-    const keys = getCachedKeysByCategory();
-    const list = keys[bucket] || [];
-    return list.length ? list : FALLBACK[bucket] || [];
-  } catch {
-    return FALLBACK[bucket] || [];
-  }
-}
-
-function escapeRegex(value) {
-  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function reasonClause(keys) {
-  const sorted = [...keys].sort((a, b) => b.length - a.length);
-  const alts = sorted.map(escapeRegex).join('|');
-  if (!alts) return { statusReason: { $exists: false } };
-  const pattern = `(^|not_connected:)(${alts})($|[\\s:.—–-])`;
-  return {
-    statusReason: { $regex: pattern, $options: 'i' },
-  };
-}
-
-function bucketClause(bucket) {
-  return {
-    $and: [
-      { status: { $ne: 'converted' } },
-      reasonClause(resolveKeys(bucket)),
-    ],
-  };
-}
-
-const CLAUSES = {
-  cold: () => bucketClause('cold'),
-  warm: () => bucketClause('warm'),
-  hot: () => bucketClause('hot'),
-};
-
 function applyListStatusBucket(mongoFilter, listStatus) {
-  const key = String(listStatus || '').toLowerCase();
-  const builder = CLAUSES[key];
-  if (!builder) return mongoFilter;
-  if (!mongoFilter.$and) mongoFilter.$and = [];
-  mongoFilter.$and.push(builder());
-  delete mongoFilter.status;
+  const key = String(listStatus || '').trim().toLowerCase();
+  if (!['hot', 'warm', 'cold'].includes(key)) return mongoFilter;
+
+  // VIP collapsed to hot in pipeline redesign
+  if (key === 'hot') {
+    mongoFilter.temperature = { $in: ['hot', 'vip'] };
+    mongoFilter.isHot = true;
+  } else {
+    mongoFilter.temperature = key;
+    if (key === 'cold' || key === 'warm') {
+      // Don't force isHot false — some legacy docs may only have temperature set
+      delete mongoFilter.isHot;
+    }
+  }
+
+  // Temperature filter must not wipe an explicit pipeline status if both somehow arrive
   return mongoFilter;
 }
 

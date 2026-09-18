@@ -3,7 +3,7 @@ import { Search, RotateCcw, Filter, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   DESTINATIONS,
-  LEAD_STATUSES,
+  PIPELINE_LEAD_STATUSES,
   TRAVEL_MONTHS,
   BUDGET_FILTER_OPTIONS,
   PRIORITY_FILTER_OPTIONS,
@@ -180,18 +180,18 @@ export default function LeadFilterBar({
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="mr-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">Results</span>
           <ChipButton
-            active={filters.status === 'converted' && filters.filter !== 'arrivals' && !filters.listStatus}
+            active={(filters.status === 'booked' || filters.status === 'converted') && filters.filter !== 'arrivals' && !filters.listStatus}
             activeClass="bg-emerald-600 text-white shadow-sm shadow-emerald-500/30 ring-emerald-700/20"
             idleClass="bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100"
             onClick={() =>
               applyQuick(
-                filters.status === 'converted' && filters.filter !== 'arrivals' && !filters.listStatus
+                (filters.status === 'booked' || filters.status === 'converted') && filters.filter !== 'arrivals' && !filters.listStatus
                   ? { status: '', filter: '', listStatus: '' }
-                  : { status: 'converted', filter: '', listStatus: '' }
+                  : { status: 'booked', filter: '', listStatus: '' }
               )
             }
           >
-            Converted
+            Booked
           </ChipButton>
           <ChipButton
             active={filters.filter === 'arrivals'}
@@ -201,7 +201,7 @@ export default function LeadFilterBar({
               applyQuick(
                 filters.filter === 'arrivals'
                   ? { status: '', filter: '', listStatus: '' }
-                  : { status: 'converted', filter: 'arrivals', listStatus: '' }
+                  : { status: 'booked', filter: 'arrivals', listStatus: '' }
               )
             }
           >
@@ -361,19 +361,21 @@ export default function LeadFilterBar({
               <div>
                 <FieldLabel>Lead Status</FieldLabel>
                 <select
-                  value={filters.listStatus || ''}
+                  value={filters.status || ''}
                   onChange={(e) =>
                     onChange({
                       ...filters,
-                      listStatus: e.target.value,
-                      status: '',
-                      filter: '',
+                      status: e.target.value,
+                      listStatus: '',
+                      filter: e.target.value === 'booked' ? filters.filter : '',
                     })
                   }
                   className={fieldClass}
                 >
                   <option value="">All Statuses</option>
-                  {LEAD_STATUSES.map((s) => (
+                  {PIPELINE_LEAD_STATUSES.filter((s) =>
+                    ['new_lead', 'not_reachable', 'qualified', 'package_sent', 'follow_up', 'booked', 'postponed', 'lost'].includes(s.value)
+                  ).map((s) => (
                     <option key={s.value} value={s.value}>{s.label}</option>
                   ))}
                 </select>

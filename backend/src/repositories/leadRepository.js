@@ -46,6 +46,7 @@ async function buildLeadListFilter(query = {}, { branchId } = {}) {
     search,
     filter: listFilter,
     listStatus,
+    temperature,
     destination,
     destinationNames,
     source,
@@ -70,7 +71,28 @@ async function buildLeadListFilter(query = {}, { branchId } = {}) {
 
   const mongoFilter = { ...buildLeadSearchFilter(search), isDeleted: { $ne: true } };
 
-  if (status && !listStatus) mongoFilter.status = status;
+  // Pipeline status — expand legacy aliases so filters still match migrated + unmigrated docs
+  if (status && !listStatus) {
+    const { LEGACY_STATUS_ALIASES, LEAD_STATUSES } = require('../constants/leadPipeline');
+    const raw = String(status).trim().toLowerCase();
+    const normalized = LEGACY_STATUS_ALIASES[raw] || raw;
+    const aliasPairs = {
+      new_lead: ['new_lead', 'new'],
+      not_reachable: ['not_reachable'],
+      qualified: ['qualified', 'contacted'],
+      package_sent: ['package_sent', 'quotation_sent'],
+      follow_up: ['follow_up', 'working_progress', 'negotiation', 'reactivated'],
+      booked: ['booked', 'converted'],
+      postponed: ['postponed'],
+      lost: ['lost', 'booked_from_another_company'],
+      converted: ['booked', 'converted'],
+      new: ['new_lead', 'new'],
+      contacted: ['qualified', 'contacted'],
+      quotation_sent: ['package_sent', 'quotation_sent'],
+    };
+    const values = aliasPairs[normalized] || aliasPairs[raw] || (LEAD_STATUSES.includes(normalized) ? [normalized] : [raw]);
+    mongoFilter.status = values.length === 1 ? values[0] : { $in: values };
+  }
   if (reactivatedOnly === 'true') mongoFilter['reactivation.isReactivated'] = true;
   if (reactivationStage) mongoFilter['reactivation.stage'] = reactivationStage;
   if (executiveId) mongoFilter.assignedTo = executiveId;
@@ -88,15 +110,22 @@ async function buildLeadListFilter(query = {}, { branchId } = {}) {
   if (listFilter === 'unassigned') mongoFilter.assignedTo = null;
   else if (listFilter === 'assigned') mongoFilter.assignedTo = { $ne: null };
   else if (listFilter === 'hot') {
-    mongoFilter.isHot = true;
-    mongoFilter.status = { $nin: ['converted', 'lost', 'booked_from_another_company'] };
+    if (!mongoFilter.$and) mongoFilter.$and = [];
+    mongoFilter.$and.push({ $or: [{ isHot: true }, { temperature: { $in: ['hot', 'vip'] } }] });
+    mongoFilter.status = { $nin: ['converted', 'booked', 'lost', 'booked_from_another_company'] };
   } else if (listFilter === 'returned') {
     mongoFilter.assignedTo = null;
     mongoFilter.assignmentAcceptance = 'expired';
   } else if (listFilter === 'arrivals') {
-    mongoFilter.status = 'converted';
+    mongoFilter.status = { $in: ['booked', 'converted'] };
   } else if (listFilter === 'bookings') {
-    mongoFilter.status = 'converted';
+    mongoFilter.status = { $in: ['booked', 'converted'] };
+  }
+
+  // Explicit temperature query param (preferred over legacy listStatus for Hot/Warm/Cold)
+  if (temperature && ['hot', 'warm', 'cold'].includes(String(temperature))) {
+    const t = String(temperature);
+    mongoFilter.temperature = t === 'hot' ? { $in: ['hot', 'vip'] } : t;
   }
   if (destination) mongoFilter.destination = destination;
   if (source) mongoFilter.source = expandLeadSourceFilter(source);

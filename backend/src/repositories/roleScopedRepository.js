@@ -135,7 +135,10 @@ async function buildManagerLeadFilter(query = {}, options = {}) {
   const { filter, search } = query;
 
   if (isWorkingProgressFilter(filter)) {
-    const mongoFilter = { ...buildLeadSearchFilter(search), status: 'working_progress' };
+    const mongoFilter = {
+      ...buildLeadSearchFilter(search),
+      status: { $in: ['working_progress', 'follow_up', 'negotiation'] },
+    };
     applyCreatedAtRange(mongoFilter, query);
     applyListStatusBucket(mongoFilter, query.listStatus);
     return mongoFilter;
