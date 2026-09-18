@@ -61,7 +61,6 @@ export function useSidebarCounts(enabled = true) {
           'nav-counts',
           String(userId || ''),
           user?.role,
-          selectedBranchId || 'all',
         ]);
         const updatedAt = state?.dataUpdatedAt || 0;
         if (Date.now() - updatedAt < NAV_COUNTS_STALE_MS) return;
@@ -76,7 +75,7 @@ export function useSidebarCounts(enabled = true) {
       document.removeEventListener('visibilitychange', onVisible);
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [enabled, userId, user?.role, selectedBranchId, refresh, queryClient]);
+  }, [enabled, userId, user?.role, refresh, queryClient]);
 
   return query.data ?? null;
 }
