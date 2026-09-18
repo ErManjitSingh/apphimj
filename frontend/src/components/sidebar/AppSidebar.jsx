@@ -1,7 +1,6 @@
 import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
-import { useSelector } from 'react-redux';
 import { useSidebar } from '../../context/SidebarContext';
 import { useAuth } from '../../context/AuthContext';
 import { filterNavItems } from '../../lib/permissions';
@@ -20,23 +19,6 @@ import { SidebarThemeProvider } from './SidebarThemeContext';
 import { mainNavItems } from './sidebar-config';
 import { filterNavItemsBySearch, injectSectionHeaders, isNavItemActive } from './sidebar-utils';
 import { cn } from '../../lib/utils';
-
-function formatBranchLabel(name) {
-  const raw = String(name || '').trim();
-  if (!raw) return '';
-  const normalized = raw.toLowerCase().replace(/[\s_-]+/g, '');
-  if (
-    normalized.includes('bhatakhur') ||
-    normalized.includes('bhatakufar') ||
-    normalized.includes('bhattakufer') ||
-    normalized.includes('bhattakufar') ||
-    normalized.includes('bhata')
-  ) {
-    return 'PTW';
-  }
-  if (normalized.includes('shimla')) return 'Shimla';
-  return raw;
-}
 
 function getSidebarTimeTheme(hour) {
   if (hour >= 5 && hour < 12) return 'sidebar-time-morning';
@@ -71,7 +53,6 @@ export default function AppSidebar({
   const location = useLocation();
   const { collapsed, expandedWidth, collapsedWidth } = useSidebar();
   const { user: authUser } = useAuth();
-  const { selectedBranchId, availableBranches } = useSelector((s) => s.branch);
   const [searchQuery] = useState('');
   const [timeTheme, setTimeTheme] = useState(() => getSidebarTimeTheme(new Date().getHours()));
   const width = collapsed ? collapsedWidth : expandedWidth;
@@ -111,8 +92,6 @@ export default function AppSidebar({
             '/profile');
 
   const effectiveUser = authUser || user;
-  const selectedBranch = availableBranches.find((b) => b._id === selectedBranchId);
-  const selectedBranchLabel = formatBranchLabel(selectedBranch?.name);
   const resolvedBrandTitle = brandTitle || APP_BRAND_NAME;
   const financeRole = ['admin', 'accountant'].includes(effectiveUser?.role);
   const onFinanceRoute = ['/payments', '/invoices', '/refunds'].some((p) =>
@@ -122,7 +101,7 @@ export default function AppSidebar({
   const resolvedBrandSubtitle =
     brandSubtitle ||
     (effectiveUser?.role === 'admin'
-      ? selectedBranchLabel || 'Super Admin'
+      ? 'Admin'
       : effectiveUser?.role === 'accountant'
         ? 'Finance'
         : 'Travel Lead Management');

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSelector } from 'react-redux';
 import { useAuth } from '../context/AuthContext';
 import API from '../api/axios';
 import { NAV_COUNTS_STALE_MS, NAV_COUNTS_REFETCH_MS, GC_TIME_MS } from '../lib/queryConfig';
@@ -12,13 +11,12 @@ let sharedVisibleTimer = null;
 
 export function useSidebarCounts(enabled = true) {
   const { user } = useAuth();
-  const { selectedBranchId } = useSelector((s) => s.branch);
   const queryClient = useQueryClient();
   const userId = user?._id || user?.id;
   const debounceRef = useRef(null);
 
   const query = useQuery({
-    queryKey: ['nav-counts', String(userId || ''), user?.role, selectedBranchId || 'all'],
+    queryKey: ['nav-counts', String(userId || ''), user?.role],
     queryFn: async () => {
       // Do NOT send fresh=1 on poll — that busts Redis and stampedes Mongo under load.
       const { data } = await API.get('/nav-counts', {

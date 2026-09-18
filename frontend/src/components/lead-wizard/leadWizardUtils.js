@@ -80,7 +80,6 @@ export function leadToWizardValues(lead) {
       : '',
     referralNotes: lead.referral?.notes || '',
     priority: lead.priority || 'medium',
-    branchId: lead.branchId || '',
     leadType: lead.leadType || 'fit',
     companyName: lead.companyName || '',
     hotelCategory: lead.hotelCategory || '3_star',
@@ -160,7 +159,6 @@ export function wizardValuesToPayload(values) {
     hotelCategory: values.hotelCategory || undefined,
     specialRequirements: values.requirements || undefined,
     status: 'new',
-    ...(values.branchId ? { branchId: values.branchId } : {}),
     // Admin / lead_provider create: stay unassigned unless an assignee is chosen
     ...(values.assignmentMode === 'assign' && values.assignedTo
       ? {

@@ -30,7 +30,7 @@ const AUTO_RULES = [
   { id: 'destination-match', name: 'Destination Match', desc: 'Auto-assign on lead create (currently disabled — manual assign only)', enabled: false, color: 'from-emerald-500/20 to-teal-500/15 border-emerald-500/25' },
   { id: 'load-balance', name: 'Lowest Active Leads', desc: 'Prefer executive with fewest active pipeline leads', enabled: false, color: 'from-sky-500/20 to-blue-500/15 border-sky-500/25' },
   { id: 'round-robin', name: 'Round Robin', desc: 'Tie-breaker when multiple executives have the same load', enabled: false, color: 'from-violet-500/20 to-purple-500/15 border-violet-500/25' },
-  { id: 'fallback-queue', name: 'Branch Fallback', desc: 'Used when no destination specialist is available', enabled: false, color: 'from-amber-500/20 to-orange-500/15 border-amber-500/25' },
+  { id: 'fallback-queue', name: 'Fallback Queue', desc: 'Used when no destination specialist is available', enabled: false, color: 'from-amber-500/20 to-orange-500/15 border-amber-500/25' },
 ];
 
 const theme = FILTER_THEMES.unassigned;

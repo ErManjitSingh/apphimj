@@ -111,7 +111,6 @@ export default function LeadPreviewDrawer({
   onClose,
   onAssign,
   onDelete,
-  onTransferBranch,
   canEditLead = true,
 }) {
   const navigate = useNavigate();
@@ -269,11 +268,6 @@ export default function LeadPreviewDrawer({
                     <DropdownMenuItem onClick={() => onAssign(lead)} className="gap-2 rounded-lg cursor-pointer">
                       <UserCheck className="w-4 h-4" />
                       {assignedName ? 'Reassign Lead' : 'Assign Lead'}
-                    </DropdownMenuItem>
-                  )}
-                  {onTransferBranch && (
-                    <DropdownMenuItem onClick={() => onTransferBranch(lead)} className="gap-2 rounded-lg cursor-pointer">
-                      <RefreshCw className="w-4 h-4" /> Transfer Branch
                     </DropdownMenuItem>
                   )}
                   {onDelete && (

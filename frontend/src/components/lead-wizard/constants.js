@@ -234,7 +234,6 @@ export const defaultWizardValues = {
   budget: '',
   leadSource: 'website',
   priority: 'medium',
-  branchId: '',
   leadType: 'fit',
   companyName: '',
   alternatePhone: '',

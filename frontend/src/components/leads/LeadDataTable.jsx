@@ -39,7 +39,7 @@ const defaultMenuActions = {
   view: true,
   edit: true,
   assign: true,
-  transferBranch: true,
+  transferBranch: false,
   delete: true,
 };
 
@@ -53,7 +53,6 @@ export default function LeadDataTable({
   onRowClick,
   onDelete,
   onAssign,
-  onTransferBranch,
   onAccepted,
   onAcceptExpired,
   canEditLead = true,
@@ -198,7 +197,6 @@ export default function LeadDataTable({
             onRowClick={onRowClick}
             onDelete={onDelete}
             onAssign={onAssign}
-            onTransferBranch={onTransferBranch}
             onAccepted={onAccepted}
             onAcceptExpired={onAcceptExpired}
             canEditLead={canEditLead}
@@ -212,7 +210,6 @@ export default function LeadDataTable({
       onRowClick,
       onDelete,
       onAssign,
-      onTransferBranch,
       onAccepted,
       onAcceptExpired,
       canEditLead,

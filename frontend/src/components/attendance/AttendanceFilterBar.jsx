@@ -1,4 +1,4 @@
-import { CalendarDays, Search, ChevronDown } from 'lucide-react';
+import { CalendarDays, Search } from 'lucide-react';
 import { ATTENDANCE_PRESETS } from './attendanceDateUtils';
 import { cn } from '../../lib/utils';
 
@@ -10,9 +10,6 @@ export default function AttendanceFilterBar({
   rangeLabel,
   search,
   onSearchChange,
-  branches = [],
-  branchId,
-  onBranchChange,
 }) {
   return (
     <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5">
@@ -48,22 +45,6 @@ export default function AttendanceFilterBar({
             );
           })}
         </div>
-      </div>
-
-      <div className="relative">
-        <select
-          value={branchId || ''}
-          onChange={(e) => onBranchChange?.(e.target.value)}
-          className="h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 pr-10 text-sm font-medium text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
-        >
-          <option value="">All Branches & Offices</option>
-          {branches.map((b) => (
-            <option key={b._id} value={b._id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
-        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
       </div>
 
       <div className="relative">

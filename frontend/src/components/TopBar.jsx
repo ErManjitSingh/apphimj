@@ -1,8 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Plus, Bell, Sun, Moon, Menu, X, LogOut, User, LogIn, ChevronDown, RefreshCw } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useDispatch, useSelector } from 'react-redux';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
@@ -19,12 +18,6 @@ import {
 import { cn } from '../lib/utils';
 import AttendanceTopBarAction from './attendance/AttendanceTopBarAction';
 import HeaderLatestActivity from './HeaderLatestActivity';
-import API from '../api/axios';
-import {
-  hydrateSelectedBranch,
-  setAvailableBranches,
-  setSelectedBranch,
-} from '../store/slices/branchSlice';
 import { refreshAppData } from '../lib/appRefresh';
 import { useSidebar } from '../context/SidebarContext';
 
@@ -69,57 +62,17 @@ function IconButton({ children, className, accent, ...props }) {
 export default function TopBar({ onMenuClick }) {
   const { mobileOpen, toggleMobileOpen } = useSidebar();
   const queryClient = useQueryClient();
-  const dispatch = useDispatch();
   const { toggleTheme, isDark } = useTheme();
   const { user, logout, hasPermission } = useAuth();
   const { unreadCount, openDrawer } = useNotifications();
-  const { selectedBranchId } = useSelector((s) => s.branch);
   const navigate = useNavigate();
   const location = useLocation();
   const accent = getTopBarAccent(location.pathname);
   const profilePath = getProfilePath(location.pathname);
   const isAdmin = user?.role === 'admin';
-  const isLeadProvider = user?.role === 'lead_provider';
-  const canSwitchBranches = isAdmin || isLeadProvider;
-  const canAddLead = isAdmin || isLeadProvider || hasPermission?.('leads', 'create');
+  const canAddLead = isAdmin || user?.role === 'lead_provider' || hasPermission?.('leads', 'create');
   const adminRoleLine = user?.roleName || user?.role;
   const [isRefreshing, setIsRefreshing] = useState(false);
-
-  useEffect(() => {
-    dispatch(hydrateSelectedBranch());
-  }, [dispatch]);
-
-  useEffect(() => {
-    if (!canSwitchBranches) return;
-    API.get('/branches', { skipSuccessToast: true, skipErrorToast: true })
-      .then((r) => {
-        const list = Array.isArray(r.data) ? r.data : [];
-        dispatch(setAvailableBranches(list));
-        if (!list.length) return;
-        const storedBranchId =
-          typeof window !== 'undefined'
-            ? window.localStorage.getItem('crm.selectedBranchId')
-            : null;
-        const resolvedBranchId =
-          selectedBranchId && list.some((b) => b._id === selectedBranchId)
-            ? selectedBranchId
-            : storedBranchId && list.some((b) => b._id === storedBranchId)
-              ? storedBranchId
-              : null;
-        if (!resolvedBranchId) {
-          const preferredBranchId =
-            user?.branchId && list.some((b) => b._id === user.branchId)
-              ? user.branchId
-              : list[0]._id;
-          dispatch(setSelectedBranch(preferredBranchId));
-        } else if (resolvedBranchId !== selectedBranchId) {
-          dispatch(setSelectedBranch(resolvedBranchId));
-        }
-      })
-      .catch(() => {
-        dispatch(setAvailableBranches([]));
-      });
-  }, [dispatch, canSwitchBranches, selectedBranchId, user?.branchId]);
 
   const handleLogout = async () => {
     try {

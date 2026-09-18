@@ -10,7 +10,6 @@ import {
 import { checkLeadDuplicate } from '../../../services/leadEnterpriseApi';
 import DuplicateLeadWarning from '../../leads/DuplicateLeadWarning';
 import { useAuth } from '../../../context/AuthContext';
-import { useSelector } from 'react-redux';
 import WizardField, { WizardInput, IconInput, IconSelect, WizardTextarea } from '../WizardField';
 import {
   INDIAN_STATES, DESTINATIONS, LEAD_TYPES, LEAD_SOURCES, PRIORITIES,
@@ -370,7 +369,6 @@ function HeroBanner() {
 
 export default function StepLeadForm({ isEdit, leadId }) {
   const { user } = useAuth();
-  const { availableBranches } = useSelector((s) => s.branch);
   const { register, watch, setValue, formState: { errors } } = useWizardForm();
   const phone = watch('phone');
   const alternatePhone = watch('alternatePhone');
@@ -380,11 +378,9 @@ export default function StepLeadForm({ isEdit, leadId }) {
   const leadType = watch('leadType') || 'fit';
   const priority = watch('priority');
   const leadSource = watch('leadSource');
-  const branchId = watch('branchId');
   const travelDate = watch('travelDate');
   const returnDate = watch('returnDate');
   const whatsapp = watch('whatsapp');
-  const isAdmin = user?.role === 'admin';
   const isSalesExecutive = user?.role === 'sales_executive';
   const lockIdentity = isEdit && isSalesExecutive;
   const sourceOptions = useMemo(() => {
@@ -960,21 +956,6 @@ export default function StepLeadForm({ isEdit, leadId }) {
               </div>
               <input type="hidden" {...register('priority')} />
             </div>
-
-            {isAdmin && (
-              <WizardField label="Branch">
-                <IconSelect
-                  value={branchId || ''}
-                  onChange={(e) => setValue('branchId', e.target.value)}
-                >
-                  <option value="">Current selected branch</option>
-                  {availableBranches.map((b) => (
-                    <option key={b._id} value={b._id}>{b.name}</option>
-                  ))}
-                </IconSelect>
-                <input type="hidden" {...register('branchId')} />
-              </WizardField>
-            )}
           </div>
 
           <WizardField label="Requirements">

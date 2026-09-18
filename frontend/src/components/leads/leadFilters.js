@@ -39,10 +39,6 @@ export function applyLeadFilters(leads, filters, routeStatus = '') {
     result = result.filter((l) => String(l.teamId?._id || l.teamId || '') === String(filters.teamId));
   }
 
-  if (filters.branchId) {
-    result = result.filter((l) => String(l.branchId?._id || l.branchId || '') === String(filters.branchId));
-  }
-
   if (filters.state) {
     const state = filters.state.toLowerCase();
     result = result.filter((l) => String(l.state || '').toLowerCase() === state);

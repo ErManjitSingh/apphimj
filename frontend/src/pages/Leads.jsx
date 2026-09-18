@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { useSelector } from 'react-redux';
 import { useAuth } from '../context/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
 import AdminAssignLeadModal from '../components/leads/AdminAssignLeadModal';
-import LeadBranchTransferModal from '../components/leads/LeadBranchTransferModal';
 import { useLeadAssign } from '../hooks/useLeadAssign';
 import API from '../api/axios';
 import { toast } from '../context/ToastContext';
@@ -57,7 +55,6 @@ export default function Leads() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { availableBranches, selectedBranchId } = useSelector((s) => s.branch);
   const { can } = usePermissions();
   const isAdmin = user?.role === 'admin';
   const isSalesManager = user?.role === 'sales_manager';
@@ -71,15 +68,14 @@ export default function Leads() {
   const leadMenuActions = useMemo(
     () =>
       isLimitedRole
-        ? { view: true, edit: false, assign: false, transferBranch: false, delete: false }
+        ? { view: true, edit: false, assign: false,  delete: false }
         : isLeadProvider
-          ? { view: true, edit: canEditLead, assign: userCanAssignLeads, transferBranch: false, delete: false }
+          ? { view: true, edit: canEditLead, assign: userCanAssignLeads,  delete: false }
           : {
               view: true,
               edit: isManagerRole,
               assign: isManagerRole,
-              transferBranch: isManagerRole,
-              delete: isManagerRole && canDeleteLead,
+                            delete: isManagerRole && canDeleteLead,
             },
     [isLimitedRole, isLeadProvider, canEditLead, userCanAssignLeads, isManagerRole, canDeleteLead]
   );
@@ -95,8 +91,6 @@ export default function Leads() {
   });
   const [rowSelection, setRowSelection] = useState({});
   const [previewLead, setPreviewLead] = useState(null);
-  const [transferLead, setTransferLead] = useState(null);
-  const [transferSubmitting, setTransferSubmitting] = useState(false);
   const [bulkStatusOpen, setBulkStatusOpen] = useState(false);
   const [pageCursors, setPageCursors] = useState({});
   const [isMobileViewport, setIsMobileViewport] = useState(
@@ -300,26 +294,6 @@ export default function Leads() {
     invalidateLeads();
   }, [confirm, invalidateLeads]);
 
-  const handleTransferBranch = useCallback(async ({ leadId, branchId }) => {
-    const branch = availableBranches.find((b) => b._id === branchId);
-    const ok = await confirm({
-      title: 'Transfer lead to another branch?',
-      message: `Do you want to transfer this lead to ${branch?.name || 'the selected branch'}?`,
-      confirmLabel: 'Transfer',
-      cancelLabel: 'Cancel',
-      tone: 'warning',
-    });
-    if (!ok) return;
-
-    setTransferSubmitting(true);
-    try {
-      await API.patch(`/leads/${leadId}/transfer-branch`, { branchId });
-      setTransferLead(null);
-      invalidateLeads();
-    } finally {
-      setTransferSubmitting(false);
-    }
-  }, [availableBranches, confirm, invalidateLeads]);
 
   const handleBulkStatus = async (payload) => {
     const ids = Object.keys(rowSelection).filter((k) => rowSelection[k]);
@@ -433,7 +407,6 @@ export default function Leads() {
             onRowClick={openLead}
             onDelete={canDeleteLead ? handleDelete : undefined}
             onAssign={userCanAssignLeads ? openAssign : undefined}
-            onTransferBranch={isManagerRole ? setTransferLead : undefined}
             onAccepted={invalidateLeads}
             onAcceptExpired={invalidateLeads}
             canEditLead={(isManagerRole || isLeadProvider) && canEditLead}
@@ -457,7 +430,6 @@ export default function Leads() {
         onClose={() => setPreviewLead(null)}
         onAssign={userCanAssignLeads ? openAssign : undefined}
         onDelete={canDeleteLead ? handleDelete : undefined}
-        onTransferBranch={isAdmin ? setTransferLead : undefined}
         canEditLead={canEditLead}
       />
 
@@ -485,14 +457,6 @@ export default function Leads() {
       )}
 
       {isAdmin && (
-        <LeadBranchTransferModal
-          open={!!transferLead}
-          lead={transferLead}
-          branches={availableBranches.filter((b) => b._id !== selectedBranchId)}
-          submitting={transferSubmitting}
-          onClose={() => setTransferLead(null)}
-          onSubmit={handleTransferBranch}
-        />
       )}
     </div>
   );

@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { authStorage } from '../auth/authStorage';
-import { BRANCH_STORAGE_KEY } from '../store/slices/branchSlice';
 import { toast } from '../context/ToastContext';
 import { getApiSuccessMessage, getApiErrorMessage, shouldSkipSuccessToast } from './toastMessages';
 import {
@@ -19,28 +18,9 @@ let lastRateLimitToastAt = 0;
 
 API.interceptors.request.use((config) => {
   const token = authStorage.getToken();
-  const selectedBranchId =
-    typeof window !== 'undefined' ? window.localStorage.getItem(BRANCH_STORAGE_KEY) : null;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
     authStorage.touchActivity();
-  }
-  if (selectedBranchId) {
-    config.headers['x-branch-id'] = selectedBranchId;
-    const method = (config.method || 'get').toLowerCase();
-    const url = config.url || '';
-    const skipBranchQueryParam =
-      url.includes('/public-packages') ||
-      url.includes('/catalog-hotels') ||
-      url.includes('/catalog-cabs');
-    if (method === 'get') {
-      if (!skipBranchQueryParam) {
-        config.params = {
-          ...(config.params || {}),
-          branchId: config.params?.branchId || selectedBranchId,
-        };
-      }
-    }
   }
   return config;
 });

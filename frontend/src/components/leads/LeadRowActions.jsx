@@ -139,7 +139,6 @@ export default function LeadRowActions({
   onRowClick,
   onDelete,
   onAssign,
-  onTransferBranch,
   onAccepted,
   onAcceptExpired,
   canEditLead = true,
@@ -161,7 +160,7 @@ export default function LeadRowActions({
   const showAssignedName = Boolean(assignedName);
   const showEdit = actions.edit && canEditLead;
   const showAssignMenu = actions.assign && onAssign;
-  const showTransfer = actions.transferBranch && onTransferBranch;
+  const showTransfer = false;
   const showDelete = actions.delete && onDelete;
   const hasMenuItems = actions.view || showEdit || showAssignMenu || showTransfer || showDelete;
   const hasLeading = showAssign || showAssignedName || showReassignExpired;
@@ -216,18 +215,7 @@ export default function LeadRowActions({
           </div>
         </DropdownMenuItem>
       )}
-      {showTransfer && (
-        <DropdownMenuItem
-          onClick={() => onTransferBranch(lead)}
-          className="gap-3 rounded-xl px-2 py-2.5 focus:bg-violet-500/8"
-        >
-          <MenuActionIcon icon={RefreshCw} tone="fuchsia" />
-          <div className="min-w-0 text-left">
-            <p className="text-sm font-semibold text-content-primary">Transfer Branch</p>
-            <p className="text-[11px] text-content-muted">Move to another office</p>
-          </div>
-        </DropdownMenuItem>
-      )}
+
       {showDelete && (
         <>
           <DropdownMenuSeparator className="my-1.5 bg-violet-500/10" />

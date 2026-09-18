@@ -155,7 +155,7 @@ export default function DestinationDetail() {
           rowSelection={rowSelection}
           onRowSelectionChange={setRowSelection}
           onRowClick={(lead) => navigate(`/leads/${lead._id}`)}
-          menuActions={{ view: true, edit: false, assign: false, transferBranch: false, delete: false }}
+          menuActions={{ view: true, edit: false, assign: false, delete: false }}
           showAssignButton={false}
           serverPagination={{
             pageIndex: pagination.pageIndex,

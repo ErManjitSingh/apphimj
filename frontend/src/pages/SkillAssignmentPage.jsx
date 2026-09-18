@@ -193,7 +193,7 @@ export default function SkillAssignmentPage() {
           ))}
           <div className="sm:col-span-3 rounded-2xl border border-dashed border-subtle p-4 text-sm text-content-muted">
             Lead type is auto-detected on create (pax count, corporate keywords) or selected manually in the lead form.
-            Assignment order: match branch → match skill → active → present → lowest leads → round robin.
+            Assignment order: match skill → active → present → lowest leads → round robin.
           </div>
         </div>
       )}
@@ -247,7 +247,7 @@ export default function SkillAssignmentPage() {
               disabled={!leadAutoAssignmentEnabled}
               onChange={(e) => setSkillAutoEnabled(e.target.checked)}
             />
-            Enable skill-based auto assignment for this branch
+            Enable skill-based auto assignment
           </label>
           <div className="space-y-2">
             {managers.map((m) => (

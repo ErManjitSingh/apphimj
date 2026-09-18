@@ -45,14 +45,12 @@ function ChipButton({ active, onClick, children, activeClass, idleClass }) {
   );
 }
 
-function hasMoreFilterValues(filters = {}, canFilterBranch) {
+function hasMoreFilterValues(filters = {}) {
   return Boolean(
-    filters.branchId ||
-      filters.teamId ||
+    filters.teamId ||
       filters.state ||
       filters.priority ||
-      filters.travelMonth ||
-      (canFilterBranch && filters.branchId)
+      filters.travelMonth
   );
 }
 
@@ -68,10 +66,8 @@ export default function LeadFilterBar({
   const { user } = useAuth();
   const [executives, setExecutives] = useState([]);
   const [teams, setTeams] = useState([]);
-  const [branches, setBranches] = useState([]);
-  const canFilterBranch = ['admin', 'lead_provider', 'hr_admin', 'sales_manager'].includes(user?.role);
   const [mode, setMode] = useState('basic');
-  const [showMore, setShowMore] = useState(() => hasMoreFilterValues(filters, canFilterBranch));
+  const [showMore, setShowMore] = useState(() => hasMoreFilterValues(filters));
   const morePanelRef = useRef(null);
 
   useEffect(() => {
@@ -82,16 +78,6 @@ export default function LeadFilterBar({
       .then((res) => setTeams(Array.isArray(res.data) ? res.data : []))
       .catch(() => setTeams([]));
   }, []);
-
-  // Fetched directly (not via the redux branch-switcher state) so this dropdown works the
-  // same for every role that can filter by branch, independent of the admin/lead_provider
-  // "switch active branch" feature and its x-branch-id header side effects.
-  useEffect(() => {
-    if (!canFilterBranch) return;
-    API.get('/branches', { skipSuccessToast: true, skipErrorToast: true })
-      .then((res) => setBranches(Array.isArray(res.data) ? res.data : []))
-      .catch(() => setBranches([]));
-  }, [canFilterBranch]);
 
   const set = (key, val) => onChange({ ...filters, [key]: val });
 
@@ -328,21 +314,7 @@ export default function LeadFilterBar({
             className="overflow-hidden"
           >
             <div className="mt-3 grid grid-cols-1 gap-3 rounded-xl border border-violet-100 bg-violet-50/40 p-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {canFilterBranch && (
-                <div>
-                  <FieldLabel>Branch</FieldLabel>
-                  <select
-                    value={filters.branchId || ''}
-                    onChange={(e) => set('branchId', e.target.value)}
-                    className={fieldClass}
-                  >
-                    <option value="">All Branches</option>
-                    {branches.map((b) => (
-                      <option key={b._id} value={b._id}>{b.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+
               <div>
                 <FieldLabel>Team</FieldLabel>
                 <select value={filters.teamId || ''} onChange={(e) => set('teamId', e.target.value)} className={fieldClass}>

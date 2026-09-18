@@ -8,18 +8,18 @@ const TYPE_LABELS = {
   assign: 'Assigned',
   reassign: 'Reassigned',
   bulk_assign: 'Bulk Assigned',
-  branch_transfer: 'Branch Transfer',
+  lead_transfer: 'Lead Transfer',
 };
 
 const TYPE_ICONS = {
   assign: UserCheck,
   reassign: UserCheck,
   bulk_assign: UserCheck,
-  branch_transfer: Building2,
+  lead_transfer: Building2,
 };
 
 function formatEntry(row) {
-  if (row.type === 'branch_transfer') {
+  if (row.type === 'lead_transfer') {
     const from = row.fromBranchId?.name || row.fromBranchId?.code || 'Previous branch';
     const to = row.toBranchId?.name || row.toBranchId?.code || 'New branch';
     return `${from} → ${to}`;

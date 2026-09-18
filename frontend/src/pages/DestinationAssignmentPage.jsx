@@ -190,7 +190,7 @@ export default function DestinationAssignmentPage() {
         autoAssignEnabled,
         fallbackUserIds: fallbackIds,
       });
-      toast.success('Branch assignment settings saved');
+      toast.success('Assignment settings saved');
       fetchBranchSettings();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to save settings');
@@ -356,14 +356,14 @@ export default function DestinationAssignmentPage() {
             </div>
           ))}
           {!mappings.length && !loading && (
-            <p className="text-sm text-content-muted text-center py-8">No active sales executives in this branch.</p>
+            <p className="text-sm text-content-muted text-center py-8">No active sales executives.</p>
           )}
         </div>
       )}
 
       {tab === 'fallback' && (
         <div className="rounded-2xl border border-subtle bg-surface/80 p-5 space-y-4 max-w-2xl">
-          <h3 className="font-bold text-content-primary">Branch Fallback Queue</h3>
+          <h3 className="font-bold text-content-primary">Fallback Queue</h3>
           <p className="text-sm text-content-muted">
             When no destination specialist is available, leads assign from this queue using the same rules (active, present, lowest leads, round robin).
           </p>
@@ -374,7 +374,7 @@ export default function DestinationAssignmentPage() {
               disabled={!leadAutoAssignmentEnabled}
               onChange={(e) => setAutoAssignEnabled(e.target.checked)}
             />
-            Enable destination auto-assignment for this branch
+            Enable destination auto-assignment
           </label>
           <div className="space-y-2">
             {mappings.map((row) => (

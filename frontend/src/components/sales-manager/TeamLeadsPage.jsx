@@ -83,16 +83,7 @@ export default function TeamLeadsPage() {
   const isLostView = filter === 'lost';
   const isAllView = filter === 'all';
 
-  // "All Leads" gets the same rich filter set (and the same /sales-manager/leads endpoint
-  // param handling) as Admin's Lead Management — see useLeadsQuery/buildLeadListFilter.
-  // Branch is sent as `leadBranchId`, NOT `branchId`: the generic `branchId` query param is
-  // inspected by the auth middleware for org-wide branch-switching and would 403 a Sales
-  // Manager (a non-org-wide role) the moment they pick any branch other than their own. This
-  // list-scoped rename keeps that org-wide mechanism completely untouched.
-  const allLeadsFilters = useMemo(() => {
-    const { branchId, ...rest } = appliedFilters;
-    return branchId ? { ...rest, leadBranchId: branchId } : rest;
-  }, [appliedFilters]);
+  const allLeadsFilters = appliedFilters;
 
   const allLeadsQuery = useLeadsQuery({
     filters: allLeadsFilters,

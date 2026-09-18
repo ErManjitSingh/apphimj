@@ -81,9 +81,9 @@ export default function OperationsDashboardCharts({ branchStats, bookingsByStatu
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
       <PanelCard
-        title="Branch-wise Statistics"
+        title="Team Statistics"
         footerLink="/operations-manager/reports"
-        footerLabel="View All Branches"
+        footerLabel="View details"
         delay={0.05}
       >
         <OperationsDonutChart data={branchData} totalLabel="Bookings" />

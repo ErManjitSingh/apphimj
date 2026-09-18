@@ -57,7 +57,6 @@ export default function HrEmployeeProfilePage() {
         <InfoCard title="Compensation" rows={[
           { icon: Briefcase, label: 'Salary', value: emp.salary ? `₹${Number(emp.salary).toLocaleString('en-IN')}` : '—' },
           { icon: Briefcase, label: 'Manager', value: emp.reportingManagerId ? [emp.reportingManagerId.firstName, emp.reportingManagerId.lastName].filter(Boolean).join(' ') : '—' },
-          { icon: Briefcase, label: 'Branch', value: emp.branchId?.name || '—' },
         ]} />
       </div>
     </div>

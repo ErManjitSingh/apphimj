@@ -37,8 +37,6 @@ export default function AdminAttendancePage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [branches, setBranches] = useState([]);
-  const [branchId, setBranchId] = useState('');
   const [marking, setMarking] = useState(false);
   const [focusList, setFocusList] = useState('office');
 
@@ -52,24 +50,18 @@ export default function AdminAttendancePage() {
       params: {
         from,
         to,
-        ...(branchId ? { branchId } : {}),
       },
       skipSuccessToast: true,
     })
       .then((r) => setData(r.data))
       .catch(() => setData(null))
       .finally(() => setLoading(false));
-  }, [from, to, branchId]);
+  }, [from, to]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  useEffect(() => {
-    API.get('/branches', { skipSuccessToast: true, skipErrorToast: true })
-      .then((r) => setBranches(Array.isArray(r.data) ? r.data : r.data?.data || []))
-      .catch(() => setBranches([]));
-  }, []);
 
   useDataRefresh(['attendance'], load);
 
@@ -187,9 +179,6 @@ export default function AdminAttendancePage() {
         rangeLabel={rangeLabel}
         search={search}
         onSearchChange={setSearch}
-        branches={branches}
-        branchId={branchId}
-        onBranchChange={setBranchId}
       />
 
       {loading ? (

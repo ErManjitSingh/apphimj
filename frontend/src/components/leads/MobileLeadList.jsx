@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
 import {
   Bell,
   ChevronLeft,
@@ -90,14 +89,12 @@ export default function MobileLeadList({
   const { toggleMobileOpen } = useSidebar();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { availableBranches = [] } = useSelector((s) => s.branch);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [search, setSearch] = useState(filters.search || '');
   const [executives, setExecutives] = useState([]);
   const [teams, setTeams] = useState([]);
   const moreFiltersRef = useRef(null);
-  const canFilterBranch = ['admin', 'lead_provider', 'hr_admin'].includes(user?.role);
   const pageNumber = pagination.pageIndex + 1;
   const pageCount = total ? Math.max(1, Math.ceil(total / pagination.pageSize)) : null;
 
@@ -263,12 +260,7 @@ export default function MobileLeadList({
                       <option key={status.value} value={status.value}>{status.label}</option>
                     ))}
                   </select>
-                  {canFilterBranch && (
-                    <select value={filters.branchId || ''} onChange={(event) => onFiltersChange({ ...filters, branchId: event.target.value })} className="h-9 rounded-xl border border-slate-200 bg-white px-2 text-[9px] text-slate-600 outline-none">
-                      <option value="">Branch</option>
-                      {availableBranches.map((b) => <option key={b._id} value={b._id}>{b.name}</option>)}
-                    </select>
-                  )}
+
                   <select value={filters.teamId || ''} onChange={(event) => onFiltersChange({ ...filters, teamId: event.target.value })} className="h-9 rounded-xl border border-slate-200 bg-white px-2 text-[9px] text-slate-600 outline-none">
                     <option value="">Team</option>
                     {teams.map((t) => <option key={t._id} value={t._id}>{t.name}</option>)}

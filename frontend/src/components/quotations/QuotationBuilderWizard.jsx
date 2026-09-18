@@ -100,7 +100,7 @@ const MANAGER_CONFIG = {
   backPath: '/sales-manager/quotations/pending',
   successPath: '/sales-manager/quotations/approved',
   title: 'Package Builder',
-  subtitle: 'Build and approve a tour package for any team lead in your branch',
+  subtitle: 'Build and approve a tour package for any team lead for your team',
   draftStatus: 'draft',
   submitStatus: 'approved',
   draftLabel: 'Save Draft',

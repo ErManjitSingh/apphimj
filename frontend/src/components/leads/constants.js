@@ -145,7 +145,6 @@ export const emptyFilters = {
   dateTo: '',
   priority: '',
   teamId: '',
-  branchId: '',
   state: '',
 };
 

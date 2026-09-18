@@ -3,17 +3,13 @@ import { motion } from 'framer-motion';
 import { LEAD_SOURCES, PRIORITIES, getLeadSourcesForRole } from '../constants';
 import { cn } from '../../../lib/utils';
 import { useAuth } from '../../../context/AuthContext';
-import { useSelector } from 'react-redux';
 import { useMemo } from 'react';
 
 export default function StepLeadInformation() {
   const { register, watch, setValue, formState: { errors } } = useWizardForm();
   const { user } = useAuth();
-  const { availableBranches } = useSelector((s) => s.branch);
   const priority = watch('priority');
   const leadSource = watch('leadSource');
-  const branchId = watch('branchId');
-  const isAdmin = user?.role === 'admin';
   const sourceOptions = useMemo(() => {
     const base = getLeadSourcesForRole(user?.role);
     if (leadSource && !base.some((s) => s.value === leadSource)) {
@@ -82,27 +78,6 @@ export default function StepLeadInformation() {
         </div>
         <input type="hidden" {...register('priority')} />
       </div>
-
-      {isAdmin && (
-        <div>
-          <label className="block text-sm font-medium text-content-primary mb-2">
-            Lead Branch
-          </label>
-          <select
-            value={branchId || ''}
-            onChange={(e) => setValue('branchId', e.target.value)}
-            className="input-premium w-full h-11 rounded-xl"
-          >
-            <option value="">Current selected branch</option>
-            {availableBranches.map((b) => (
-              <option key={b._id} value={b._id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-          <input type="hidden" {...register('branchId')} />
-        </div>
-      )}
     </motion.div>
   );
 }
