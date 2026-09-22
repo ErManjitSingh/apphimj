@@ -223,6 +223,7 @@ async function notifyFollowUpReminder(followUp, lead) {
   const when = new Date(followUp.scheduledAt).toLocaleString('en-IN', {
     dateStyle: 'medium',
     timeStyle: 'short',
+    timeZone: process.env.ATTENDANCE_TZ || 'Asia/Kolkata',
   });
 
   const payload = {
@@ -236,6 +237,7 @@ async function notifyFollowUpReminder(followUp, lead) {
       leadName: lead?.name,
       category: followUp.category || 'warm',
       leadStatus: lead?.status,
+      scheduledAt: followUp.scheduledAt,
       href: lead?._id ? `/leads/${lead._id}` : undefined,
     },
   };

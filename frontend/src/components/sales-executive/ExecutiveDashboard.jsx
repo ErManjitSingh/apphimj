@@ -10,6 +10,7 @@ import API from '../../api/axios';
 import { APP_GREETING } from '../../lib/greeting';
 import MobileExecutiveDashboard from './dashboard/MobileExecutiveDashboard';
 import ExecutiveWelcomeBanner from './dashboard/ExecutiveWelcomeBanner';
+import ExecutiveTargetStrip from './dashboard/ExecutiveTargetStrip';
 import ExecutiveHeroKpis from './dashboard/ExecutiveHeroKpis';
 import ExecutiveWorkspacePanel, {
   ExecutiveTargetsCard,
@@ -91,6 +92,8 @@ export default function ExecutiveDashboard() {
         )}
 
         <ExecutiveWelcomeBanner firstName={firstName} now={now} />
+
+        <ExecutiveTargetStrip target={data?.target} now={now} />
 
         <ColdCallAlertsPanel
           items={data?.coldCallReminders || []}

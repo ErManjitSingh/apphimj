@@ -1,6 +1,7 @@
 import { cn } from '../../lib/utils';
 
 export const INSIGHT_PERIODS = [
+  { key: 'month', label: 'This Month' },
   { key: 'today', label: 'Today' },
   { key: 'yesterday', label: 'Yesterday' },
   { key: 'total', label: 'Total' },

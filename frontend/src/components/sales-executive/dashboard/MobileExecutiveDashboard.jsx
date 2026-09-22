@@ -4,6 +4,7 @@ import {
   CalendarDays,
   ChevronDown,
   Download,
+  Flame,
   IndianRupee,
   Menu,
   MoreHorizontal,
@@ -16,12 +17,12 @@ import {
   Upload,
   UserRoundCheck,
   Users,
-  Loader,
 } from 'lucide-react';
 import { toast } from '../../../context/ToastContext';
 import { useSidebar } from '../../../context/SidebarContext';
 import { formatCurrency } from '../executiveUtils';
 import ExecutiveMonthlyTargetCard from './ExecutiveMonthlyTargetCard';
+import ExecutiveTargetStrip from './ExecutiveTargetStrip';
 import ExecutiveDashboardPeriodFilter from './ExecutiveDashboardPeriodFilter';
 import { withPeriodParams } from '../../../lib/periodFilters';
 import RecentUpdatesRemindersRow from './RecentUpdatesRemindersRow';
@@ -30,9 +31,9 @@ import { APP_BRAND_NAME } from '../../../config/branding';
 
 const KPI_CARDS = [
   { key: 'myLeads', label: 'Total Leads', icon: Users, tone: 'bg-blue-500', spark: '#7c3aed', path: '/sales-executive/leads/all' },
+  { key: 'hotLeads', label: 'Hot Leads', icon: Flame, tone: 'bg-rose-500', spark: '#f43f5e', path: '/sales-executive/leads/hot' },
   { key: 'todayLeads', label: 'Fresh / Today', icon: Sparkles, tone: 'bg-sky-500', spark: '#0ea5e9', path: '/sales-executive/leads/new' },
   { key: 'connectedLeads', label: 'Connected', icon: Phone, tone: 'bg-emerald-500', spark: '#10b981', path: '/sales-executive/leads/contacted' },
-  { key: 'workingProgress', label: 'Work in Progress', icon: Loader, tone: 'bg-orange-500', spark: '#f97316', path: '/sales-executive/leads/working-progress' },
   { key: 'followUpPending', label: 'F/U Pending', icon: Clock3, tone: 'bg-amber-500', spark: '#f59e0b', path: '/sales-executive/follow-ups' },
   { key: 'convertedLeads', label: 'Converted', icon: UserRoundCheck, tone: 'bg-emerald-600', spark: '#059669', path: '/sales-executive/leads/converted' },
   { key: 'todayFollowups', label: "Today's F/U", icon: CalendarDays, tone: 'bg-blue-500', spark: '#3b82f6', path: '/sales-executive/follow-ups' },
@@ -193,6 +194,10 @@ export default function MobileExecutiveDashboard({
             periodLabel={periodLabel}
             compact
           />
+        </div>
+
+        <div className="mt-4">
+          <ExecutiveTargetStrip target={data?.target} now={now} />
         </div>
 
         <div className="mt-4 grid grid-cols-3 gap-2">

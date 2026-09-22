@@ -325,6 +325,14 @@ export function resolveExtraBedNightRate(source = {}, mealKey = 'map') {
     normalizeMealPlanKey(
       mealKey || source?.mealPlan?.key || source?.mealPlanKey || room?.mealPlanKey
     ) || 'map';
+
+  // Manual / override rate on the quotation line wins (own hotels often have no API extra-bed).
+  const explicit =
+    Number(source?.extraBedPerNight ?? room?.extraBedPerNight ?? room?.extraBedRate ?? 0) || 0;
+  if (explicit > 0 && (source?.extraBedRateManual || room?.extraBedRateManual)) {
+    return explicit;
+  }
+
   const rates = extraBedRatesFrom(source) || extraBedRatesFrom(room);
   if (rates) {
     const keyed = Number(rates[want] || 0);
@@ -340,9 +348,6 @@ export function resolveExtraBedNightRate(source = {}, mealKey = 'map') {
     for (const key of fallback) {
       if (Number(rates[key] || 0) > 0) return Number(rates[key]);
     }
-    return 0;
   }
-  return (
-    Number(source?.extraBedPerNight ?? room?.extraBedRate ?? 0) || 0
-  );
+  return explicit;
 }

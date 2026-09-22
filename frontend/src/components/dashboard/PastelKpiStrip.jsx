@@ -2,9 +2,9 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   CalendarDays,
-  FileText,
+  CheckCircle2,
+  Flame,
   IndianRupee,
-  Target,
   TrendingDown,
   TrendingUp,
   UserRound,
@@ -85,11 +85,11 @@ const CARDS = [
     ring: 'hover:ring-violet-200',
   },
   {
-    key: 'quotations',
-    label: 'Quotations Sent',
-    icon: FileText,
-    path: '/quotations',
-    sparkKey: 'converted',
+    key: 'hot',
+    label: 'Hot Leads',
+    icon: Flame,
+    path: '/leads/hot',
+    sparkKey: 'totalLeads',
     spark: '#F59E0B',
     iconBg: 'from-amber-400 to-orange-600',
     iconShadow: 'shadow-amber-500/35',
@@ -99,12 +99,11 @@ const CARDS = [
     ring: 'hover:ring-amber-200',
   },
   {
-    key: 'conversionRate',
-    label: 'Conversion Rate',
-    icon: Target,
-    path: '/reports',
-    suffix: '%',
-    sparkKey: 'conversionRate',
+    key: 'conversions',
+    label: 'Converted',
+    icon: CheckCircle2,
+    path: '/leads/converted',
+    sparkKey: 'converted',
     spark: '#EC4899',
     iconBg: 'from-pink-400 to-rose-600',
     iconShadow: 'shadow-pink-500/35',
@@ -129,11 +128,26 @@ export default function PastelKpiStrip({ stats, filters }) {
     change: kpis.bookings?.change || 0,
     changeType: kpis.bookings?.changeType || 'neutral',
   };
+  const converted = {
+    value: Number(
+      stats?.convertedLeads ??
+        kpis.conversions?.value ??
+        kpis.bookings?.value ??
+        0
+    ),
+    change: kpis.conversions?.change ?? kpis.bookings?.change ?? 0,
+    changeType: kpis.conversions?.changeType ?? kpis.bookings?.changeType ?? 'neutral',
+  };
 
   return (
     <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-6">
       {CARDS.map((cfg, index) => {
-        const meta = cfg.key === 'customers' ? customers : kpiMeta(kpis, cfg.key);
+        const meta =
+          cfg.key === 'customers'
+            ? customers
+            : cfg.key === 'conversions'
+              ? converted
+              : kpiMeta(kpis, cfg.key);
         const isUp = meta.changeType === 'up';
         const isDown = meta.changeType === 'down';
         const Icon = cfg.icon;

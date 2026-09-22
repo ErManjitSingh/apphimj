@@ -5,7 +5,7 @@ import API from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import { canManageFollowUps } from '../../lib/followupPermissions';
 import { useDataRefresh } from '../../hooks/useDataRefresh';
-import { createExecutiveFollowUp, updateExecutiveFollowUp, buildFollowUpPayload } from './followupApi';
+import { createExecutiveFollowUp, updateExecutiveFollowUp, buildFollowUpPayload, normalizeScheduledAt } from './followupApi';
 import FollowUpHeader from './FollowUpHeader';
 import FollowUpKpiCards from './FollowUpKpiCards';
 import FollowUpFilterBar from './FollowUpFilterBar';
@@ -134,7 +134,7 @@ export default function FollowUpPage() {
     if (editFollowup) {
       await updateExecutiveFollowUp(editFollowup._id, {
         action: 'reschedule',
-        scheduledAt: new Date(data.scheduledAt).toISOString(),
+        scheduledAt: normalizeScheduledAt(data.scheduledAt),
         remarks: data.notes,
         category: data.category,
         priority: data.priority,

@@ -5,10 +5,11 @@ const ApiError = require('../utils/apiError');
 const { FOLLOWUP_POPULATE } = require('../utils/queryHelpers');
 const { NOTIFICATION_TYPES } = require('../constants/notificationTypes');
 const { notifyFollowUpOutcome } = require('./notificationService');
-const {
+  const {
   normalizeFollowUpPayload,
   syncLeadFollowUpDates,
   applyCategoryToLead,
+  cancelPendingFollowUpsForLead,
   FOLLOWUP_CATEGORIES,
 } = require('../utils/followUpHelpers');
 const { onLeadConverted } = require('./leadConversionService');
@@ -16,10 +17,19 @@ const { logLeadActivity } = require('./leadActivityService');
 
 async function resolveMissedAlertsForLead(leadId, followUpId) {
   const leadIdStr = leadId?.toString?.() || `${leadId}`;
+  const followUpIdStr = followUpId?.toString?.() || `${followUpId}`;
   await Notification.updateMany(
     {
-      type: NOTIFICATION_TYPES.FOLLOWUP_MISSED,
-      'meta.leadId': { $in: [leadId, leadIdStr] },
+      type: {
+        $in: [
+          NOTIFICATION_TYPES.FOLLOWUP_MISSED,
+          NOTIFICATION_TYPES.FOLLOWUP_REMINDER,
+        ],
+      },
+      $or: [
+        { 'meta.leadId': { $in: [leadId, leadIdStr] } },
+        { 'meta.followUpId': { $in: [followUpId, followUpIdStr].filter(Boolean) } },
+      ],
       'meta.resolved': { $ne: true },
     },
     {
@@ -61,6 +71,12 @@ async function createFollowUpForLead({ body, user, leadFilter = null }) {
   }
 
   const followup = await FollowUp.create(payload);
+  // One active pending follow-up per lead — older pending rows were showing again and again.
+  if (payload.status === 'pending') {
+    await cancelPendingFollowUpsForLead(lead._id, { exceptId: followup._id });
+  }
+  // Clear stale missed/reminder alerts so old schedule never keeps pinging.
+  await resolveMissedAlertsForLead(lead._id, followup._id);
   // NOTE: intentionally 'pending' here regardless of payload.status (which reflects the FollowUp
   // document's own status, e.g. 'completed' for a Converted record) — this call site must not
   // flip lead.status to converted on its own; conversion is driven by the dedicated lead-status
@@ -68,7 +84,17 @@ async function createFollowUpForLead({ body, user, leadFilter = null }) {
   // pending follow-ups once the lead actually converts.
   await applyCategoryToLead(lead, payload.category, 'pending', body);
   await syncLeadFollowUpDates(lead._id);
-  await resolveMissedAlertsForLead(lead._id, followup._id);
+
+  // Keep cold-call / callback reminder pointer on the NEW schedule (not the superseded one).
+  if (payload.status === 'pending' && payload.scheduledAt) {
+    const stillCold = payload.category === 'cold' || lead.coldCallPending;
+    if (stillCold || lead.coldCallFollowUpId) {
+      lead.coldCallReminderAt = payload.scheduledAt;
+      lead.coldCallFollowUpId = followup._id;
+      if (payload.category === 'cold') lead.coldCallPending = true;
+      await lead.save();
+    }
+  }
 
   if (payload.category === 'cold' && !['invalid_number', 'not_interested', 'booked_elsewhere'].includes(String(body.coldReason || payload.outcome || ''))) {
     const LeadNote = require('../models/LeadNote');
@@ -150,8 +176,14 @@ async function updateFollowUpRecord({ followup, body, user } = {}) {
       lead.coldCallFollowUpId = undefined;
       await lead.save();
     }
-    if (action === 'reschedule') {
+    if (action === 'reschedule' || (scheduledAt && String(prevScheduled) !== String(followup.scheduledAt))) {
+      // Invalidate old reminder so the NEW schedule is what notifies (not the previous 12pm).
       await resolveMissedAlertsForLead(lead._id, followup._id);
+      // If cold-call reminder was tied to this follow-up, move it to the new time.
+      if (String(lead.coldCallFollowUpId || '') === String(followup._id)) {
+        lead.coldCallReminderAt = followup.scheduledAt;
+        await lead.save();
+      }
     }
     if (action === 'complete') {
       notifyFollowUpOutcome(followup, lead).catch(() => {});

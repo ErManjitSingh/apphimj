@@ -22,6 +22,7 @@ import {
 import { formatLeadId } from '../leads/constants';
 import RepeatedLeadBadge from '../leads/RepeatedLeadBadge';
 import { getLeadListStatusDisplay } from '../../lib/executiveStatusDisplay';
+import { temperatureLabel, temperatureTone } from '../../lib/leadPipeline';
 import {
   getInitials,
   computeLeadScores,
@@ -188,6 +189,12 @@ export default function LeadDetailHeader({
                 </h1>
                 <span className="inline-flex items-center rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-500 ring-1 ring-sky-100">
                   {badgeLabel}
+                </span>
+                <span
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${temperatureTone(lead.temperature, lead.status)}`}
+                  title="Lead temperature (independent of pipeline status)"
+                >
+                  {temperatureLabel(lead.temperature, lead.status)}
                 </span>
                 {(lead.isRepeatCustomer || lead.isVip) && <RepeatedLeadBadge size="sm" />}
               </div>

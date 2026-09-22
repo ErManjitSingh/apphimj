@@ -39,6 +39,8 @@ export function useDashboardQuery(endpoint = '/dashboard/stats', filters = {}, o
     staleTime: DASHBOARD_STALE_MS,
     gcTime: GC_TIME_MS,
     placeholderData: (prev) => prev,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
     enabled,
     ...rest,
   });

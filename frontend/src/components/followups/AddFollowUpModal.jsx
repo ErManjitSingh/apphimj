@@ -13,6 +13,7 @@ import {
   isBookedStatus,
 } from '../../lib/leadPipeline';
 import { cn } from '../../lib/utils';
+import { localTodayInput, localTimeInput, localDateTimeToIso } from '../../lib/localDateTime';
 
 const emptyForm = {
   lead: '',
@@ -52,13 +53,8 @@ export default function AddFollowUpModal({
     setError('');
     if (editData) {
       const d = new Date(editData.scheduledAt);
-      const pad2 = (n) => String(n).padStart(2, '0');
-      const localDate = Number.isNaN(d.getTime())
-        ? ''
-        : `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-      const localTime = Number.isNaN(d.getTime())
-        ? '10:00'
-        : `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+      const localDate = Number.isNaN(d.getTime()) ? '' : localTodayInput(d);
+      const localTime = Number.isNaN(d.getTime()) ? '10:00' : localTimeInput(d);
       const temp =
         editData.category === 'hot' || editData.category === 'cold' || editData.category === 'warm'
           ? editData.category
@@ -80,11 +76,10 @@ export default function AddFollowUpModal({
         tokenAmount: '',
       });
     } else {
-      const today = new Date().toISOString().split('T')[0];
       setForm({
         ...emptyForm,
         lead: fixedLeadId || '',
-        date: today,
+        date: localTodayInput(),
         status: normalizeLeadStatus(lead?.status || 'follow_up'),
         temperature: lead?.temperature === 'vip' ? 'hot' : lead?.temperature || 'warm',
         callOutcome: lead?.callOutcome || '',
@@ -168,7 +163,7 @@ export default function AddFollowUpModal({
         lead: fixedLeadId || form.lead,
         date: isBooked ? null : form.date,
         time: isBooked ? null : form.time,
-        scheduledAt: isBooked ? null : `${form.date}T${form.time}:00`,
+        scheduledAt: isBooked ? null : localDateTimeToIso(form.date, form.time),
         notes: remarks,
         category,
         outcome: form.callOutcome || undefined,
@@ -176,8 +171,7 @@ export default function AddFollowUpModal({
         statusUpdate,
       });
       if (!editData) {
-        const today = new Date().toISOString().split('T')[0];
-        setForm({ ...emptyForm, lead: fixedLeadId || '', date: today });
+        setForm({ ...emptyForm, lead: fixedLeadId || '', date: localTodayInput() });
       }
       onClose();
     } catch (err) {

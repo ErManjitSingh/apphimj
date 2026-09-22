@@ -51,7 +51,7 @@ export default function ScenicDashboardBanner({ filters, onOpenFilters }) {
       <div className="absolute inset-y-0 left-0 w-[62%] bg-gradient-to-r from-white via-white/88 to-transparent" />
       <div className="absolute inset-y-0 right-0 w-[38%] bg-gradient-to-l from-black/35 via-black/10 to-transparent" />
 
-      <div className="relative flex min-h-[168px] items-center justify-between gap-4 px-5 py-4 sm:px-6">
+      <div className="relative z-[1] flex min-h-[168px] items-center justify-between gap-4 px-5 py-4 sm:px-6">
         <div className="min-w-0 max-w-xl">
           <h1 className="text-[22px] font-semibold leading-tight tracking-tight text-slate-900 sm:text-[26px]">
             {timeGreeting()},{' '}
@@ -100,16 +100,6 @@ export default function ScenicDashboardBanner({ filters, onOpenFilters }) {
           </p>
         </div>
       </div>
-
-      <p className="pointer-events-none absolute bottom-3 right-6 hidden font-[Caveat,cursive] text-[20px] leading-none text-white/90 drop-shadow-md lg:block">
-        Explore
-        <br />
-        Plan
-        <br />
-        Travel
-        <br />
-        Repeat
-      </p>
     </div>
   );
 }

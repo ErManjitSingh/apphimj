@@ -30,7 +30,29 @@ export const LEAD_TEMPERATURE_OPTIONS = [
   { value: 'hot', label: 'Hot', emoji: '🔥' },
   { value: 'warm', label: 'Warm', emoji: '🟡' },
   { value: 'cold', label: 'Cold', emoji: '🔵' },
+  { value: 'na', label: 'N/A', emoji: '⚪', hint: 'Closed deals — not mix with pipeline heat' },
 ];
+
+export function normalizeLeadTemperature(raw, status) {
+  const key = String(raw || '').trim().toLowerCase();
+  if (key === 'vip') return 'hot';
+  if (['hot', 'warm', 'cold', 'na'].includes(key)) return key;
+  if (isBookedStatus(status) || isLostStatus(status)) return 'na';
+  return 'warm';
+}
+
+export function temperatureLabel(raw, status) {
+  const key = normalizeLeadTemperature(raw, status);
+  return LEAD_TEMPERATURE_OPTIONS.find((t) => t.value === key)?.label || key;
+}
+
+export function temperatureTone(raw, status) {
+  const key = normalizeLeadTemperature(raw, status);
+  if (key === 'hot') return 'bg-rose-50 text-rose-600 ring-rose-200';
+  if (key === 'cold') return 'bg-sky-50 text-sky-600 ring-sky-200';
+  if (key === 'na') return 'bg-slate-100 text-slate-500 ring-slate-200';
+  return 'bg-amber-50 text-amber-700 ring-amber-200';
+}
 
 export const CALL_OUTCOME_OPTIONS = [
   { value: 'connected', label: 'Connected' },
@@ -108,7 +130,7 @@ export function buildPipelineStatusPayload({
   if (next === 'lost') {
     payload.lostReason = lostReason || note || 'other';
     payload.statusReason = payload.lostReason;
-    payload.temperature = payload.temperature || 'cold';
+    payload.temperature = 'na';
     payload.isHot = false;
   }
   if (next === 'postponed') {
@@ -117,8 +139,8 @@ export function buildPipelineStatusPayload({
     else payload.postponedAt = new Date().toISOString();
   }
   if (next === 'booked') {
-    payload.temperature = 'hot';
-    payload.isHot = true;
+    payload.temperature = 'na';
+    payload.isHot = false;
   }
   return payload;
 }

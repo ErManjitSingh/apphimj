@@ -62,7 +62,7 @@ const getDestinationDetail = asyncHandler(async (req, res) => {
 });
 
 const insightQuery = (req) => {
-  const period = typeof req.query.period === 'string' ? req.query.period : 'today';
+  const period = typeof req.query.period === 'string' ? req.query.period : 'month';
   const dateFrom = typeof req.query.dateFrom === 'string' ? req.query.dateFrom : '';
   const dateTo = typeof req.query.dateTo === 'string' ? req.query.dateTo : '';
   return { period, dateFrom, dateTo };

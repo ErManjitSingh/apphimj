@@ -3,7 +3,6 @@ const ApiError = require('../utils/apiError');
 const asyncHandler = require('../utils/asyncHandler');
 const {
   FOLLOWUP_POPULATE,
-  startOfDay,
 } = require('../utils/queryHelpers');
 const { createFollowUpForLead, updateFollowUpRecord } = require('../services/followUpService');
 const { findFollowUpsPaginated } = require('../repositories/followUpRepository');
@@ -12,23 +11,16 @@ const {
   getMissedFollowUpsPreview,
   getTeamFollowUpReport,
 } = require('../services/followUpSummaryService');
-
-async function syncMissedFollowUps() {
-  const todayStart = startOfDay();
-  await FollowUp.updateMany(
-    { status: 'pending', scheduledAt: { $lt: todayStart } },
-    { status: 'missed' }
-  );
-}
+const { syncMissedFollowUpsThrottled } = require('../utils/followUpHelpers');
 
 const listFollowUps = asyncHandler(async (req, res) => {
-  await syncMissedFollowUps();
+  await syncMissedFollowUpsThrottled();
   const result = await findFollowUpsPaginated(req.query);
   res.json(result);
 });
 
 const getFollowUpSummary = asyncHandler(async (req, res) => {
-  await syncMissedFollowUps();
+  await syncMissedFollowUpsThrottled();
   const [summary, missedPreview, teamReport] = await Promise.all([
     getAdminFollowUpSummary(),
     getMissedFollowUpsPreview({}, 8),
@@ -67,7 +59,7 @@ const deleteFollowUp = asyncHandler(async (req, res) => {
 });
 
 const markMissedFollowUps = asyncHandler(async (req, res) => {
-  await syncMissedFollowUps();
+  await syncMissedFollowUpsThrottled();
   res.json({ message: 'Missed follow-ups updated' });
 });
 

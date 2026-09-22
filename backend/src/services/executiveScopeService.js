@@ -1,7 +1,7 @@
 const Lead = require('../models/Lead');
 const cacheService = require('./cacheService');
 
-const LEAD_IDS_TTL_MS = 60_000;
+const LEAD_IDS_TTL_MS = 120_000;
 
 async function getExecutiveLeadIds(userId, branchId = null) {
   const key = `exec-leads:${userId}:${branchId || 'all'}`;
@@ -16,10 +16,11 @@ async function getExecutiveLeadIds(userId, branchId = null) {
   );
 }
 
-function buildExecutiveFollowUpFilter(userId, branchId, leadIds) {
+function buildExecutiveFollowUpFilter(userId, branchId, _leadIds) {
+  // Strict own-queue scope — never another executive's follow-ups.
   return {
     ...(branchId ? { branchId } : {}),
-    $or: [{ assignedTo: userId }, { lead: { $in: leadIds } }],
+    assignedTo: userId,
   };
 }
 

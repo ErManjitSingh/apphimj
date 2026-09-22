@@ -8,20 +8,21 @@ async function getAdminFollowUpSummary() {
   return getFollowUpSummary({});
 }
 
-async function getExecutiveFollowUpSummary(userId, leadIds) {
+async function getExecutiveFollowUpSummary(userId) {
   return getFollowUpSummary({
-    $or: [{ assignedTo: userId }, { lead: { $in: leadIds } }],
+    assignedTo: userId,
   });
 }
 
 async function getMissedFollowUpsPreview(baseFilter, limit = 8) {
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  const tabFilter = buildFollowUpTabFilter('missed');
+  const filter =
+    baseFilter?.$or && tabFilter?.$or
+      ? { ...baseFilter, $and: [{ $or: baseFilter.$or }, { $or: tabFilter.$or }] }
+      : { ...baseFilter, ...tabFilter };
+  if (baseFilter?.$or && tabFilter?.$or) delete filter.$or;
 
-  return FollowUp.find({
-    ...baseFilter,
-    ...buildFollowUpTabFilter('missed'),
-  })
+  return FollowUp.find(filter)
     .populate('lead', 'name phone destination')
     .populate('assignedTo', 'name')
     .sort({ scheduledAt: 1 })

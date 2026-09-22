@@ -1,6 +1,10 @@
 const FollowUp = require('../models/FollowUp');
 const Lead = require('../models/Lead');
+const cacheService = require('../services/cacheService');
 const { promoteReactivatedLeadOnFollowUp } = require('../services/reactivationService');
+
+const SYNC_MISSED_TTL_MS = 5 * 60 * 1000;
+const COLLAPSE_DUP_TTL_MS = 10 * 60 * 1000;
 
 const FOLLOWUP_CATEGORIES = [
   'warm',
@@ -101,12 +105,66 @@ function buildFollowUpCategoryFilter(category) {
  * from before conversion (Warm/Hot/Cold scheduling) must stop counting as active. Historical
  * completed/missed/cancelled follow-ups are left untouched.
  */
-async function cancelPendingFollowUpsForLead(leadId, { exceptId = null } = {}) {
+async function cancelPendingFollowUpsForLead(leadId, { exceptId = null, outcome = 'superseded' } = {}) {
   const filter = { lead: leadId, status: 'pending' };
   if (exceptId) filter._id = { $ne: exceptId };
   await FollowUp.updateMany(filter, {
-    $set: { status: 'cancelled', outcome: 'lead_converted' },
+    $set: { status: 'cancelled', outcome },
   });
+}
+
+/**
+ * Keep only the soonest pending follow-up per lead; cancel the rest.
+ * Stops the same pending item from showing again and again in SE lists.
+ * Throttled — full scan is expensive and does not need to run on every list request.
+ */
+async function collapseDuplicatePendingFollowUps(baseFilter = {}) {
+  const throttleKey = `fu-collapse:${JSON.stringify(baseFilter)}`;
+  const recent = await cacheService.get(throttleKey);
+  if (recent) return 0;
+
+  const groups = await FollowUp.aggregate([
+    { $match: { ...baseFilter, status: 'pending' } },
+    { $sort: { scheduledAt: 1, createdAt: 1 } },
+    {
+      $group: {
+        _id: '$lead',
+        keep: { $first: '$_id' },
+        all: { $push: '$_id' },
+        count: { $sum: 1 },
+      },
+    },
+    { $match: { count: { $gt: 1 } } },
+  ]);
+
+  const cancelIds = [];
+  for (const group of groups) {
+    for (const id of group.all) {
+      if (String(id) !== String(group.keep)) cancelIds.push(id);
+    }
+  }
+  await cacheService.set(throttleKey, { at: Date.now() }, COLLAPSE_DUP_TTL_MS);
+  if (!cancelIds.length) return 0;
+  await FollowUp.updateMany(
+    { _id: { $in: cancelIds } },
+    { $set: { status: 'cancelled', outcome: 'superseded' } }
+  );
+  return cancelIds.length;
+}
+
+/** Mark overdue pending → missed at most once every few minutes (global). */
+async function syncMissedFollowUpsThrottled() {
+  const throttleKey = 'fu-sync-missed';
+  const recent = await cacheService.get(throttleKey);
+  if (recent) return 0;
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const result = await FollowUp.updateMany(
+    { status: 'pending', scheduledAt: { $lt: todayStart } },
+    { status: 'missed' }
+  );
+  await cacheService.set(throttleKey, { at: Date.now() }, SYNC_MISSED_TTL_MS);
+  return result?.modifiedCount || 0;
 }
 
 async function syncLeadFollowUpDates(leadId) {
@@ -153,7 +211,7 @@ async function applyCategoryToLead(lead, category, status, body = {}) {
       if (!lead.convertedAt) lead.convertedAt = new Date();
       if (!lead.bookingDate) lead.bookingDate = lead.convertedAt;
       // Converted leaves the follow-up lifecycle — no active next-follow-up may remain.
-      await cancelPendingFollowUpsForLead(lead._id);
+      await cancelPendingFollowUpsForLead(lead._id, { outcome: 'lead_converted' });
       lead.nextFollowUp = undefined;
       lead.coldCallPending = false;
       lead.coldCallReminderAt = undefined;
@@ -349,4 +407,6 @@ module.exports = {
   applyCategoryToLead,
   normalizeFollowUpPayload,
   cancelPendingFollowUpsForLead,
+  collapseDuplicatePendingFollowUps,
+  syncMissedFollowUpsThrottled,
 };

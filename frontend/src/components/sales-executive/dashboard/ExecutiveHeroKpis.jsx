@@ -4,8 +4,8 @@ import {
   Users,
   CalendarClock,
   Phone,
-  Handshake,
   Trophy,
+  Flame,
   TrendingUp,
   TrendingDown,
   Minus,
@@ -20,6 +20,13 @@ const CARDS = [
     path: '/sales-executive/leads/all',
   },
   {
+    key: 'hotLeads',
+    label: 'Hot Leads',
+    icon: Flame,
+    iconWrap: 'bg-rose-50 text-rose-500',
+    path: '/sales-executive/leads/hot',
+  },
+  {
     key: 'todayFollowups',
     label: 'Follow-ups Today',
     icon: CalendarClock,
@@ -32,13 +39,6 @@ const CARDS = [
     icon: Phone,
     iconWrap: 'bg-emerald-50 text-emerald-500',
     path: '/sales-executive/leads/contacted',
-  },
-  {
-    key: 'workingProgress',
-    label: 'Meetings',
-    icon: Handshake,
-    iconWrap: 'bg-violet-50 text-violet-500',
-    path: '/sales-executive/leads/working-progress',
   },
   {
     key: 'convertedLeads',

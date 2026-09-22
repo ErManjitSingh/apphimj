@@ -705,6 +705,48 @@ export default function PackageBuilderWorkspace({
     );
   };
 
+  const handleSetMattressRate = (day, roomSlot, rate) => {
+    if (!day) return;
+    const slot = Math.max(1, Number(roomSlot) || 1);
+    const nextRate = Math.max(0, Math.round(Number(rate) || 0));
+    const overnight =
+      Array.isArray(itinerary) && itinerary.length > 1 ? itinerary.slice(0, -1) : [day];
+    const targetDays = overnight.length ? overnight : [day];
+    let lines = Array.isArray(dayWiseHotels) ? [...dayWiseHotels] : [];
+
+    targetDays.forEach((d) => {
+      const idx = lines.findIndex(
+        (h) => h.day === d.day && Number(h.roomSlot || 1) === slot
+      );
+      if (idx >= 0) {
+        const prev = lines[idx];
+        lines[idx] = {
+          ...prev,
+          extraBedPerNight: nextRate,
+          extraBedRateManual: true,
+          room: prev.room
+            ? { ...prev.room, extraBedRate: nextRate, extraBedRateManual: true }
+            : prev.room,
+        };
+        return;
+      }
+      if (slot !== 1) return;
+      const option = d.hotelMeta || (d.hotel ? { name: d.hotel } : null);
+      if (!option) return;
+      const { entry } = buildHotelStayEntry(d, option, 1);
+      entry.extraBedPerNight = nextRate;
+      entry.extraBedRateManual = true;
+      if (entry.room) {
+        entry.room = { ...entry.room, extraBedRate: nextRate, extraBedRateManual: true };
+      }
+      lines.push(entry);
+    });
+
+    onDayWiseHotelsChange?.(
+      lines.sort((a, b) => a.day - b.day || (a.roomSlot || 1) - (b.roomSlot || 1))
+    );
+  };
+
   const openCabPicker = (mode = 'change') => setPicker({ type: 'cab', cabMode: mode });
   const openStayPicker = () => setPicker({ type: 'hotel' });
   const openDayHotelPicker = (day, opts = {}) => setPicker({ type: 'hotel', day, ...opts });
@@ -952,6 +994,7 @@ export default function PackageBuilderWorkspace({
               onAddHotelRoom={openAddRoomPicker}
               onChangeExtraRoom={openChangeExtraRoomPicker}
               onChangeRoomMattresses={handleSetRoomMattresses}
+              onChangeMattressRate={handleSetMattressRate}
               onChangeCab={() => openCabPicker('change')}
               onAddCab={() => openCabPicker('add')}
               onCabFareChange={(value) => {

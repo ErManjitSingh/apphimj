@@ -5,6 +5,7 @@ import {
   FOLLOWUP_CATEGORY_OPTIONS,
   getOutcomesForCategory,
 } from '../../followups/constants';
+import { localTodayInput, localDateTimeToIso } from '../../../lib/localDateTime';
 
 export default function CreateFollowUpModal({ open, onClose, onSubmit, leadName }) {
   const [date, setDate] = useState('');
@@ -17,7 +18,7 @@ export default function CreateFollowUpModal({ open, onClose, onSubmit, leadName 
 
   useEffect(() => {
     if (open) {
-      setDate(new Date().toISOString().split('T')[0]);
+      setDate(localTodayInput());
       setError('');
       setNotes('');
       setCategory('warm');
@@ -40,7 +41,12 @@ export default function CreateFollowUpModal({ open, onClose, onSubmit, leadName 
     setSaving(true);
     setError('');
     try {
-      const scheduledAt = new Date(`${date}T${time}:00`).toISOString();
+      const scheduledAt = localDateTimeToIso(date, time);
+      if (!scheduledAt) {
+        setError('Invalid date / time');
+        setSaving(false);
+        return;
+      }
       await onSubmit({
         scheduledAt,
         notes,

@@ -46,6 +46,7 @@ const {
   generateQuoteNumber,
 } = require('../utils/queryHelpers');
 const { createFollowUpForLead, updateFollowUpRecord } = require('../services/followUpService');
+const { collapseDuplicatePendingFollowUps } = require('../utils/followUpHelpers');
 const { markLeadViewedByExecutive } = require('../services/leadExecutiveStallService');
 const { applyPhoneVisibilityGate } = require('../utils/leadPhoneVisibility');
 const { logExecutiveActivity } = require('../services/executiveActivityService');
@@ -715,11 +716,12 @@ const addLeadNote = asyncHandler(async (req, res) => {
 
 const listFollowUps = asyncHandler(async (req, res) => {
   const leadIds = await getExecutiveLeadIds(req.user._id, req.branchId);
-  const result = await findScopedFollowUpsPaginated(
-    buildExecutiveFollowUpFilter(req.user._id, req.branchId, leadIds),
-    req.query,
-    { branchId: req.branchId }
-  );
+  const baseFilter = buildExecutiveFollowUpFilter(req.user._id, req.branchId, leadIds);
+  // Collapse duplicate pending rows for the same lead before listing (own data only).
+  await collapseDuplicatePendingFollowUps(baseFilter);
+  const result = await findScopedFollowUpsPaginated(baseFilter, req.query, {
+    branchId: req.branchId,
+  });
   res.json(result);
 });
 
@@ -727,7 +729,7 @@ const getFollowUpSummary = asyncHandler(async (req, res) => {
   const leadIds = await getExecutiveLeadIds(req.user._id, req.branchId);
   const baseFilter = buildExecutiveFollowUpFilter(req.user._id, req.branchId, leadIds);
   const [summary, missedPreview] = await Promise.all([
-    getExecutiveFollowUpSummary(req.user._id, leadIds),
+    getExecutiveFollowUpSummary(req.user._id),
     getMissedFollowUpsPreview(baseFilter, 8),
   ]);
   res.json({ ...summary, missedPreview });

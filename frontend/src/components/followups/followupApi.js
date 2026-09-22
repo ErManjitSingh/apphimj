@@ -1,4 +1,5 @@
 import API from '../../api/axios';
+import { localDateTimeToIso } from '../../lib/localDateTime';
 
 /** Create follow-up (sales executive only). */
 export async function createExecutiveFollowUp(payload) {
@@ -11,16 +12,25 @@ export async function updateExecutiveFollowUp(id, payload) {
   return res.data;
 }
 
+export function normalizeScheduledAt(value) {
+  if (!value) return null;
+  const raw = String(value);
+  // Naive local datetime from older callers — convert with local wall-clock fields.
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(raw) && !/[zZ]|[+-]\d{2}:\d{2}$/.test(raw)) {
+    const [datePart, timePart] = raw.split('T');
+    return localDateTimeToIso(datePart, (timePart || '00:00').slice(0, 5));
+  }
+  const scheduledDate = new Date(value);
+  return Number.isNaN(scheduledDate.getTime()) ? null : scheduledDate.toISOString();
+}
+
 export function buildFollowUpPayload(form) {
-  const scheduledDate = form.scheduledAt ? new Date(form.scheduledAt) : null;
   return {
     lead: form.lead,
     type: form.type || 'call',
     category: form.category || 'warm',
-    // Converted sends no next-follow-up date/time — the backend logs it as an already-resolved
-    // historical entry instead of an active follow-up. See followUpHelpers.normalizeFollowUpPayload.
-    scheduledAt:
-      scheduledDate && !Number.isNaN(scheduledDate.getTime()) ? scheduledDate.toISOString() : null,
+    // Converted sends no next-follow-up date/time — backend logs it as resolved history.
+    scheduledAt: normalizeScheduledAt(form.scheduledAt),
     notes: form.notes || form.remarks || '',
     priority: form.priority || 'medium',
     outcome: form.outcome || '',
@@ -30,7 +40,6 @@ export function buildFollowUpPayload(form) {
     warmOutcome: form.warmOutcome || undefined,
     hotOutcome: form.hotOutcome || undefined,
     lostReason: form.lostReason || undefined,
-    // Exact option key / "key — note" so list shows what executive selected
     statusReason: form.statusReason || undefined,
   };
 }

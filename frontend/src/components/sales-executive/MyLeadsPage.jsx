@@ -52,6 +52,7 @@ export default function MyLeadsPage() {
   const [stateFilter, setStateFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
+  const [temperatureFilter, setTemperatureFilter] = useState('');
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 });
   const [modal, setModal] = useState(null);
   const [commercialLeadId, setCommercialLeadId] = useState(null);
@@ -60,9 +61,11 @@ export default function MyLeadsPage() {
   const Icon = ICONS[meta.icon] || Sparkles;
 
   const isAllView = filter === 'all';
-  const isConvertedView = filter === 'converted';
+  const isConvertedView = filter === 'converted' || filter === 'booked';
 
   const outcomeMeta = statusFilter ? getFollowUpOutcome(statusFilter) : null;
+  const pipelineStatus =
+    isAllView && statusFilter && !outcomeMeta ? statusFilter : '';
   const outcomeReasonKey = outcomeMeta?.lostReason || outcomeMeta?.value || '';
 
   const { data, isLoading } = useRoleLeadsQuery({
@@ -70,7 +73,7 @@ export default function MyLeadsPage() {
     filter,
     search: debouncedSearch,
     skipDebounce: true,
-    status: isAllView && outcomeMeta ? outcomeMeta.status : '',
+    status: isAllView && outcomeMeta ? outcomeMeta.status : pipelineStatus,
     statusReason:
       isAllView && outcomeReasonKey && !['converted', 'working_progress'].includes(statusFilter)
         ? outcomeReasonKey
@@ -78,6 +81,8 @@ export default function MyLeadsPage() {
     destination: destinationFilter,
     state: stateFilter,
     priority: priorityFilter,
+    source: sourceFilter,
+    temperature: temperatureFilter,
     dateFrom,
     dateTo,
     page: pagination.pageIndex + 1,
@@ -105,7 +110,15 @@ export default function MyLeadsPage() {
                 ? 'workingProgress'
                 : filter === 'duplicates' || filter === 'repeated'
                   ? 'repeated'
-                  : filter
+                  : filter === 'new-lead'
+                    ? 'newLead'
+                    : filter === 'not-reachable'
+                      ? 'notReachable'
+                      : filter === 'package-sent'
+                        ? 'packageSent'
+                        : filter === 'booked'
+                          ? 'booked'
+                          : filter
           ],
   }) ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / pagination.pageSize) || 1);
@@ -117,7 +130,18 @@ export default function MyLeadsPage() {
 
   useEffect(() => {
     setPagination((p) => ({ ...p, pageIndex: 0 }));
-  }, [filter, debouncedSearch, statusFilter, destinationFilter, stateFilter, priorityFilter, dateFrom, dateTo]);
+  }, [
+    filter,
+    debouncedSearch,
+    statusFilter,
+    destinationFilter,
+    stateFilter,
+    priorityFilter,
+    sourceFilter,
+    temperatureFilter,
+    dateFrom,
+    dateTo,
+  ]);
 
   useEffect(() => {
     setStatusFilter('');
@@ -263,6 +287,8 @@ export default function MyLeadsPage() {
         onPriorityChange={setPriorityFilter}
         sourceFilter={sourceFilter}
         onSourceChange={setSourceFilter}
+        temperatureFilter={temperatureFilter}
+        onTemperatureChange={setTemperatureFilter}
         dateFrom={dateFrom}
         dateTo={dateTo}
         onPeriodSelect={setPeriod}
@@ -300,6 +326,10 @@ export default function MyLeadsPage() {
         onStateChange={setStateFilter}
         priorityFilter={priorityFilter}
         onPriorityChange={setPriorityFilter}
+        sourceFilter={sourceFilter}
+        onSourceChange={setSourceFilter}
+        temperatureFilter={temperatureFilter}
+        onTemperatureChange={setTemperatureFilter}
         showStatusFilter={isAllView}
         showAddLead={false}
         dateFrom={dateFrom}

@@ -9,7 +9,7 @@ import { cn } from '../../lib/utils';
 export default function SidebarBrand({ title = APP_BRAND_NAME, subtitle = APP_DEFAULT_SUBTITLE }) {
   const { collapsed, toggleCollapsed, mobileOpen, setMobileOpen } = useSidebar();
   const { accent } = useSidebarTheme();
-  const isLight = accent.titleGradient === 'text-slate-900';
+  const isLight = accent.titleGradient === 'text-black' || accent.titleGradient === 'text-slate-900';
 
   if (collapsed) {
     return (
@@ -58,7 +58,7 @@ export default function SidebarBrand({ title = APP_BRAND_NAME, subtitle = APP_DE
             className={cn(
               'shrink-0 p-1.5 rounded-lg transition-colors lg:hidden',
               isLight
-                ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                ? 'text-black hover:text-black hover:bg-slate-100'
                 : 'text-slate-400 hover:text-white hover:bg-white/[0.08]'
             )}
             aria-label="Close menu"
@@ -73,7 +73,7 @@ export default function SidebarBrand({ title = APP_BRAND_NAME, subtitle = APP_DE
           className={cn(
             'shrink-0 p-1.5 rounded-lg transition-colors hidden lg:flex',
             isLight
-              ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+              ? 'text-black hover:text-black hover:bg-slate-100'
               : 'text-slate-400 hover:text-white hover:bg-white/[0.08]'
           )}
           aria-label="Collapse sidebar"

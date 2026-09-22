@@ -192,9 +192,27 @@ function buildExecutiveLeadFilter(filterKey, query = {}) {
   if (filterKey === 'contacted') {
     return { status: 'contacted' };
   }
+  if (filterKey === 'new-lead' || filterKey === 'new_lead') {
+    return { status: { $in: ['new_lead', 'new'] } };
+  }
+  if (filterKey === 'not-reachable' || filterKey === 'not_reachable') {
+    return { status: 'not_reachable' };
+  }
+  if (filterKey === 'qualified') {
+    return { status: { $in: ['qualified', 'contacted'] } };
+  }
+  if (filterKey === 'package-sent' || filterKey === 'package_sent') {
+    return { status: { $in: ['package_sent', 'quotation_sent'] } };
+  }
+  if (filterKey === 'postponed') {
+    return { status: 'postponed' };
+  }
+  if (filterKey === 'booked') {
+    return { status: { $in: ['booked', 'converted'] } };
+  }
   if (isWorkingProgressFilter(filterKey)) return { status: 'working_progress' };
   if (filterKey === 'follow-up') return { status: { $in: ['follow_up', 'negotiation'] } };
-  if (filterKey === 'converted') return { status: 'converted' };
+  if (filterKey === 'converted') return { status: { $in: ['converted', 'booked'] } };
   if (filterKey === 'lost') return { status: { $in: ['lost', 'booked_from_another_company'] } };
   if (filterKey === 'reactivated') {
     return {
@@ -337,7 +355,6 @@ async function findExecutiveLeadsPaginated(userId, query = {}, options = {}) {
   } else {
     Object.assign(owned, searchPart);
   }
-  if (andParts.length) owned.$and = andParts;
   Object.assign(owned, withBranch({}, options.branchId));
   if (filterKey !== 'new') applyPeriodTouch(owned, query);
 
@@ -354,14 +371,42 @@ async function findExecutiveLeadsPaginated(userId, query = {}, options = {}) {
 
   if (filterKey === 'all' || !filterKey || filterKey === 'package-shared' || filterKey === 'package_shared') {
     if (query.status) owned.status = query.status;
-    else owned.status = { $nin: ['lost', 'booked_from_another_company', 'converted'] };
+    else owned.status = { $nin: ['lost', 'booked_from_another_company', 'converted', 'booked'] };
     if (query.destination) owned.destination = query.destination;
     if (query.state) owned.state = query.state;
     if (query.statusReason) {
       owned.statusReason = { $regex: String(query.statusReason).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
     }
-    if (query.priority === 'hot') owned.isHot = true;
-    else if (query.priority) owned.priority = query.priority;
+    if (query.priority && query.priority !== 'hot') owned.priority = query.priority;
+  }
+
+  // Source / temperature apply on any list view (advanced filter bar)
+  if (query.source) {
+    const src = String(query.source).trim().toLowerCase();
+    const SOURCE_ALIASES = {
+      google_ads: ['google_ads', 'google', 'website', 'dpw'],
+      facebook_ads: ['facebook_ads', 'facebook', 'meta', 'portal_lead', 'instagram'],
+      website: ['website', 'dpw', 'dpw_wa', 'website_form'],
+      organic: ['organic', 'direct', 'website'],
+      manual: ['manual', 'manual_entry', 'call_lead', 'referral'],
+    };
+    const aliases = SOURCE_ALIASES[src];
+    if (aliases) owned.source = { $in: aliases };
+    else owned.source = query.source;
+  }
+  if (query.temperature === 'hot' || query.priority === 'hot') {
+    andParts.push({ $or: [{ temperature: 'hot' }, { isHot: true }] });
+  } else if (query.temperature === 'warm' || query.temperature === 'cold' || query.temperature === 'na') {
+    owned.temperature = query.temperature;
+  }
+  // Destination / state also useful outside Total view
+  if (filterKey && filterKey !== 'all' && filterKey !== 'package-shared' && filterKey !== 'package_shared') {
+    if (query.destination) owned.destination = query.destination;
+    if (query.state) owned.state = query.state;
+  }
+
+  if (andParts.length) {
+    owned.$and = [...(owned.$and || []), ...andParts];
   }
 
   if (isRepeatedView) {
@@ -477,15 +522,43 @@ async function resolveLeadIdsForSearch(search, options = {}) {
   return leads.map((l) => l._id);
 }
 
+/**
+ * Merge Mongo filters without clobbering `$or` / `$and` (e.g. executive scope `$or`
+ * must stay when tab filter also uses `$or` for missed pending).
+ */
+function mergeMongoFilters(base = {}, extra = {}) {
+  const out = { ...base };
+  for (const [key, value] of Object.entries(extra || {})) {
+    if (value === undefined) continue;
+    if (key === '$or') {
+      if (out.$or) {
+        out.$and = [...(out.$and || []), { $or: out.$or }, { $or: value }];
+        delete out.$or;
+      } else if (Array.isArray(out.$and)) {
+        out.$and.push({ $or: value });
+      } else {
+        out.$or = value;
+      }
+      continue;
+    }
+    if (key === '$and') {
+      out.$and = [...(out.$and || []), ...(Array.isArray(value) ? value : [value])];
+      continue;
+    }
+    out[key] = value;
+  }
+  return out;
+}
+
 async function findScopedFollowUpsPaginated(baseFilter, query = {}, options = {}) {
   const { page, limit, skip } = parsePagination(query, LIST_PAGINATION);
   const sort = parseSort(query, { scheduledAt: 1 });
 
-  const filter = {
-    ...withBranch(baseFilter, options.branchId),
-    ...buildFollowUpTabFilter(query.tab || query.kpiTab),
-    ...buildFollowUpCategoryFilter(query.category),
-  };
+  let filter = mergeMongoFilters(
+    withBranch(baseFilter, options.branchId),
+    buildFollowUpTabFilter(query.tab || query.kpiTab)
+  );
+  filter = mergeMongoFilters(filter, buildFollowUpCategoryFilter(query.category));
 
   if (query.status) filter.status = query.status;
   if (query.priority) filter.priority = query.priority;

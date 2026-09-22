@@ -1,40 +1,30 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { MapPin, PhoneCall, Sparkles, Users } from 'lucide-react';
+import { TrendingDown, TrendingUp } from 'lucide-react';
 import API from '../../api/axios';
 import { DASHBOARD_STALE_MS, GC_TIME_MS } from '../../lib/queryConfig';
 import { cn } from '../../lib/utils';
 import InsightPeriodTabs from './InsightPeriodTabs';
 
-const DEST_TONES = [
-  'from-orange-500 to-amber-500',
-  'from-sky-500 to-blue-600',
-  'from-emerald-500 to-teal-600',
-  'from-violet-500 to-purple-600',
-  'from-rose-500 to-pink-600',
-  'from-cyan-500 to-sky-600',
-];
-
 function n(v) {
   return Number(v || 0).toLocaleString('en-IN');
 }
 
-function SummaryChip({ icon: Icon, label, value, tone, sub }) {
+function Stat({ label, value, hint, tone }) {
   return (
-    <div className={cn('rounded-2xl p-3 ring-1', tone)}>
-      <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider opacity-80">
-        <Icon className="h-3 w-3" />
-        {label}
-      </div>
-      <p className="metric-tabular mt-1 text-[20px] font-bold leading-none tracking-tight">{value}</p>
-      {sub ? <p className="mt-1 text-[10px] font-medium opacity-70">{sub}</p> : null}
+    <div className="min-w-0">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+      <p className={cn('metric-tabular mt-0.5 text-[16px] font-bold leading-none', tone || 'text-slate-900')}>
+        {value}
+      </p>
+      {hint ? <div className="mt-0.5 truncate text-[10px] text-slate-400">{hint}</div> : null}
     </div>
   );
 }
 
 export default function DestinationInsightCard() {
-  const [period, setPeriod] = useState('today');
+  const [period, setPeriod] = useState('month');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const customReady = period !== 'custom' || Boolean(dateFrom || dateTo);
@@ -58,118 +48,114 @@ export default function DestinationInsightCard() {
     placeholderData: (prev) => prev,
   });
 
-  const rows = data?.rows || [];
-  const totals = data?.totals || { queries: 0, connected: 0, leads: 0, connectRate: 0 };
+  const rows = (data?.rows || []).slice(0, 8);
+  const totals = data?.totals || {
+    queries: 0,
+    hot: 0,
+    warm: 0,
+    cold: 0,
+    prevQueries: 0,
+    destinations: 0,
+  };
   const maxQueries = Math.max(...rows.map((r) => Number(r.queries || 0)), 1);
+  const delta = Number(totals.queryDelta || 0);
+  const DeltaIcon = delta >= 0 ? TrendingUp : TrendingDown;
 
   return (
-    <div className="flex h-full min-h-[420px] flex-col overflow-hidden rounded-[24px] bg-white shadow-sm ring-1 ring-slate-100">
-      <div className="border-b border-slate-100 bg-gradient-to-r from-orange-50/80 via-white to-sky-50/60 px-5 py-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-orange-500">Destination report</p>
-            <h2 className="mt-0.5 text-[16px] font-semibold text-slate-900">Destination-wise Queries</h2>
-            <p className="mt-0.5 text-[12px] text-slate-500">
-              Queries, connected calls, and open leads · {data?.label || 'Today'}
-            </p>
-          </div>
-          <InsightPeriodTabs
-            period={period}
-            onPeriodChange={setPeriod}
-            dateFrom={dateFrom}
-            dateTo={dateTo}
-            onDateFrom={setDateFrom}
-            onDateTo={setDateTo}
-          />
+    <div className="flex h-full flex-col overflow-hidden rounded-[22px] bg-white shadow-sm ring-1 ring-slate-100">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+        <div className="min-w-0">
+          <h2 className="text-[15px] font-semibold text-slate-900">Destinations</h2>
+          <p className="text-[11px] text-slate-500">
+            {data?.label || 'This Month'}
+            {data?.previousLabel ? ` · vs ${data.previousLabel}` : ''}
+          </p>
         </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <SummaryChip
-            icon={Sparkles}
-            label="Queries"
-            value={n(totals.queries)}
-            sub={`${totals.destinations || 0} destinations`}
-            tone="bg-orange-50 text-orange-800 ring-orange-100"
-          />
-          <SummaryChip
-            icon={PhoneCall}
-            label="Connected"
-            value={n(totals.connected)}
-            sub={`${totals.connectRate || 0}% connect rate`}
-            tone="bg-sky-50 text-sky-800 ring-sky-100"
-          />
-          <SummaryChip
-            icon={Users}
-            label="Open Leads"
-            value={n(totals.leads)}
-            sub="Still in pipeline"
-            tone="bg-emerald-50 text-emerald-800 ring-emerald-100"
-          />
-          <SummaryChip
-            icon={MapPin}
-            label="Connect Rate"
-            value={`${totals.connectRate || 0}%`}
-            sub="Connected / queries"
-            tone="bg-violet-50 text-violet-800 ring-violet-100"
-          />
-        </div>
+        <InsightPeriodTabs
+          period={period}
+          onPeriodChange={setPeriod}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          onDateFrom={setDateFrom}
+          onDateTo={setDateTo}
+        />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto px-2 py-2">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3 border-b border-slate-100 px-4 py-3 sm:grid-cols-5">
+        <Stat label="Queries" value={n(totals.queries)} hint={`${totals.destinations || 0} places`} />
+        <Stat
+          label="vs Last"
+          value={`${delta >= 0 ? '+' : ''}${n(delta)}`}
+          hint={
+            <span className="inline-flex items-center gap-0.5">
+              <DeltaIcon className="h-3 w-3" />
+              was {n(totals.prevQueries)}
+            </span>
+          }
+          tone={delta >= 0 ? 'text-emerald-600' : 'text-rose-600'}
+        />
+        <Stat label="Hot" value={n(totals.hot)} tone="text-rose-600" hint={`was ${n(totals.prevHot)}`} />
+        <Stat label="Warm" value={n(totals.warm)} tone="text-amber-600" hint={`was ${n(totals.prevWarm)}`} />
+        <Stat label="Cold" value={n(totals.cold)} tone="text-sky-600" hint={`was ${n(totals.prevCold)}`} />
+      </div>
+
+      <div className="min-h-0 flex-1 px-2 py-2">
         {isLoading && !rows.length ? (
-          <div className="space-y-2 p-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-14 animate-pulse rounded-2xl bg-slate-100" />
+          <div className="space-y-1.5 p-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-9 animate-pulse rounded-xl bg-slate-100" />
             ))}
           </div>
         ) : !rows.length ? (
-          <p className="flex h-full items-center justify-center px-5 py-12 text-center text-sm text-slate-400">
-            No destination queries in this period
-          </p>
+          <p className="px-3 py-8 text-center text-sm text-slate-400">No destination queries yet</p>
         ) : (
-          <ul className="space-y-1.5 p-2">
+          <ul className="space-y-0.5">
             {rows.map((row, index) => {
               const queries = Number(row.queries || 0);
-              const width = Math.max(8, (queries / maxQueries) * 100);
+              const width = Math.max(6, (queries / maxQueries) * 100);
+              const rowDelta = Number(row.queryDelta || 0);
               return (
                 <li key={row.destination}>
                   <Link
-                    to={`/destination/${row.destination}`}
-                    className="block rounded-2xl px-3 py-2.5 transition hover:bg-slate-50"
+                    to={`/destination/${encodeURIComponent(row.destination)}`}
+                    className="group flex items-center gap-2.5 rounded-xl px-2.5 py-2 transition hover:bg-slate-50"
                   >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={cn(
-                          'flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-[11px] font-bold text-white shadow-sm',
-                          DEST_TONES[index % DEST_TONES.length]
-                        )}
-                      >
-                        {index + 1}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="truncate text-[13px] font-semibold text-slate-800">{row.destination}</p>
-                          <p className="metric-tabular shrink-0 text-[13px] font-bold text-slate-900">{n(queries)}</p>
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[10px] font-bold text-slate-500 group-hover:bg-orange-50 group-hover:text-orange-600">
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="truncate text-[13px] font-semibold text-slate-800">{row.destination}</p>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <span
+                            className={cn(
+                              'text-[10px] font-bold tabular-nums',
+                              rowDelta > 0
+                                ? 'text-emerald-600'
+                                : rowDelta < 0
+                                  ? 'text-rose-500'
+                                  : 'text-slate-300'
+                            )}
+                          >
+                            {rowDelta > 0 ? '+' : ''}
+                            {n(rowDelta)}
+                          </span>
+                          <span className="metric-tabular w-8 text-right text-[13px] font-bold text-slate-900">
+                            {n(queries)}
+                          </span>
                         </div>
-                        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                      </div>
+                      <div className="mt-1 flex items-center gap-2">
+                        <div className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100">
                           <div
                             className="h-full rounded-full bg-gradient-to-r from-orange-400 to-amber-400"
                             style={{ width: `${width}%` }}
                           />
                         </div>
-                        <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]">
-                          <span className="text-orange-600">
-                            Query <b className="tabular-nums">{n(row.queries)}</b>
-                          </span>
-                          <span className="text-sky-600">
-                            Connected <b className="tabular-nums">{n(row.connected)}</b>
-                          </span>
-                          <span className="text-emerald-600">
-                            Leads <b className="tabular-nums">{n(row.leads)}</b>
-                          </span>
-                          <span className="text-violet-600">
-                            {row.connectRate || 0}%
-                          </span>
+                        <div className="flex shrink-0 items-center gap-1.5 text-[10px] font-semibold tabular-nums">
+                          <span className="text-rose-500">{n(row.hot)}H</span>
+                          <span className="text-amber-500">{n(row.warm)}W</span>
+                          <span className="text-sky-500">{n(row.cold)}C</span>
                         </div>
                       </div>
                     </div>

@@ -16,6 +16,7 @@ const { getExecutiveIdsForLeader } = require('./teamScopeService');
 const { getEnterpriseKpis, getSourceAnalytics, getExecutivePerformance } = require('./leadAnalyticsService');
 const { getEmailDashboardStats } = require('./emailStatsService');
 const { getMonthlyTargets, buildTargetProgress } = require('./salesTargetService');
+const { getExecutiveLeadIds } = require('./executiveScopeService');
 const { withBranch } = require('../utils/branchScope');
 const { sumMarketingSpendInRange } = require('./marketingSpendService');
 const { rollupCityStatsIntoStates, resolveDestinationGroupValues } = require('../utils/destinationHierarchy');
@@ -1441,8 +1442,9 @@ async function buildExecutiveDashboard(userId, options = {}) {
   );
 
   const leadScope = withBranch({ assignedTo: execId }, branchId);
-  const leadIds = await Lead.find(leadScope).distinct('_id');
-  const followScope = { $or: [{ assignedTo: execId }, { lead: { $in: leadIds } }] };
+  const leadIds = await getExecutiveLeadIds(execId, branchId);
+  // Own assigned follow-ups only — never another executive's queue.
+  const followScope = withBranch({ assignedTo: execId }, branchId);
   const quoteScope = { $or: [{ createdByExecutive: execId }, { lead: { $in: leadIds } }] };
 
   const periodTouch = {
@@ -2580,6 +2582,21 @@ async function buildTeamPerformance(options = {}) {
   };
 }
 
+function destinationInsightFields() {
+  return {
+    destinationKey: {
+      $toLower: { $trim: { input: { $ifNull: ['$destination', 'Not specified'] } } },
+    },
+    destinationName: {
+      $cond: [
+        { $or: [{ $eq: [{ $ifNull: ['$destination', ''] }, ''] }, { $eq: ['$destination', null] }] },
+        'Not specified',
+        '$destination',
+      ],
+    },
+  };
+}
+
 function insightPeriodRange(period = 'total', dateFrom, dateTo) {
   const key = String(period || 'total').toLowerCase();
   if (key === 'custom' && (dateFrom || dateTo)) {
@@ -2604,51 +2621,105 @@ function insightPeriodRange(period = 'total', dateFrom, dateTo) {
     const end = endOfDay(new Date(todayStart.getTime() - 1));
     return { start, end, isAllTime: false, label: 'Yesterday' };
   }
+  if (key === 'month' || key === 'this_month') {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    const end = endOfDay(now);
+    return {
+      start,
+      end,
+      isAllTime: false,
+      label: now.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }),
+    };
+  }
   return { start: null, end: null, isAllTime: true, label: 'Total' };
 }
 
-function destinationInsightFields() {
+function previousInsightRange(current) {
+  if (!current || current.isAllTime || !current.start || !current.end) {
+    return null;
+  }
+  const startMs = current.start.getTime();
+  const endMs = current.end.getTime();
+  const span = Math.max(24 * 60 * 60 * 1000, endMs - startMs + 1);
+  const prevEnd = new Date(startMs - 1);
+  const prevStart = new Date(prevEnd.getTime() - span + 1);
   return {
-    destinationKey: {
-      $toLower: { $trim: { input: { $ifNull: ['$destination', 'Not specified'] } } },
-    },
-    destinationName: {
-      $cond: [
-        { $or: [{ $eq: [{ $ifNull: ['$destination', ''] }, ''] }, { $eq: ['$destination', null] }] },
-        'Not specified',
-        '$destination',
-      ],
+    start: prevStart,
+    end: prevEnd,
+    isAllTime: false,
+    label:
+      startOfDay(prevStart).getTime() === startOfDay(prevEnd).getTime()
+        ? prevStart.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+        : `${prevStart.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} – ${prevEnd.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`,
+  };
+}
+
+function destinationTempRegex(keys = []) {
+  if (!keys.length) return null;
+  const alts = [...keys].map(escapeRegex).sort((a, b) => b.length - a.length).join('|');
+  return `(^|not_connected:)(${alts})($|[\\s:.—–-])`;
+}
+
+function destinationInsightGroupStage(tempKeys) {
+  const hotRe = destinationTempRegex(tempKeys.hot);
+  const warmRe = destinationTempRegex(tempKeys.warm);
+  const coldRe = destinationTempRegex(tempKeys.cold);
+  const tempSum = (re) =>
+    re
+      ? {
+          $sum: {
+            $cond: [
+              {
+                $regexMatch: {
+                  input: { $ifNull: ['$statusReason', ''] },
+                  regex: re,
+                  options: 'i',
+                },
+              },
+              1,
+              0,
+            ],
+          },
+        }
+      : { $sum: 0 };
+
+  return {
+    $group: {
+      _id: '$destinationKey',
+      destination: { $first: '$destinationName' },
+      queries: { $sum: 1 },
+      connected: {
+        $sum: { $cond: [{ $ne: ['$status', 'new'] }, 1, 0] },
+      },
+      leads: {
+        $sum: {
+          $cond: [
+            { $in: ['$status', ['lost', 'booked_from_another_company', 'converted', 'booked']] },
+            0,
+            1,
+          ],
+        },
+      },
+      hot: tempSum(hotRe),
+      warm: tempSum(warmRe),
+      cold: tempSum(coldRe),
+      bookings: {
+        $sum: { $cond: [{ $in: ['$status', ['converted', 'booked']] }, 1, 0] },
+      },
     },
   };
 }
 
-async function buildDestinationInsight(options = {}) {
-  const { branchId, period = 'today', dateFrom, dateTo } = options;
-  const { start, end, isAllTime, label } = insightPeriodRange(period, dateFrom, dateTo);
-  const match = activeLeadScope(start && end ? { createdAt: { $gte: start, $lte: end } } : {}, branchId);
-
+async function aggregateDestinationInsightRows(branchId, range, tempKeys) {
+  const match = activeLeadScope(
+    range?.start && range?.end ? { createdAt: { $gte: range.start, $lte: range.end } } : {},
+    branchId
+  );
   const rows = await Lead.aggregate([
     { $match: match },
     { $addFields: destinationInsightFields() },
-    {
-      $group: {
-        _id: '$destinationKey',
-        destination: { $first: '$destinationName' },
-        queries: { $sum: 1 },
-        connected: {
-          $sum: { $cond: [{ $ne: ['$status', 'new'] }, 1, 0] },
-        },
-        leads: {
-          $sum: {
-            $cond: [
-              { $in: ['$status', ['lost', 'booked_from_another_company', 'converted', 'booked']] },
-              0,
-              1,
-            ],
-          },
-        },
-      },
-    },
+    destinationInsightGroupStage(tempKeys),
     { $sort: { queries: -1 } },
   ]);
 
@@ -2657,36 +2728,103 @@ async function buildDestinationInsight(options = {}) {
     queries: row.queries,
     connected: row.connected,
     leads: row.leads,
+    hot: row.hot || 0,
+    warm: row.warm || 0,
+    cold: row.cold || 0,
+    bookings: row.bookings || 0,
     connectRate: row.queries ? Math.round((row.connected / row.queries) * 1000) / 10 : 0,
   }));
 
-  const destinations = await rollupCityStatsIntoStates(mapped, {
+  return rollupCityStatsIntoStates(mapped, {
     nameField: 'destination',
-    metricFields: ['queries', 'connected', 'leads'],
+    metricFields: ['queries', 'connected', 'leads', 'hot', 'warm', 'cold', 'bookings'],
     rateConfig: { field: 'connectRate', numerator: 'connected', denominator: 'queries' },
     sortField: 'queries',
     limit: 40,
   });
+}
 
-  const totals = destinations.reduce(
+async function buildDestinationInsight(options = {}) {
+  const { branchId, period = 'month', dateFrom, dateTo } = options;
+  const current = insightPeriodRange(period, dateFrom, dateTo);
+  const previous = previousInsightRange(current);
+  const tempKeys = await resolveStatusOptionKeys();
+
+  const [destinations, prevDestinations] = await Promise.all([
+    aggregateDestinationInsightRows(branchId, current, tempKeys),
+    previous ? aggregateDestinationInsightRows(branchId, previous, tempKeys) : Promise.resolve([]),
+  ]);
+
+  const prevMap = new Map(
+    (prevDestinations || []).map((row) => [String(row.destination || '').toLowerCase(), row])
+  );
+
+  const rows = destinations.map((row) => {
+    const prev = prevMap.get(String(row.destination || '').toLowerCase()) || {};
+    const prevQueries = Number(prev.queries || 0);
+    const queries = Number(row.queries || 0);
+    return {
+      ...row,
+      prevQueries,
+      prevHot: Number(prev.hot || 0),
+      prevWarm: Number(prev.warm || 0),
+      prevCold: Number(prev.cold || 0),
+      prevBookings: Number(prev.bookings || 0),
+      queryDelta: queries - prevQueries,
+      queryDeltaPct: prevQueries
+        ? Math.round(((queries - prevQueries) / prevQueries) * 1000) / 10
+        : queries
+          ? 100
+          : 0,
+    };
+  });
+
+  const totals = rows.reduce(
     (acc, row) => {
       acc.queries += Number(row.queries || 0);
       acc.connected += Number(row.connected || 0);
       acc.leads += Number(row.leads || 0);
+      acc.hot += Number(row.hot || 0);
+      acc.warm += Number(row.warm || 0);
+      acc.cold += Number(row.cold || 0);
+      acc.bookings += Number(row.bookings || 0);
+      acc.prevQueries += Number(row.prevQueries || 0);
+      acc.prevHot += Number(row.prevHot || 0);
+      acc.prevWarm += Number(row.prevWarm || 0);
+      acc.prevCold += Number(row.prevCold || 0);
       return acc;
     },
-    { queries: 0, connected: 0, leads: 0 }
+    {
+      queries: 0,
+      connected: 0,
+      leads: 0,
+      hot: 0,
+      warm: 0,
+      cold: 0,
+      bookings: 0,
+      prevQueries: 0,
+      prevHot: 0,
+      prevWarm: 0,
+      prevCold: 0,
+    }
   );
 
   return {
-    period: isAllTime ? 'total' : period,
-    label,
+    period: current.isAllTime ? 'total' : period,
+    label: current.label,
+    previousLabel: previous?.label || null,
     totals: {
       ...totals,
       connectRate: totals.queries ? Math.round((totals.connected / totals.queries) * 1000) / 10 : 0,
-      destinations: destinations.length,
+      destinations: rows.length,
+      queryDelta: totals.queries - totals.prevQueries,
+      queryDeltaPct: totals.prevQueries
+        ? Math.round(((totals.queries - totals.prevQueries) / totals.prevQueries) * 1000) / 10
+        : totals.queries
+          ? 100
+          : 0,
     },
-    rows: destinations,
+    rows,
   };
 }
 

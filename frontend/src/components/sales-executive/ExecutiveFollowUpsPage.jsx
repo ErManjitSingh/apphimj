@@ -26,6 +26,7 @@ import {
   updateExecutiveFollowUp,
   buildFollowUpPayload,
 } from '../followups/followupApi';
+import { datetimeLocalToIso } from '../../lib/localDateTime';
 import { ActionModal } from './LeadActionsMenu';
 import { cn } from '../../lib/utils';
 
@@ -158,9 +159,11 @@ export default function ExecutiveFollowUpsPage() {
     if (!rescheduleAt) {
       return;
     }
+    const scheduledAt = datetimeLocalToIso(rescheduleAt);
+    if (!scheduledAt) return;
     await updateExecutiveFollowUp(modal._id, {
       action: 'reschedule',
-      scheduledAt: new Date(rescheduleAt).toISOString(),
+      scheduledAt,
       remarks,
     });
     setModal(null);

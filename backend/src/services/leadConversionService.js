@@ -152,7 +152,7 @@ async function onLeadConverted(lead, actor, options = {}) {
   // Converted leaves the follow-up lifecycle — any Warm/Hot/Cold next-follow-up scheduled before
   // conversion must stop being active. Historical (completed/missed) follow-ups are untouched.
   const { cancelPendingFollowUpsForLead, syncLeadFollowUpDates } = require('../utils/followUpHelpers');
-  await cancelPendingFollowUpsForLead(lead._id);
+  await cancelPendingFollowUpsForLead(lead._id, { outcome: 'lead_converted' });
   if (lead.coldCallPending || lead.coldCallReminderAt || lead.coldCallFollowUpId) {
     await Lead.findByIdAndUpdate(lead._id, {
       $set: { coldCallPending: false },

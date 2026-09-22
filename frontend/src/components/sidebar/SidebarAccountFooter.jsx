@@ -45,7 +45,8 @@ export default function SidebarAccountFooter() {
   const { accent, profilePath } = useSidebarTheme();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const isLight = accent.titleGradient === 'text-slate-900';
+  const isLight =
+    accent.titleGradient === 'text-black' || accent.titleGradient === 'text-slate-900';
 
   const handleLogout = async () => {
     window.setTimeout(() => setMobileOpen(false), 0);
@@ -97,7 +98,7 @@ export default function SidebarAccountFooter() {
 
   if (collapsed) {
     return (
-      <div className="mt-auto border-t border-slate-100 p-2">
+      <div className="mt-auto space-y-2 border-t border-slate-100 p-2">
         <Tooltip>
           <TooltipTrigger asChild>
             <button
@@ -113,30 +114,42 @@ export default function SidebarAccountFooter() {
           </TooltipTrigger>
           <TooltipContent side="right">{user?.name || 'Profile'}</TooltipContent>
         </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">Logout</TooltipContent>
+        </Tooltip>
       </div>
     );
   }
 
   return (
-    <div className="mt-auto shrink-0 border-t border-slate-100 px-3 pb-3 pt-3">
+    <div className="mt-auto shrink-0 space-y-2 border-t border-slate-100 px-3 pb-3 pt-3">
       <DropdownMenuRoot>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="flex w-full items-center gap-2.5 rounded-2xl border border-slate-100 bg-white px-2.5 py-2 text-left shadow-sm transition hover:bg-slate-50"
+            className="flex w-full items-center gap-2.5 rounded-2xl border border-slate-200 bg-white px-2.5 py-2 text-left shadow-sm transition hover:bg-slate-50"
           >
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-orange-600 text-[11px] font-bold text-white shadow-sm shadow-orange-500/20">
               {getInitials(user?.name)}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-semibold text-slate-800">
+              <span className="block truncate text-[13px] font-semibold text-black">
                 {user?.name || 'User'}
               </span>
-              <span className="block truncate text-[11px] text-slate-400">
+              <span className="block truncate text-[11px] text-black/70">
                 {roleLabel(user?.role)}
               </span>
             </span>
-            <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+            <ChevronDown className="h-4 w-4 shrink-0 text-black" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" side="top" className="w-52">
@@ -152,13 +165,22 @@ export default function SidebarAccountFooter() {
               event.preventDefault();
               handleLogout();
             }}
-            className="text-rose-600 focus:text-rose-600"
+            className="text-rose-700 focus:text-rose-700"
           >
             <LogOut className="h-4 w-4" />
             Logout
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenuRoot>
+
+      <button
+        type="button"
+        onClick={handleLogout}
+        className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-2 py-2.5 text-[13px] font-semibold text-rose-700 transition hover:bg-rose-100 hover:text-rose-800"
+      >
+        <LogOut className="h-4 w-4 shrink-0" />
+        Logout
+      </button>
     </div>
   );
 }

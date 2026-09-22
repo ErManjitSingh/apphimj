@@ -18,7 +18,7 @@ export default function SidebarNavSection({ label }) {
       >
         <p
           className={cn(
-            'text-[10px] font-bold uppercase tracking-[0.14em] text-sidebar-muted/75',
+            'text-[10px] font-bold uppercase tracking-[0.14em] text-sidebar-text',
             'select-none'
           )}
         >

@@ -227,7 +227,7 @@ export default function LeadOverviewSection({
               ) : null
             }
           />
-          <div className="grid grid-cols-2 gap-x-5 gap-y-5 sm:grid-cols-3 xl:grid-cols-7">
+          <div className="grid grid-cols-2 gap-x-5 gap-y-5 sm:grid-cols-3 xl:grid-cols-4">
             <Field icon={MapPin} label="Destination" value={lead.destination || '—'} />
             <Field
               icon={Calendar}
@@ -249,6 +249,8 @@ export default function LeadOverviewSection({
               label="Assigned To"
               value={lead.assignedTo?.name || 'Unassigned'}
             />
+            <Field icon={MapPin} label="Pickup point" value={lead.pickupPoint || '—'} />
+            <Field icon={MapPin} label="Drop point" value={lead.dropPoint || '—'} />
           </div>
           <div className="mt-4 rounded-xl bg-slate-50 px-4 py-3">
             <div className="mb-1 flex items-center justify-between">

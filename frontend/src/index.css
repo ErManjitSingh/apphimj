@@ -390,8 +390,8 @@
   }
 
   .sidebar-light {
-    --sidebar-text: #0f172a;
-    --sidebar-muted: #64748b;
+    --sidebar-text: #000000;
+    --sidebar-muted: #111111;
     --sidebar-hover: rgba(15, 23, 42, 0.05);
     --sidebar-active: #f97316;
     --sidebar-border: #f1f5f9;

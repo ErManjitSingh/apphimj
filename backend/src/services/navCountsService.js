@@ -307,6 +307,39 @@ async function aggregateExecutiveLeadCounts(userId, branchId) {
           },
           { $count: 'n' },
         ],
+        fresh: [
+          {
+            $match: {
+              ...activeOpen,
+              $or: [
+                { createdAt: { $gte: startOfToday, $lte: endOfToday } },
+                { assignedAt: { $gte: startOfToday, $lte: endOfToday } },
+              ],
+            },
+          },
+          { $count: 'n' },
+        ],
+        newLead: [
+          { $match: { ...notRepeated, status: { $in: ['new_lead', 'new'] } } },
+          { $count: 'n' },
+        ],
+        notReachable: [
+          { $match: { ...notRepeated, status: 'not_reachable' } },
+          { $count: 'n' },
+        ],
+        qualified: [
+          { $match: { ...notRepeated, status: { $in: ['qualified', 'contacted'] } } },
+          { $count: 'n' },
+        ],
+        packageSent: [
+          {
+            $match: {
+              ...notRepeated,
+              status: { $in: ['package_sent', 'quotation_sent'] },
+            },
+          },
+          { $count: 'n' },
+        ],
         contacted: [{ $match: { ...notRepeated, status: 'contacted' } }, { $count: 'n' }],
         workingProgress: [
           { $match: { ...notRepeated, status: 'working_progress' } },
@@ -326,13 +359,21 @@ async function aggregateExecutiveLeadCounts(userId, branchId) {
             $match: {
               ...notRepeated,
               isHot: true,
-              status: { $nin: ['converted', 'lost', 'booked_from_another_company'] },
+              status: { $nin: ['converted', 'booked', 'lost', 'booked_from_another_company'] },
             },
           },
           { $count: 'n' },
         ],
         converted: [
-          { $match: { ...notRepeated, status: 'converted' } },
+          { $match: { ...notRepeated, status: { $in: ['converted', 'booked'] } } },
+          { $count: 'n' },
+        ],
+        booked: [
+          { $match: { ...notRepeated, status: { $in: ['converted', 'booked'] } } },
+          { $count: 'n' },
+        ],
+        postponed: [
+          { $match: { ...notRepeated, status: 'postponed' } },
           { $count: 'n' },
         ],
         lost: [
@@ -378,11 +419,18 @@ async function aggregateExecutiveLeadCounts(userId, branchId) {
       selfAdded: facetCount(row, 'selfAdded'),
       repeated: facetCount(row, 'repeated'),
       new: facetCount(row, 'new'),
+      fresh: facetCount(row, 'fresh'),
+      newLead: facetCount(row, 'newLead'),
+      notReachable: facetCount(row, 'notReachable'),
+      qualified: facetCount(row, 'qualified'),
+      packageSent: facetCount(row, 'packageSent'),
       contacted: facetCount(row, 'contacted'),
       workingProgress: facetCount(row, 'workingProgress'),
       followUp: facetCount(row, 'followUp'),
       hot: facetCount(row, 'hot'),
       converted: facetCount(row, 'converted'),
+      booked: facetCount(row, 'booked'),
+      postponed: facetCount(row, 'postponed'),
       lost: facetCount(row, 'lost'),
       reactivated: facetCount(row, 'reactivated'),
       urgent: facetCount(row, 'urgent'),

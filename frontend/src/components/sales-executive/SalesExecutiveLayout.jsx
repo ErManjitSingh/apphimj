@@ -1,5 +1,6 @@
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
 import { SidebarProvider } from '../../context/SidebarContext';
 import AppSidebar from '../sidebar/AppSidebar';
@@ -10,10 +11,47 @@ import MissedFollowUpAlert from '../notifications/MissedFollowUpAlert';
 import RouteFallback from '../ui/RouteFallback';
 import SalesExecutiveMobileNav from './SalesExecutiveMobileNav';
 import { salesExecutiveNavItems } from './sidebar-config';
+import API from '../../api/axios';
+import {
+  buildDashboardParams,
+  dashboardQueryKey,
+} from '../../features/dashboard/hooks/useDashboardQuery';
+import { getDefaultExecDashboardFilters } from './dashboard/ExecutiveDashboardPeriodFilter';
+import { DASHBOARD_STALE_MS, GC_TIME_MS } from '../../lib/queryConfig';
+
+function usePrefetchExecutiveWarmData() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const userId = user?._id || user?.id;
+
+  useEffect(() => {
+    if (!userId) return undefined;
+    const filters = getDefaultExecDashboardFilters();
+    const endpoint = '/sales-executive/dashboard';
+    queryClient.prefetchQuery({
+      queryKey: dashboardQueryKey(endpoint, filters),
+      queryFn: async () => {
+        const { data } = await API.get(endpoint, {
+          params: buildDashboardParams(filters),
+          skipSuccessToast: true,
+        });
+        return data;
+      },
+      staleTime: DASHBOARD_STALE_MS,
+      gcTime: GC_TIME_MS,
+    });
+    const t = window.setTimeout(() => {
+      import('./MyLeadsPage').catch(() => {});
+      import('./ExecutiveFollowUpsPage').catch(() => {});
+    }, 1200);
+    return () => window.clearTimeout(t);
+  }, [queryClient, userId]);
+}
 
 function SalesExecutiveShell() {
   const { user } = useAuth();
   const { pathname } = useLocation();
+  usePrefetchExecutiveWarmData();
   const isDashboard = pathname === '/sales-executive/dashboard';
   const isQuotationBuilder =
     pathname === '/sales-executive/quotations/new' ||

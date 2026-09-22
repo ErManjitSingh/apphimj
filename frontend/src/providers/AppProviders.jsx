@@ -13,6 +13,7 @@ const queryClient = new QueryClient({
       retry: 1,
       refetchOnWindowFocus: false,
       refetchOnReconnect: true,
+      refetchOnMount: false,
       staleTime: LIST_STALE_MS,
       gcTime: GC_TIME_MS,
     },

@@ -70,8 +70,17 @@ function ChangeBtn({ onClick, label = 'Change' }) {
   );
 }
 
-function MattressStepper({ count = 0, onChange, disabled = false, nightRate = 0 }) {
+function MattressStepper({
+  count = 0,
+  onChange,
+  disabled = false,
+  nightRate = 0,
+  onNightRateChange,
+}) {
   const n = clampExtraMattresses(count);
+  const rate = Math.max(0, Number(nightRate) || 0);
+  const canEditRate = typeof onNightRateChange === 'function';
+
   return (
     <div className="inline-flex items-center gap-1 shrink-0 rounded-lg border border-emerald-300 bg-white px-1.5 py-0.5">
       <BedDouble className="h-3 w-3 text-emerald-700" aria-hidden />
@@ -95,10 +104,31 @@ function MattressStepper({ count = 0, onChange, disabled = false, nightRate = 0 
       >
         <Plus className="h-3 w-3" />
       </button>
-      {nightRate > 0 && (
-        <span className="pl-0.5 text-[9px] font-bold text-emerald-700 whitespace-nowrap">
-          {formatINR(nightRate)}/n
-        </span>
+      {canEditRate ? (
+        <label className="inline-flex items-center gap-0.5 pl-0.5">
+          <span className="text-[9px] font-bold text-emerald-700">₹</span>
+          <input
+            type="number"
+            min={0}
+            step={50}
+            disabled={disabled}
+            value={rate || ''}
+            placeholder="Rate"
+            onChange={(e) => {
+              const next = Math.max(0, Math.round(Number(e.target.value) || 0));
+              onNightRateChange(next);
+            }}
+            className="h-6 w-14 rounded-md border border-emerald-200 bg-emerald-50/80 px-1 text-[10px] font-bold text-emerald-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200"
+            aria-label="Extra mattress rate per night"
+          />
+          <span className="text-[9px] font-bold text-emerald-700">/n</span>
+        </label>
+      ) : (
+        rate > 0 && (
+          <span className="pl-0.5 text-[9px] font-bold text-emerald-700 whitespace-nowrap">
+            {formatINR(rate)}/n
+          </span>
+        )
       )}
     </div>
   );
@@ -131,6 +161,7 @@ function HotelCard({
   roomHint = null,
   extraRoomLines = [],
   primaryExtraMattresses = 0,
+  onChangeMattressRate,
 }) {
   const image = meta?.image || meta?.images?.[0];
   const stars = Math.min(5, Math.round(Number(meta?.starRating || 0)));
@@ -221,6 +252,12 @@ function HotelCard({
                     onChange={(n) =>
                       onChangeRoomMattresses(Number(hotelSel?.roomSlot || 1), n)
                     }
+                    onNightRateChange={
+                      onChangeMattressRate
+                        ? (rate) =>
+                            onChangeMattressRate(Number(hotelSel?.roomSlot || 1), rate)
+                        : undefined
+                    }
                   />
                 )}
                 {hasOptions && onOpenPicker && <ChangeBtn onClick={onOpenPicker} label="Change room" />}
@@ -251,6 +288,11 @@ function HotelCard({
                     count={extraMattressesOnLine(line)}
                     nightRate={resolveExtraBedNightRate(line, line.mealPlan?.key || 'map')}
                     onChange={(n) => onChangeRoomMattresses(line.roomSlot || idx + 2, n)}
+                    onNightRateChange={
+                      onChangeMattressRate
+                        ? (rate) => onChangeMattressRate(line.roomSlot || idx + 2, rate)
+                        : undefined
+                    }
                   />
                 )}
                 {onChangeExtraRoom && (
@@ -508,6 +550,7 @@ function SortableDayCard({
   onAddHotelRoom,
   onChangeExtraRoom,
   onChangeRoomMattresses,
+  onChangeMattressRate,
   onChangeCab,
   onAddCab,
   onCabFareChange,
@@ -712,6 +755,11 @@ function SortableDayCard({
                 ? (slot, count) => onChangeRoomMattresses?.(day, slot, count)
                 : undefined
             }
+            onChangeMattressRate={
+              !isLastDay
+                ? (slot, rate) => onChangeMattressRate?.(day, slot, rate)
+                : undefined
+            }
             emptyLabel={isLastDay ? 'Departure day · no overnight stay' : 'Select hotel for this night'}
             rooms={extraRoomLines.length > 0 ? 1 : rooms}
             roomHint={!isLastDay ? roomHint : null}
@@ -906,6 +954,7 @@ export default function PackageBuilderDayTimeline({
   onAddHotelRoom,
   onChangeExtraRoom,
   onChangeRoomMattresses,
+  onChangeMattressRate,
   onChangeCab,
   onAddCab,
   onCabFareChange,
@@ -1003,6 +1052,7 @@ export default function PackageBuilderDayTimeline({
                   onAddHotelRoom={onAddHotelRoom}
                   onChangeExtraRoom={onChangeExtraRoom}
                   onChangeRoomMattresses={onChangeRoomMattresses}
+                  onChangeMattressRate={onChangeMattressRate}
                   onChangeCab={onChangeCab}
                   onAddCab={onAddCab}
                   onCabFareChange={onCabFareChange}

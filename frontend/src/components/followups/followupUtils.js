@@ -1,27 +1,25 @@
 import { FOLLOWUP_STATUSES, FOLLOWUP_PRIORITIES } from './constants';
 
-const REF_TODAY = new Date('2026-05-31T12:00:00.000Z');
-
-export function isSameDay(a, b = REF_TODAY) {
+export function isSameDay(a, b = new Date()) {
   const d1 = new Date(a);
   const d2 = new Date(b);
   return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
 }
 
 export function isToday(scheduledAt) {
-  return isSameDay(scheduledAt, REF_TODAY);
+  return isSameDay(scheduledAt, new Date());
 }
 
 export function isPast(scheduledAt) {
-  return new Date(scheduledAt) < REF_TODAY;
+  return new Date(scheduledAt) < new Date();
 }
 
 export function isFuture(scheduledAt) {
-  return new Date(scheduledAt) > REF_TODAY && !isToday(scheduledAt);
+  return new Date(scheduledAt) > new Date() && !isToday(scheduledAt);
 }
 
 export function daysOverdue(scheduledAt) {
-  const diff = REF_TODAY - new Date(scheduledAt);
+  const diff = Date.now() - new Date(scheduledAt).getTime();
   return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
 }
 
