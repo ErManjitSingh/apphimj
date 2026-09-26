@@ -23,14 +23,26 @@ export function daysOverdue(scheduledAt) {
   return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
 }
 
+const ORG_TZ = 'Asia/Kolkata';
+
 export function formatFollowUpDate(iso) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  return new Date(iso).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: ORG_TZ,
+  });
 }
 
 export function formatFollowUpTime(iso) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+  return new Date(iso).toLocaleTimeString('en-IN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: ORG_TZ,
+  });
 }
 
 export function formatFollowUpDateTime(iso) {

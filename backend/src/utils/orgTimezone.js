@@ -23,8 +23,9 @@ const EOD_MINUTE = Number(process.env.ATTENDANCE_EOD_MINUTE ?? 30);
 const SESSION_START_HOUR = Number(process.env.ATTENDANCE_SESSION_START_HOUR ?? 6);
 const SESSION_START_MINUTE = Number(process.env.ATTENDANCE_SESSION_START_MINUTE ?? 30);
 
-/** Roles subject to the daily session window (both the login-start gate and the EOD cutoff). */
-const SESSION_WINDOW_ROLES = ['sales_executive'];
+/** Roles subject to the daily session window (both the login-start gate and the EOD cutoff).
+ * Empty = no time restriction (24×7 login). Set to ['sales_executive'] to re-enable. */
+const SESSION_WINDOW_ROLES = [];
 /** Back-compat alias — some call sites predate the SESSION_WINDOW_ROLES name. */
 const EOD_LOGOUT_ROLES = SESSION_WINDOW_ROLES;
 

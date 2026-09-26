@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Calendar,
   CalendarClock,
@@ -37,13 +37,13 @@ const KPI_CARDS = [
   {
     key: 'all',
     title: 'Total Leads',
-    hint: 'Active assigned (excl. repeated)',
+    hint: 'All leads assigned to you',
     path: '/sales-executive/leads/all',
     icon: List,
-    wrap: 'from-slate-50 to-violet-50 border-slate-100',
-    iconBg: 'bg-slate-700 text-white',
-    valueClass: 'text-slate-800',
-    arrow: 'bg-slate-700 text-white',
+    accent: 'bg-[#5D5FEF]/10 text-[#5D5FEF]',
+    rail: 'bg-[#5D5FEF]',
+    ringActive: 'ring-[#5D5FEF]/35 border-[#5D5FEF]/40',
+    valueClass: 'text-slate-900',
     showSelfAdded: true,
   },
   {
@@ -52,10 +52,10 @@ const KPI_CARDS = [
     hint: 'Created or assigned today',
     path: '/sales-executive/leads/new',
     icon: FileText,
-    wrap: 'from-violet-50 to-indigo-50 border-violet-100',
-    iconBg: 'bg-violet-600 text-white',
-    valueClass: 'text-violet-700',
-    arrow: 'bg-violet-600 text-white',
+    accent: 'bg-[#5D5FEF]/10 text-[#5D5FEF]',
+    rail: 'bg-[#5D5FEF]',
+    ringActive: 'ring-[#5D5FEF]/35 border-[#5D5FEF]/40',
+    valueClass: 'text-slate-900',
   },
   {
     key: 'contacted',
@@ -63,10 +63,10 @@ const KPI_CARDS = [
     hint: 'Call picked leads',
     path: '/sales-executive/leads/contacted',
     icon: Phone,
-    wrap: 'from-emerald-50 to-teal-50 border-emerald-100',
-    iconBg: 'bg-emerald-500 text-white',
-    valueClass: 'text-emerald-700',
-    arrow: 'bg-emerald-500 text-white',
+    accent: 'bg-emerald-50 text-emerald-600',
+    rail: 'bg-emerald-500',
+    ringActive: 'ring-emerald-300/50 border-emerald-300',
+    valueClass: 'text-slate-900',
   },
   {
     key: 'workingProgress',
@@ -74,21 +74,21 @@ const KPI_CARDS = [
     hint: 'Requirements in motion',
     path: '/sales-executive/leads/working-progress',
     icon: Loader,
-    wrap: 'from-orange-50 to-amber-50 border-orange-100',
-    iconBg: 'bg-orange-500 text-white',
-    valueClass: 'text-orange-700',
-    arrow: 'bg-orange-500 text-white',
+    accent: 'bg-orange-50 text-orange-600',
+    rail: 'bg-orange-500',
+    ringActive: 'ring-orange-300/50 border-orange-300',
+    valueClass: 'text-slate-900',
   },
   {
     key: 'converted',
-    title: 'Converted',
-    hint: 'Successful conversions',
+    title: 'Booked',
+    hint: 'Confirmed deals',
     path: '/sales-executive/leads/converted',
     icon: Trophy,
-    wrap: 'from-amber-50 to-orange-50 border-amber-100',
-    iconBg: 'bg-amber-500 text-white',
-    valueClass: 'text-amber-700',
-    arrow: 'bg-amber-500 text-white',
+    accent: 'bg-emerald-50 text-emerald-600',
+    rail: 'bg-emerald-500',
+    ringActive: 'ring-emerald-300/50 border-emerald-300',
+    valueClass: 'text-slate-900',
   },
 ];
 
@@ -138,6 +138,7 @@ function formatDateTime(iso) {
     hour: '2-digit',
     minute: '2-digit',
     hour12: true,
+    timeZone: 'Asia/Kolkata',
   });
 }
 
@@ -213,6 +214,7 @@ export default function MobileExecutiveLeads({
   onOpenMenu,
 }) {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const { user } = useAuth();
   const { toggleMobileOpen } = useSidebar();
   const counts = useSidebarCounts();
@@ -332,30 +334,41 @@ export default function MobileExecutiveLeads({
         <section className="grid grid-cols-2 gap-2.5">
           {KPI_CARDS.map((card) => {
             const Icon = card.icon;
+            const active = pathname === card.path || pathname.startsWith(`${card.path}/`);
             return (
               <Link
                 key={card.key}
                 to={card.path}
                 className={cn(
-                  'relative overflow-hidden rounded-2xl border bg-gradient-to-br p-3 shadow-sm',
-                  card.wrap,
+                  'group relative overflow-hidden rounded-2xl border bg-white p-3 shadow-sm transition-all',
+                  'hover:-translate-y-0.5 hover:shadow-md',
+                  active
+                    ? cn('ring-2 shadow-md', card.ringActive)
+                    : 'border-slate-100/90 hover:border-slate-200',
                 )}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <span className={cn('flex h-9 w-9 items-center justify-center rounded-xl', card.iconBg)}>
-                    <Icon className="h-4 w-4" />
+                <span
+                  className={cn(
+                    'absolute inset-y-0 left-0 w-[3px] rounded-l-2xl transition-opacity',
+                    card.rail,
+                    active ? 'opacity-100' : 'opacity-70 group-hover:opacity-100',
+                  )}
+                />
+                <div className="flex items-start justify-between gap-2 pl-1">
+                  <span className={cn('flex h-8 w-8 items-center justify-center rounded-xl', card.accent)}>
+                    <Icon className="h-4 w-4" strokeWidth={2.25} />
                   </span>
-                  <span className={cn('flex h-7 w-7 items-center justify-center rounded-lg', card.arrow)}>
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 text-slate-400">
                     <ChevronRight className="h-4 w-4" />
                   </span>
                 </div>
-                <p className={cn('mt-3 text-[28px] font-black leading-none metric-tabular', card.valueClass)}>
+                <p className={cn('mt-2.5 pl-1 text-[22px] font-bold leading-none metric-tabular tabular-nums tracking-tight', card.valueClass)}>
                   {pad2(kpiValues[card.key])}
                 </p>
-                <p className="mt-1.5 text-[12px] font-bold text-slate-800">{card.title}</p>
-                <p className="mt-0.5 text-[11px] text-slate-500">{card.hint}</p>
+                <p className="mt-1.5 pl-1 text-[11px] font-semibold text-slate-500">{card.title}</p>
+                <p className="mt-0.5 pl-1 text-[11px] text-slate-400">{card.hint}</p>
                 {card.showSelfAdded ? (
-                  <p className="mt-1 text-[11px] font-semibold text-slate-600">
+                  <p className="mt-1 pl-1 text-[11px] font-semibold text-slate-600">
                     Self added: <span className="tabular-nums">{pad2(kpiValues.selfAdded)}</span>
                   </p>
                 ) : null}

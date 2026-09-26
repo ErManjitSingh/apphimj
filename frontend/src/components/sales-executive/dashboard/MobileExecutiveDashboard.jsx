@@ -42,11 +42,16 @@ const KPI_CARDS = [
 
 const STATUS_STYLES = {
   new: 'bg-violet-50 text-violet-600',
+  new_lead: 'bg-violet-50 text-violet-600',
   contacted: 'bg-emerald-50 text-emerald-600',
   follow_up: 'bg-blue-50 text-blue-600',
   negotiation: 'bg-blue-50 text-blue-600',
   quotation_sent: 'bg-amber-50 text-amber-600',
+  package_sent: 'bg-amber-50 text-amber-600',
   converted: 'bg-emerald-50 text-emerald-600',
+  booked: 'bg-emerald-50 text-emerald-600',
+  lost: 'bg-red-50 text-red-700',
+  booked_from_another_company: 'bg-red-50 text-red-700',
 };
 
 function titleCase(value) {
@@ -272,8 +277,8 @@ export default function MobileExecutiveDashboard({
             <h2 className="text-xs font-bold text-slate-900">Recent Leads</h2>
             <Link to="/sales-executive/leads/all" className="text-[10px] font-semibold text-violet-600">View All</Link>
           </div>
-          <div className="divide-y divide-slate-100">
-            {leads.slice(0, 5).map((lead, index) => (
+          <div className="max-h-[17.5rem] divide-y divide-slate-100 overflow-y-auto overscroll-contain scrollbar-thin">
+            {leads.map((lead, index) => (
               <Link key={lead._id} to={`/sales-executive/leads/${lead._id}/view`} className="flex items-center gap-2.5 px-4 py-2.5">
                 <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white ${
                   ['bg-violet-500', 'bg-emerald-500', 'bg-orange-500', 'bg-rose-500'][index % 4]

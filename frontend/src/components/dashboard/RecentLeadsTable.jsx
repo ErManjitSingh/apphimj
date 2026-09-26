@@ -16,9 +16,8 @@ export default function RecentLeadsTable({
   embedded = false,
   showAgent = true,
 }) {
-  const visibleLeads = maxRows ? leads.slice(0, maxRows) : leads;
-  const total = totalCount ?? leads.length;
-  const hasMore = total > visibleLeads.length;
+  const rows = leads || [];
+  const total = totalCount ?? rows.length;
 
   const columns = [
     { key: 'customer', label: 'Customer' },
@@ -32,15 +31,15 @@ export default function RecentLeadsTable({
     { key: 'source', label: 'Source' },
   ];
 
-  const tableBody = visibleLeads.length === 0 ? (
+  const tableBody = rows.length === 0 ? (
     <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
       <Inbox className="w-10 h-10 text-content-muted/40 mb-3" />
       <p className="text-sm font-medium text-content-muted">{emptyMessage}</p>
     </div>
   ) : (
-    <div className="overflow-x-auto">
+    <div className="max-h-[22rem] overflow-auto overscroll-contain scrollbar-thin">
       <table className="w-full min-w-[760px] table-auto border-collapse">
-        <thead>
+        <thead className="sticky top-0 z-[1] bg-surface">
           <tr>
             {columns.map((col) => (
               <th key={col.key} className={LEAD_LIST_TH}>
@@ -50,7 +49,7 @@ export default function RecentLeadsTable({
           </tr>
         </thead>
         <tbody>
-          {visibleLeads.map((lead, i) => (
+          {rows.map((lead, i) => (
             <tr key={lead._id} className={leadListRowClass(i, 'cursor-pointer')}>
               <td className={LEAD_LIST_TD}>
                 <Link to={`/leads/${lead._id}`} className="block min-w-0">
@@ -102,7 +101,7 @@ export default function RecentLeadsTable({
 
   const viewAllLink = (
     <Link to={viewAllHref} className="text-xs font-medium text-brand-600 hover:underline inline-flex items-center gap-1">
-      View all{hasMore ? ` (${total})` : ''} <ArrowUpRight className="w-3.5 h-3.5" />
+      View all{total > maxRows ? ` (${total})` : ''} <ArrowUpRight className="w-3.5 h-3.5" />
     </Link>
   );
 
@@ -111,7 +110,7 @@ export default function RecentLeadsTable({
       <div>
         <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-subtle">
           <p className="text-xs text-content-muted">
-            {hasMore ? `${subtitle} · Showing ${visibleLeads.length} of ${total}` : subtitle}
+            {total > maxRows ? `${subtitle} · Scroll for more (${total})` : subtitle}
           </p>
           {viewAllLink}
         </div>
@@ -123,7 +122,7 @@ export default function RecentLeadsTable({
   return (
     <DashboardPanel
       title={title}
-      subtitle={hasMore ? `${subtitle} · Showing ${visibleLeads.length} of ${total}` : subtitle}
+      subtitle={total > maxRows ? `${subtitle} · Scroll for more (${total})` : subtitle}
       noPadding
       action={viewAllLink}
     >

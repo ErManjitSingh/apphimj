@@ -105,8 +105,8 @@ function resolvePublicLeadSource(raw = {}) {
 
   if (isFacebookForm) {
     return {
-      source: 'portal_lead',
-      sourceLabel: 'Portal Lead',
+      source: 'website_2',
+      sourceLabel: 'Website 2',
       channel: 'facebook',
     };
   }
@@ -142,8 +142,8 @@ function resolvePublicLeadSource(raw = {}) {
     // Explicit Google → DPW WA; Meta CTWA → DPW2 WA; bare WhatsApp defaults to Google Ads WA (DPW WA)
     if (isFbWa && !isGoogleWa) {
       return {
-        source: 'portal_lead',
-        sourceLabel: 'Portal Lead',
+        source: 'website_2',
+        sourceLabel: 'Website 2',
         channel: 'whatsapp',
       };
     }

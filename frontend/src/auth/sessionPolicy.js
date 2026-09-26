@@ -2,12 +2,10 @@ export const RESTRICTED_SESSION_ROLES = ['admin', 'sales_manager'];
 export const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
 
 /**
- * Sales executives' daily session window (must mirror
- * backend/src/utils/orgTimezone.js — the backend is the source of truth for
- * enforcement, this is only used to proactively warn/redirect the client
- * before its next API call would get a 401 anyway).
+ * Sales executives' daily session window (mirrors backend/src/utils/orgTimezone.js).
+ * Empty = no EOD / login-time restriction (24×7).
  */
-export const EOD_LOGOUT_ROLES = ['sales_executive'];
+export const EOD_LOGOUT_ROLES = [];
 export const EOD_LOGOUT_HOUR = 20;
 export const EOD_LOGOUT_MINUTE = 30;
 export const SESSION_START_HOUR = 6;

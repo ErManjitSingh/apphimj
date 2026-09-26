@@ -28,9 +28,20 @@ const LOST_REASONS = [
   { value: 'not_interested', label: 'Not interested' },
   { value: 'lost_contacted', label: 'Lost contacted' },
   { value: 'does_not_exist', label: 'Does not exist' },
+  { value: 'other', label: 'Other' },
 ];
 
 const LOST_REASON_VALUES = LOST_REASONS.map((r) => r.value);
+
+/** Older UI keys → canonical SOP values */
+const LOST_REASON_ALIASES = {
+  competitor_booked: 'booked_elsewhere',
+  price_issue: 'too_expensive',
+  budget_issues: 'budget_issue',
+  plan_cancelled: 'not_travelling',
+  language_barrier: 'other',
+  booked_from_another_company: 'booked_elsewhere',
+};
 
 /** Fields required before any quotation (SOP §3) — budget & special requirements optional */
 const QUOTE_QUALIFICATION_FIELDS = [
@@ -48,5 +59,6 @@ module.exports = {
   FIRST_CONTACT_SLA,
   LOST_REASONS,
   LOST_REASON_VALUES,
+  LOST_REASON_ALIASES,
   QUOTE_QUALIFICATION_FIELDS,
 };

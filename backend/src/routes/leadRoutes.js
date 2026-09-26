@@ -39,6 +39,8 @@ const {
   listRecycleBin,
   restoreLead,
   permanentDeleteLead,
+  bulkRestoreLeads,
+  bulkPermanentDeleteLeads,
   getAgingAnalytics,
   listCallNotes,
   addCallNote,
@@ -63,6 +65,8 @@ router.get('/analytics/kpis', authorize('admin', 'sales_manager', 'lead_provider
 router.get('/analytics/sla', authorize('admin', 'sales_manager', 'lead_provider'), getSlaAnalytics);
 router.get('/audit-log', authorize('admin', 'sales_manager'), listAuditLog);
 router.get('/recycle-bin', authorize('admin', 'sales_manager', 'lead_provider'), listRecycleBin);
+router.post('/recycle-bin/bulk-restore', requirePermission('leads', 'edit'), bulkRestoreLeads);
+router.post('/recycle-bin/bulk-permanent', requirePermission('leads', 'delete'), bulkPermanentDeleteLeads);
 router.post('/bulk-status', requirePermission('leads', 'edit'), bulkUpdateStatus);
 router.post('/bulk-export', requirePermission('leads', 'view'), bulkExportLeads);
 router.post('/merge', authorize('admin', 'sales_manager'), mergeDuplicateLeads);

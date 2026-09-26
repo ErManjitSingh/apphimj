@@ -328,8 +328,12 @@ function normalizeLeadUpdateInput(body = {}) {
   if (hasOwn(body, 'isHot')) normalized.isHot = Boolean(body.isHot);
 
   if (hasOwn(body, 'temperature')) {
-    normalized.temperature = normalizeTemperature(body.temperature);
-    normalized.isHot = normalized.temperature === 'hot';
+    const tempKey = String(body.temperature || '').trim().toLowerCase();
+    // 'na' is a UI sentinel for booked/lost — never persist (enum is hot/warm/cold).
+    if (tempKey && tempKey !== 'na') {
+      normalized.temperature = normalizeTemperature(body.temperature);
+      normalized.isHot = normalized.temperature === 'hot';
+    }
   }
 
   if (body.coldCallDone === true || body.coldCallDone === 'true') {

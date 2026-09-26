@@ -24,7 +24,9 @@ function PdfSection({ title, eyebrow, children, flush, spaced, className = '' })
     spaced ? 'quote-ht-section-spaced' : '',
     flush ? 'quote-ht-section--flush' : '',
     className,
-  ].filter(Boolean).join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <section className={sectionClass}>
@@ -32,9 +34,12 @@ function PdfSection({ title, eyebrow, children, flush, spaced, className = '' })
         <div className="quote-ht-section-title">
           {eyebrow && <span className="quote-ht-section-eyebrow">{eyebrow}</span>}
           <span className="quote-ht-section-heading">{title}</span>
+          <span className="quote-ht-section-rule" aria-hidden="true" />
         </div>
       )}
-      <div className={`quote-ht-section-content ${flush ? 'quote-ht-section-content-flush' : ''}`.trim()}>
+      <div
+        className={`quote-ht-section-content ${flush ? 'quote-ht-section-content-flush' : ''}`.trim()}
+      >
         {children}
       </div>
     </section>
@@ -67,7 +72,6 @@ function PdfImage({ src, alt, className }) {
   );
 }
 
-/** MakeMyTrip-style hotel voucher card — large photo + stay details */
 function HotelStayCard({ dayHotel, dayMeals }) {
   if (!dayHotel?.name) return null;
 
@@ -90,7 +94,7 @@ function HotelStayCard({ dayHotel, dayMeals }) {
         ) : (
           <div className="quote-ht-stay-photo-fallback">Stay</div>
         )}
-        <span className="quote-ht-stay-photo-tag">Hotel</span>
+        <span className="quote-ht-stay-photo-tag">Overnight</span>
       </div>
       <div className="quote-ht-stay-body">
         <div className="quote-ht-stay-label">Your Stay</div>
@@ -145,8 +149,8 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
 
   return (
     <div ref={ref} className="quote-ht-pdf">
-      {/* Slim brand bar */}
-      <div className="quote-ht-topbar">
+      {/* Brand masthead */}
+      <header className="quote-ht-topbar">
         <div className="quote-ht-brand-row">
           <img
             src={COMPANY_INFO.logoUrl}
@@ -154,15 +158,19 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
             className="quote-ht-logo-img"
             crossOrigin="anonymous"
           />
-          <span className="quote-ht-brand-tagline">{COMPANY_INFO.tagline}</span>
+          <div className="quote-ht-brand-text">
+            <span className="quote-ht-brand-name">{COMPANY_INFO.brand}</span>
+            <span className="quote-ht-brand-tagline">{COMPANY_INFO.tagline}</span>
+          </div>
         </div>
         <div className="quote-ht-quote-meta">
+          <span className="quote-ht-meta-pill">Travel Quotation</span>
           <div className="qnum">{quote.quoteNumber}</div>
           <div>{formatQuoteDate(quote.createdAt)}</div>
         </div>
-      </div>
+      </header>
 
-      {/* Full-bleed cover — MakeMyTrip holiday style */}
+      {/* Cinematic cover */}
       <div className="quote-ht-cover">
         {coverSrc ? (
           <PdfImage src={coverSrc} alt={destLabel} className="quote-ht-cover-img" />
@@ -170,8 +178,10 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
           <div className="quote-ht-cover-fallback" />
         )}
         <div className="quote-ht-cover-shade" />
+        <div className="quote-ht-cover-ornament" aria-hidden="true" />
         <div className="quote-ht-cover-content">
           <span className="quote-ht-cover-badge">{shortName}</span>
+          <p className="quote-ht-cover-kicker">Crafted for {guestFirst}</p>
           <h1 className="quote-ht-cover-title">{pkg.name}</h1>
           <p className="quote-ht-cover-route">{pkg.routing || pkg.destination}</p>
           <div className="quote-ht-cover-chips">
@@ -181,23 +191,27 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
           </div>
         </div>
         <div className="quote-ht-cover-price">
-          <span className="price-label">Total Price</span>
+          <span className="price-label">Investment</span>
           <span className="price-value">{formatINR(p.total)}</span>
-          <span className="price-note">All inclusive</span>
+          <span className="price-note">All inclusive · GST as applicable</span>
         </div>
       </div>
 
-      {/* Trip at a glance tiles */}
+      {/* Trip at a glance */}
       <div className="quote-ht-glance">
         <div className="quote-ht-glance-item">
-          <span className="quote-ht-glance-icon">G</span>
+          <span className="quote-ht-glance-icon" aria-hidden="true">
+            ✦
+          </span>
           <div>
             <span className="lbl">Guest</span>
             <span className="val">{lead.name || 'Guest'}</span>
           </div>
         </div>
         <div className="quote-ht-glance-item">
-          <span className="quote-ht-glance-icon">T</span>
+          <span className="quote-ht-glance-icon" aria-hidden="true">
+            ◎
+          </span>
           <div>
             <span className="lbl">Travellers</span>
             <span className="val">
@@ -206,7 +220,9 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
           </div>
         </div>
         <div className="quote-ht-glance-item">
-          <span className="quote-ht-glance-icon">R</span>
+          <span className="quote-ht-glance-icon" aria-hidden="true">
+            ▢
+          </span>
           <div>
             <span className="lbl">Rooms</span>
             <span className="val">
@@ -216,7 +232,9 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
           </div>
         </div>
         <div className="quote-ht-glance-item">
-          <span className="quote-ht-glance-icon">C</span>
+          <span className="quote-ht-glance-icon" aria-hidden="true">
+            ▷
+          </span>
           <div>
             <span className="lbl">Cab</span>
             <span className="val">{pkg.cabCategory || vehicles[0]?.name || '—'}</span>
@@ -224,20 +242,22 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
         </div>
       </div>
 
-      {/* Destination highlights strip */}
+      {/* Destination gallery strip */}
       {highlightThumbs.length > 1 && (
         <div className="quote-ht-highlights">
-          {highlightThumbs.map((img) => (
+          {highlightThumbs.map((img, i) => (
             <figure key={img.url} className="quote-ht-highlight-card">
               <PdfImage src={img.url} alt={img.label} className="quote-ht-highlight-img" />
-              <figcaption>{img.label}</figcaption>
+              <figcaption>
+                <span className="quote-ht-highlight-num">{String(i + 1).padStart(2, '0')}</span>
+                {img.label}
+              </figcaption>
             </figure>
           ))}
         </div>
       )}
 
-      {/* Welcome */}
-      <PdfSection title={`Hello ${guestFirst},`} eyebrow="Personal note" spaced>
+      <PdfSection title={`Hello ${guestFirst},`} eyebrow="A note from us" spaced>
         <div className="quote-ht-welcome">
           <p>{welcomePara}</p>
           <p className="quote-ht-welcome-contact">
@@ -246,7 +266,6 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
         </div>
       </PdfSection>
 
-      {/* Trip summary snapshot */}
       <PdfSection title="Trip Snapshot" eyebrow="Overview" spaced>
         <div className="quote-ht-snapshot">
           {[
@@ -267,7 +286,6 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
         </div>
       </PdfSection>
 
-      {/* Transport */}
       {vehicles.length > 0 && (
         <PdfSection title="Transfers & Cab" eyebrow="Transport" spaced>
           <div className="quote-ht-transport-grid">
@@ -288,7 +306,6 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
         </PdfSection>
       )}
 
-      {/* Day-wise timeline itinerary */}
       {pkg.itinerary?.length > 0 && (
         <PdfSection title="Day-wise Itinerary" eyebrow="Your journey" spaced flush>
           <div className="quote-ht-timeline">
@@ -304,7 +321,9 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
                   className={`quote-ht-timeline-item${isLast ? ' is-last' : ''}`}
                 >
                   <div className="quote-ht-timeline-rail">
-                    <span className="quote-ht-timeline-dot">{String(day.day).padStart(2, '0')}</span>
+                    <span className="quote-ht-timeline-dot">
+                      {String(day.day).padStart(2, '0')}
+                    </span>
                     {!isLast && <span className="quote-ht-timeline-line" />}
                   </div>
                   <div className="quote-ht-timeline-card">
@@ -332,10 +351,14 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
                     {(day.sightseeing || day.activities || day.activityNotes) && (
                       <div className="quote-ht-day-extra">
                         {day.sightseeing && (
-                          <div><strong>Sightseeing:</strong> {day.sightseeing}</div>
+                          <div>
+                            <strong>Sightseeing:</strong> {day.sightseeing}
+                          </div>
                         )}
                         {day.activities && (
-                          <div><strong>Activities:</strong> {day.activities}</div>
+                          <div>
+                            <strong>Activities:</strong> {day.activities}
+                          </div>
                         )}
                         {day.activityNotes && (
                           <div className="quote-ht-day-note">{day.activityNotes}</div>
@@ -364,7 +387,6 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
         </PdfSection>
       )}
 
-      {/* Inclusions */}
       {(pkg.inclusions?.length || pkg.exclusions?.length) && (
         <PdfSection title="What's Included" eyebrow="Package cover" spaced>
           <div className="quote-ht-inc-exc">
@@ -388,7 +410,6 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
         </PdfSection>
       )}
 
-      {/* Fare summary strip */}
       <div className="quote-ht-fare">
         <div className="quote-ht-fare-left">
           <span className="quote-ht-fare-label">Package fare</span>
@@ -403,7 +424,6 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
         </div>
       </div>
 
-      {/* Policies */}
       <PdfSection title="Policies & Terms" eyebrow="Please read" spaced>
         <div className="quote-ht-policies-wrap">
           <PolicyBlock title="Remarks" items={policies.remarks} />
@@ -414,7 +434,6 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
         </div>
       </PdfSection>
 
-      {/* Bank */}
       <PdfSection title="Payment Details" eyebrow="Bank transfer" spaced>
         <table className="quote-ht-bank-table">
           <thead>
@@ -432,7 +451,9 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
             {banks.map((b, i) => (
               <tr key={b.bank}>
                 <td>{i + 1}</td>
-                <td><strong>{b.bank}</strong></td>
+                <td>
+                  <strong>{b.bank}</strong>
+                </td>
                 <td>{b.accountName}</td>
                 <td>{b.accountNo}</td>
                 <td>{b.ifsc}</td>
@@ -444,15 +465,12 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
         </table>
       </PdfSection>
 
-      {/* Planner */}
       <PdfSection title="Need assistance?" eyebrow="Your trip expert" spaced>
         <div className="quote-ht-planner">
-          <div className="quote-ht-planner-box">
+          <div className="quote-ht-planner-box quote-ht-planner-box--accent">
             <h4>Trip Planner</h4>
             <div className="quote-ht-planner-name">{planner.name}</div>
-            <div className="quote-ht-contact-line">
-              {planner.phone || COMPANY_INFO.phone}
-            </div>
+            <div className="quote-ht-contact-line">{planner.phone || COMPANY_INFO.phone}</div>
           </div>
           <div className="quote-ht-planner-box">
             <h4>{COMPANY_INFO.name}</h4>
@@ -470,21 +488,30 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
         </div>
       </PdfSection>
 
-      <div className="quote-ht-footer">
-        <img
-          src={COMPANY_INFO.logoUrl}
-          alt={COMPANY_INFO.name}
-          className="quote-ht-footer-logo"
-          crossOrigin="anonymous"
-        />
-        <p className="quote-ht-footer-price">
-          Total Package Price: <strong>{formatINR(p.total)}</strong>
-        </p>
-        <p>{COMPANY_INFO.tagline}</p>
-        <p>{COMPANY_INFO.phone} · {COMPANY_INFO.email}</p>
-        <p>{COMPANY_INFO.website} · Instagram · Facebook</p>
-        <p className="quote-ht-footer-thanks">Thank you for choosing {COMPANY_INFO.name}</p>
-      </div>
+      <footer className="quote-ht-footer">
+        <div className="quote-ht-footer-inner">
+          <img
+            src={COMPANY_INFO.logoUrl}
+            alt={COMPANY_INFO.name}
+            className="quote-ht-footer-logo"
+            crossOrigin="anonymous"
+          />
+          <p className="quote-ht-footer-price">
+            Total Package Price: <strong>{formatINR(p.total)}</strong>
+          </p>
+          <p className="quote-ht-footer-brand">{COMPANY_INFO.brand}</p>
+          <p>{COMPANY_INFO.tagline}</p>
+          <p>
+            {COMPANY_INFO.phone} · {COMPANY_INFO.email}
+          </p>
+          <p>
+            {COMPANY_INFO.website} · Instagram · Facebook
+          </p>
+          <p className="quote-ht-footer-thanks">
+            Thank you for choosing {COMPANY_INFO.name}
+          </p>
+        </div>
+      </footer>
     </div>
   );
 });

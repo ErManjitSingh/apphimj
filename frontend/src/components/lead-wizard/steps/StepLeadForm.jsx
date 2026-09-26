@@ -37,7 +37,7 @@ function InfoCard({ icon: Icon, iconWrap, title, subtitle, children }) {
         </div>
         <div>
           <h3 className="text-sm font-bold text-slate-900 leading-tight">{title}</h3>
-          <p className="text-xs text-slate-500 leading-tight">{subtitle}</p>
+          <p className="text-xs text-slate-800 leading-tight">{subtitle}</p>
         </div>
       </div>
       <div className="p-4">{children}</div>
@@ -58,7 +58,7 @@ function StepSection({ id, number, title, subtitle, children, first }) {
         </div>
         <div className="leading-tight">
           <h4 className="text-sm font-bold text-slate-900 leading-tight">Step {number} · {title}</h4>
-          {subtitle && <p className="text-[11px] text-slate-500 leading-tight">{subtitle}</p>}
+          {subtitle && <p className="text-[11px] text-slate-800 leading-tight">{subtitle}</p>}
         </div>
       </div>
       {children}
@@ -84,14 +84,14 @@ function LeadScoreCard({ values }) {
         </div>
         <div>
           <h3 className="text-sm font-bold text-slate-900 leading-tight">Step 6 · Lead Score</h3>
-          <p className="text-xs text-slate-500 leading-tight">Automatically calculated from customer &amp; travel details</p>
+          <p className="text-xs text-slate-800 leading-tight">Automatically calculated from customer &amp; travel details</p>
         </div>
       </div>
 
       <div className="p-4">
         <div className="flex items-center gap-3">
           <p className="text-2xl font-bold tabular-nums text-slate-900 leading-none">
-            {score}<span className="text-sm font-semibold text-slate-400">/100</span>
+            {score}<span className="text-sm font-semibold text-slate-700">/100</span>
           </p>
           <span className={cn('inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide', meta.badgeClass)}>
             {meta.label}
@@ -102,7 +102,7 @@ function LeadScoreCard({ values }) {
           {Object.values(breakdown).map((cat) => (
             <div key={cat.label}>
               <div className="mb-1 flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{cat.label}</span>
+                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-800">{cat.label}</span>
                 <span className="text-[11px] font-bold tabular-nums text-slate-600">{cat.score}/{cat.max}</span>
               </div>
               <div className="space-y-0.5">
@@ -129,7 +129,7 @@ function LeadScoreCard({ values }) {
             {remaining > 0 ? `${remaining} points remaining` : 'Maximum score reached'}
           </p>
           {remaining > 0 && (
-            <p className="mt-0.5 text-[10px] text-slate-400">Complete the missing details to increase Lead Score.</p>
+            <p className="mt-0.5 text-[10px] text-slate-700">Complete the missing details to increase Lead Score.</p>
           )}
         </div>
       </div>
@@ -146,7 +146,7 @@ function Chip({ active, onClick, children, className }) {
         'px-3 py-1.5 rounded-xl border text-[12px] font-semibold transition-all',
         active
           ? 'border-[#5D5FEF]/45 bg-[#5D5FEF]/10 text-[#5D5FEF] shadow-sm'
-          : 'border-slate-200 bg-white text-slate-500 hover:border-[#5D5FEF]/25 hover:bg-[#5D5FEF]/5',
+          : 'border-slate-200 bg-white text-slate-800 hover:border-[#5D5FEF]/25 hover:bg-[#5D5FEF]/5',
         className
       )}
     >
@@ -240,7 +240,7 @@ function ReferralDetailsSection({ role, leadId }) {
           {open && query.trim().length >= 2 && (
             <div className="absolute z-20 w-full mt-1 rounded-xl border border-slate-200 bg-white shadow-xl overflow-hidden max-h-52 overflow-y-auto">
               {searching ? (
-                <p className="px-3 py-2.5 text-xs text-slate-400">Searching…</p>
+                <p className="px-3 py-2.5 text-xs text-slate-700">Searching…</p>
               ) : results.length ? (
                 results.map((r) => (
                   <button
@@ -251,11 +251,11 @@ function ReferralDetailsSection({ role, leadId }) {
                   >
                     <User className="w-3.5 h-3.5 text-[#5D5FEF] shrink-0" />
                     <span className="text-xs font-medium text-slate-800 truncate flex-1">{r.name}</span>
-                    <span className="text-[10px] text-slate-500 shrink-0">{r.phone}</span>
+                    <span className="text-[10px] text-slate-800 shrink-0">{r.phone}</span>
                   </button>
                 ))
               ) : (
-                <p className="px-3 py-2.5 text-xs text-slate-400">No match found</p>
+                <p className="px-3 py-2.5 text-xs text-slate-700">No match found</p>
               )}
             </div>
           )}
@@ -339,7 +339,7 @@ function HeroBanner() {
             <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight mt-0.5">
               Customer journey starts here
             </h2>
-            <p className="text-sm text-slate-500 mt-1">
+            <p className="text-sm text-slate-800 mt-1">
               Fill once, review twice, and we&apos;ll handle the rest.
             </p>
           </div>
@@ -457,23 +457,9 @@ export default function StepLeadForm({ isEdit, leadId }) {
       .catch(() => {});
   }, []);
 
-  const nameMatches = useMemo(() => {
-    if (!name || name.length < 2 || !duplicate) return [];
-    const q = name.toLowerCase();
-    return duplicate.name?.toLowerCase().includes(q) ? [duplicate] : [];
-  }, [name, duplicate]);
-
   const filteredDest = destinationOptions
     .filter((d) => d.toLowerCase().includes(destination.toLowerCase()))
     .slice(0, 8);
-
-  const applyCustomer = (lead) => {
-    setValue('name', lead.name);
-    setValue('phone', lead.phone);
-    setValue('email', lead.email || '');
-    setValue('city', lead.city || 'Mumbai');
-    setValue('whatsapp', lead.phone?.replace(/\D/g, '').slice(-10) || '');
-  };
 
   return (
     <motion.div
@@ -501,8 +487,7 @@ export default function StepLeadForm({ isEdit, leadId }) {
         )}
       </AnimatePresence>
 
-      {/* One Customer Information card, containing all 5 steps of a natural sales conversation as
-          numbered sub-sections — single scrollable page, the numbering/anchors are a visual guide only. */}
+      {/* One Customer Information card — numbered sub-sections as a visual guide only. */}
       <InfoCard icon={User} iconWrap="bg-[#5D5FEF]/10 text-[#5D5FEF]" title="Customer Information" subtitle="Basic details about your customer">
       <StepSection id="step-identity" number={1} first title="Customer Identity">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -521,7 +506,7 @@ export default function StepLeadForm({ isEdit, leadId }) {
             label="Phone Number"
             required
             error={errors.phone?.message}
-            hint={lockIdentity ? 'Locked — add another below' : undefined}
+            hint={lockIdentity ? 'Primary phone is locked' : undefined}
           >
             <IconInput
               {...register('phone')}
@@ -586,7 +571,7 @@ export default function StepLeadForm({ isEdit, leadId }) {
                     'mr-2 shrink-0 text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-lg transition-colors',
                     sameAsPhone
                       ? 'bg-emerald-500/15 text-emerald-700'
-                      : 'bg-slate-100 text-slate-500 hover:bg-[#5D5FEF]/10 hover:text-[#5D5FEF]'
+                      : 'bg-slate-100 text-slate-800 hover:bg-[#5D5FEF]/10 hover:text-[#5D5FEF]'
                   )}
                 >
                   Same as phone
@@ -598,7 +583,7 @@ export default function StepLeadForm({ isEdit, leadId }) {
           <WizardField
             label="Email Address"
             error={errors.email?.message}
-            hint={lockIdentity ? 'Locked — add another below' : undefined}
+            hint={lockIdentity ? 'Primary email is locked' : undefined}
           >
             <IconInput
               icon={Mail}
@@ -611,6 +596,11 @@ export default function StepLeadForm({ isEdit, leadId }) {
             />
           </WizardField>
         </div>
+        {lockIdentity ? (
+          <p className="mt-3 text-[12px] text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+            Name, primary phone and primary email are locked. You can still update travel details.
+          </p>
+        ) : null}
       </StepSection>
 
       <StepSection id="step-location" number={3} title="Location">
@@ -628,62 +618,7 @@ export default function StepLeadForm({ isEdit, leadId }) {
         </div>
       </StepSection>
 
-      <StepSection id="step-details" number={4} title="Additional Details">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          <WizardField
-            label={lockIdentity ? 'Add another phone' : 'Alternate Phone'}
-            hint={lockIdentity ? 'Primary phone cannot be changed' : undefined}
-          >
-            <IconInput icon={Phone} {...register('alternatePhone')} placeholder="Extra mobile number" />
-          </WizardField>
-
-          <WizardField
-            label={lockIdentity ? 'Add another email' : 'Alternate Email'}
-            hint={lockIdentity ? 'Primary email cannot be changed' : undefined}
-          >
-            <IconInput icon={Mail} {...register('alternateEmail')} type="email" placeholder="second@email.com" />
-          </WizardField>
-
-          <WizardField label="Date of Birth">
-            <IconInput icon={Calendar} {...register('dateOfBirth')} type="date" />
-          </WizardField>
-        </div>
-
-        {lockIdentity && (
-          <p className="mt-4 text-[12px] text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
-            Name, primary phone and primary email are locked. You can still add another phone / email and update travel details.
-          </p>
-        )}
-
-        {(nameMatches.length > 0 || searching) && (
-          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <div className="flex items-center gap-1.5 mb-2">
-              <Search className="w-3.5 h-3.5 text-[#5D5FEF]" />
-              <p className="text-xs font-semibold text-slate-800">Existing match</p>
-              {searching && <span className="text-[10px] text-slate-400">Searching…</span>}
-            </div>
-            <div className="space-y-1 max-h-28 overflow-y-auto">
-              {nameMatches.map((m) => (
-                <button
-                  key={m._id}
-                  type="button"
-                  onClick={() => applyCustomer(m)}
-                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl border border-slate-200 bg-white hover:border-[#5D5FEF]/30 hover:bg-[#5D5FEF]/5 transition-all text-left"
-                >
-                  <User className="w-3.5 h-3.5 text-[#5D5FEF] shrink-0" />
-                  <span className="text-xs font-medium text-slate-800 truncate flex-1">{m.name}</span>
-                  <span className="text-[10px] text-slate-500 flex items-center gap-1">
-                    <Phone className="w-2.5 h-2.5" /> {m.phone}
-                  </span>
-                  <span className="text-[9px] font-bold uppercase text-[#5D5FEF] bg-[#5D5FEF]/10 px-1.5 py-0.5 rounded">Use</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </StepSection>
-
-      <StepSection id="step-source" number={5} title="Lead Source">
+      <StepSection id="step-source" number={4} title="Lead Source">
         <WizardField
           label="Source"
           required
@@ -848,7 +783,7 @@ export default function StepLeadForm({ isEdit, leadId }) {
               </IconSelect>
             </WizardField>
           </div>
-          <p className="sm:col-span-2 text-[10px] text-slate-500">
+          <p className="sm:col-span-2 text-[10px] text-slate-800">
             Default MAP — hotel prices follow this plan in quotations
           </p>
         </div>

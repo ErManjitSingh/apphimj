@@ -63,7 +63,7 @@ async function makeSession(user, overrides = {}) {
   });
 }
 
-describe('Sales-executive daily session window (06:30 AM - 08:30 PM IST)', () => {
+describe.skip('Sales-executive daily session window (disabled — 24×7 login)', () => {
   describe('Configuration is centralized', () => {
     test('the shared org-timezone config exposes the new boundaries, not the old ones', () => {
       expect(orgTimezone.SESSION_START_HOUR).toBe(6);

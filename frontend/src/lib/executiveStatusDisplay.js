@@ -134,6 +134,7 @@ export const LIST_STATUS_STYLES = {
   hot: 'bg-rose-500/10 text-rose-700 dark:text-rose-300 ring-rose-500/25',
   new: 'bg-sky-500/10 text-sky-700 dark:text-sky-300 ring-sky-500/25',
   converted: 'bg-emerald-600/10 text-emerald-800 dark:text-emerald-300 ring-emerald-600/25',
+  lost: 'bg-red-500/10 text-red-700 dark:text-red-300 ring-red-500/30',
 };
 
 const LIST_STATUS_DOT = {
@@ -142,6 +143,7 @@ const LIST_STATUS_DOT = {
   hot: 'bg-rose-500',
   new: 'bg-sky-500',
   converted: 'bg-emerald-600',
+  lost: 'bg-red-600',
 };
 
 function humanizeReasonKey(key) {
@@ -171,10 +173,10 @@ export function getLeadListStatusDisplay(lead) {
   let bucket = 'new';
   if (isBookedStatus(status) || status === 'converted' || status === 'booked') {
     bucket = 'converted';
+  } else if (status === 'lost' || status === 'booked_from_another_company') {
+    bucket = 'lost';
   } else if (temp === 'hot' || temp === 'warm' || temp === 'cold') {
     bucket = temp;
-  } else if (status === 'lost' || status === 'booked_from_another_company') {
-    bucket = 'cold';
   }
 
   const pipelineKey =

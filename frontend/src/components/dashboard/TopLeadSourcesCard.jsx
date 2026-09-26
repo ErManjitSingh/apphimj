@@ -9,8 +9,7 @@ export default function TopLeadSourcesCard({ data = [] }) {
       color: item.color || BAR_COLORS[i % BAR_COLORS.length],
     }))
     .filter((r) => r.value > 0)
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 6);
+    .sort((a, b) => b.value - a.value);
 
   const total = rows.reduce((sum, row) => sum + row.value, 0) || 1;
   const withPct = rows.map((row) => ({
@@ -20,15 +19,15 @@ export default function TopLeadSourcesCard({ data = [] }) {
   const maxPct = Math.max(...withPct.map((r) => r.pct), 1);
 
   return (
-    <div className="h-full rounded-[24px] bg-white p-5 shadow-sm ring-1 ring-slate-100">
-      <div className="mb-4 flex items-center justify-between">
+    <div className="flex h-full flex-col rounded-[24px] bg-white p-5 shadow-sm ring-1 ring-slate-100">
+      <div className="mb-4 flex shrink-0 items-center justify-between">
         <h2 className="text-[15px] font-semibold text-slate-900">Top Lead Sources</h2>
         <span className="rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-500 ring-1 ring-slate-100">
           This Month
         </span>
       </div>
       {withPct.length ? (
-        <ul className="space-y-3.5">
+        <ul className="max-h-[16.25rem] space-y-3.5 overflow-y-auto overscroll-contain pr-0.5 scrollbar-thin">
           {withPct.map((row) => (
             <li key={row.name}>
               <div className="mb-1 flex items-center justify-between gap-2 text-[12px]">

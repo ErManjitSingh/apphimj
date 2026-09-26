@@ -67,15 +67,18 @@ export const CALL_OUTCOME_OPTIONS = [
 export const LOCKED_PIPELINE_STATUSES = ['booked', 'lost', 'converted', 'booked_from_another_company'];
 
 export const LOST_REASON_OPTIONS = [
-  { value: 'competitor_booked', label: 'Competitor se booked' },
-  { value: 'booked_elsewhere', label: 'Booked elsewhere' },
-  { value: 'price_issue', label: 'Price issue' },
-  { value: 'budget_issues', label: 'Budget issues' },
+  { value: 'too_expensive', label: 'Too Expensive' },
+  { value: 'not_travelling', label: 'Not Travelling' },
+  { value: 'booked_elsewhere', label: 'Booked Elsewhere' },
+  { value: 'no_response', label: 'No Response' },
+  { value: 'date_changed', label: 'Date Changed' },
+  { value: 'budget_issue', label: 'Budget Issue / Costing Issue' },
+  { value: 'destination_changed', label: 'Destination Changed' },
+  { value: 'duplicate_lead', label: 'Repeated Lead' },
+  { value: 'invalid_number', label: 'Invalid number / wrong' },
   { value: 'not_interested', label: 'Not interested' },
-  { value: 'plan_cancelled', label: 'Plan cancelled' },
-  { value: 'no_response', label: 'No response after follow-up cycle' },
-  { value: 'invalid_number', label: 'Invalid number' },
-  { value: 'language_barrier', label: 'Language barrier' },
+  { value: 'lost_contacted', label: 'Lost contacted' },
+  { value: 'does_not_exist', label: 'Does not exist' },
   { value: 'other', label: 'Other' },
 ];
 
@@ -127,9 +130,20 @@ export function buildPipelineStatusPayload({
   if (callOutcome) payload.callOutcome = callOutcome;
   if (note) payload.statusReason = note;
 
-  if (next === 'lost') {
-    payload.lostReason = lostReason || note || 'other';
-    payload.statusReason = payload.lostReason;
+  // Not-picked / busy / switched-off on a New Lead → Not Reachable status
+  const unreachable = ['not_picked', 'busy', 'switched_off', 'wrong_number'];
+  if (
+    unreachable.includes(String(callOutcome || '').toLowerCase()) &&
+    (next === 'new_lead' || next === 'new')
+  ) {
+    payload.status = 'not_reachable';
+  }
+
+  if (next === 'lost' || payload.status === 'lost') {
+    const reasonKey = lostReason || note || 'other';
+    payload.lostReason = reasonKey;
+    // Backend accepts `key` or `key — comment`; attach optional remarks as comment
+    payload.statusReason = note && lostReason ? `${lostReason} — ${note}` : reasonKey;
     payload.temperature = 'na';
     payload.isHot = false;
   }

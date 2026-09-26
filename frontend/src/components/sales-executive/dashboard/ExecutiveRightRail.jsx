@@ -48,7 +48,7 @@ export default function ExecutiveRightRail({
   todayActivities = [],
 }) {
   const tasks = todayTasks.length
-    ? todayTasks.slice(0, 4).map((task, index) => ({
+    ? todayTasks.map((task, index) => ({
         id: task._id || `task-${index}`,
         label: task.title || 'Follow-up task',
         icon: CalendarClock,
@@ -68,7 +68,7 @@ export default function ExecutiveRightRail({
 
       <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <h3 className="text-sm font-bold text-slate-800">Today&apos;s Tasks</h3>
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 max-h-[16.25rem] space-y-2 overflow-y-auto overscroll-contain pr-0.5 scrollbar-thin">
           {tasks.map((task) => {
             const Icon = task.icon || CheckSquare;
             return (
@@ -99,8 +99,8 @@ export default function ExecutiveRightRail({
           </Link>
         </div>
         {upcomingFollowups.length ? (
-          <div className="mt-3 space-y-2">
-            {upcomingFollowups.slice(0, 4).map((item) => (
+          <div className="mt-3 max-h-[16.25rem] space-y-2 overflow-y-auto overscroll-contain pr-0.5 scrollbar-thin">
+            {upcomingFollowups.map((item) => (
               <Link
                 key={item._id}
                 to="/sales-executive/follow-ups"
@@ -129,13 +129,13 @@ export default function ExecutiveRightRail({
       <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <h3 className="text-sm font-bold text-slate-800">Recent Activity</h3>
         {todayActivities.length ? (
-          <div className="relative mt-3 space-y-3 pl-1">
-            {todayActivities.slice(0, 5).map((activity, index) => (
+          <div className="relative mt-3 max-h-[16.25rem] space-y-3 overflow-y-auto overscroll-contain pl-1 pr-0.5 scrollbar-thin">
+            {todayActivities.map((activity, index) => (
               <div key={activity._id || index} className="relative flex gap-3 pl-4">
                 <span
                   className={`absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full ${activityTone(activity.type)}`}
                 />
-                {index < Math.min(todayActivities.length, 5) - 1 ? (
+                {index < todayActivities.length - 1 ? (
                   <span className="absolute left-[4px] top-4 h-[calc(100%+4px)] w-px bg-slate-200" />
                 ) : null}
                 <div className="min-w-0">

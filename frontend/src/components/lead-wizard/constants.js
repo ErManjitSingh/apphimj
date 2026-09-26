@@ -1,12 +1,11 @@
-import { User, MessageCircle, MapPin, ListPlus, Compass } from 'lucide-react';
+import { User, MessageCircle, MapPin, Compass } from 'lucide-react';
 
-/** The Add/Edit Lead form's 5 visual sections — a single scrollable page, not a click-through wizard. */
+/** The Add/Edit Lead form's visual sections — a single scrollable page, not a click-through wizard. */
 export const LEAD_FORM_STEPS = [
   { id: 1, key: 'identity', anchorId: 'step-identity', title: 'Customer Identity', subtitle: 'Name & phone number', icon: User },
   { id: 2, key: 'communication', anchorId: 'step-communication', title: 'Communication', subtitle: 'WhatsApp & email', icon: MessageCircle },
   { id: 3, key: 'location', anchorId: 'step-location', title: 'Location', subtitle: 'City & state', icon: MapPin },
-  { id: 4, key: 'details', anchorId: 'step-details', title: 'Additional Details', subtitle: 'Optional extras', icon: ListPlus },
-  { id: 5, key: 'source', anchorId: 'step-source', title: 'Lead Source', subtitle: 'Where it came from', icon: Compass },
+  { id: 4, key: 'source', anchorId: 'step-source', title: 'Lead Source', subtitle: 'Where it came from', icon: Compass },
 ];
 
 export const LEAD_FORM_STEP_IDS = LEAD_FORM_STEPS.map((s) => s.anchorId);

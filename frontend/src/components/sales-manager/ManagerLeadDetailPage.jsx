@@ -18,7 +18,6 @@ export default function ManagerLeadDetailPage() {
   const [lead, setLead] = useState(null);
   const [executives, setExecutives] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [assignOpen, setAssignOpen] = useState(false);
 
   const loadLead = useCallback(() => {
     setLoading(true);
@@ -37,16 +36,19 @@ export default function ManagerLeadDetailPage() {
 
   useDataRefresh(['leads'], loadLead);
 
-  const { assignees, assigneesLoading, handleAssign, fetchAssignees, assignConfirmDialog } = useLeadAssign({
+  const {
+    assignees,
+    assigneesLoading,
+    assignModal,
+    openAssign,
+    closeAssign,
+    handleAssign,
+    assignConfirmDialog,
+  } = useLeadAssign({
     onAssigned: async () => {
-      setAssignOpen(false);
       await loadLead();
     },
   });
-
-  useEffect(() => {
-    if (assignOpen) fetchAssignees();
-  }, [assignOpen, fetchAssignees]);
 
   const reactivate = useLeadReactivate({ leadId: id, onSuccess: loadLead });
 
@@ -71,10 +73,16 @@ export default function ManagerLeadDetailPage() {
 
   const headerExtra = !reactivate.isLost(lead) ? (
     <div className="mb-4 flex justify-end">
-      <Button variant="gradient" className="rounded-xl" onClick={() => setAssignOpen(true)}>
-        <UserPlus className="w-4 h-4 mr-1.5" />
-        {lead.assignedTo ? 'Reassign Lead' : 'Assign Lead'}
-      </Button>
+      {lead.assignedTo?.name ? (
+        <Button variant="outline" className="rounded-xl max-w-[220px]" onClick={() => openAssign(lead)} title="Click to change assignee">
+          <span className="truncate">{lead.assignedTo.name}</span>
+        </Button>
+      ) : (
+        <Button variant="gradient" className="rounded-xl" onClick={() => openAssign(lead)}>
+          <UserPlus className="w-4 h-4 mr-1.5" />
+          Assign Lead
+        </Button>
+      )}
     </div>
   ) : null;
 
@@ -104,7 +112,7 @@ export default function ManagerLeadDetailPage() {
         onCreateQuote={() => navigate(`/sales-manager/quotations/new?leadId=${id}`)}
         onContactLogged={loadLead}
         onEmailSent={loadLead}
-        onAssign={() => setAssignOpen(true)}
+        onAssign={() => openAssign(lead)}
         headerExtra={headerExtra}
         sidebarExtra={sidebarExtra}
         bottomExtra={(
@@ -113,12 +121,14 @@ export default function ManagerLeadDetailPage() {
       />
 
       <AdminAssignLeadModal
-        open={assignOpen}
-        lead={lead}
+        open={!!assignModal}
+        lead={assignModal || lead}
         assignees={assignees}
         loading={assigneesLoading}
-        onClose={() => setAssignOpen(false)}
-        onAssign={(payload) => handleAssign({ ...payload, leadIds: payload.leadIds || [id] })}
+        onClose={closeAssign}
+        onAssign={(payload) =>
+          handleAssign({ ...payload, lead, leadIds: payload.leadIds || [id] })
+        }
         allowedRoles={['sales_manager', 'team_leader', 'sales_executive']}
       />
       {assignConfirmDialog}

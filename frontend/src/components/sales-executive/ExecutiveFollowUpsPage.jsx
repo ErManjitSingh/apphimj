@@ -144,7 +144,22 @@ export default function ExecutiveFollowUpsPage() {
   }, [followups, typeFilter]);
 
   const handleAdd = async (data) => {
-    await createExecutiveFollowUp(buildFollowUpPayload(data));
+    const { statusUpdate, skipFollowUp, ...followUpData } = data;
+    const leadId = followUpData.lead;
+    const isLostClose =
+      skipFollowUp || ['lost', 'booked_from_another_company'].includes(statusUpdate?.status);
+
+    if (!isLostClose) {
+      await createExecutiveFollowUp(buildFollowUpPayload(followUpData));
+    }
+    if (statusUpdate && leadId) {
+      try {
+        await API.put(`/sales-executive/leads/${leadId}`, statusUpdate);
+      } catch (err) {
+        const msg = err.response?.data?.message || err.message || 'Status could not be updated';
+        throw new Error(isLostClose ? msg : `Follow-up saved. ${msg}`);
+      }
+    }
     refreshAll();
   };
 
@@ -371,7 +386,13 @@ export default function ExecutiveFollowUpsPage() {
 
       <ExecutiveFollowUpCta />
 
-      <AddFollowUpModal open={addOpen} onClose={() => setAddOpen(false)} onSubmit={handleAdd} leads={leads} />
+      <AddFollowUpModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSubmit={handleAdd}
+        leads={leads}
+        showLeadOutcome
+      />
 
       <ActionModal
         open={!!modal}

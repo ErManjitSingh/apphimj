@@ -3,7 +3,7 @@ export { formatBudget, formatCurrency, STATUS_STYLES } from '../sales-manager/ma
 export const LEAD_FILTERS = {
   all: {
     title: 'Total Leads',
-    desc: 'Active assigned leads (excludes repeated, converted & lost)',
+    desc: 'All leads assigned to you (any status)',
     icon: 'Users',
   },
   duplicates: {
@@ -16,7 +16,11 @@ export const LEAD_FILTERS = {
     desc: 'Leads waiting to be reassigned',
     icon: 'Undo2',
   },
-  new: { title: "Today's Fresh Leads", desc: 'Leads created or assigned to you today', icon: 'Sparkles' },
+  new: {
+    title: "Today's Fresh Leads",
+    desc: 'Created or assigned to you today — keeps previous status & data on reassign',
+    icon: 'Sparkles',
+  },
   'new-lead': { title: 'New Leads', desc: 'New leads — verification / details pending', icon: 'Sparkles' },
   'not-reachable': { title: 'Not Reachable', desc: 'Call failed / no response', icon: 'Phone' },
   qualified: { title: 'Qualified', desc: 'Requirement details confirmed', icon: 'Phone' },
@@ -83,9 +87,9 @@ export const EXEC_FILTER_THEMES = {
     icon: 'text-emerald-600',
   },
   lost: {
-    gradient: 'from-slate-500/15 via-zinc-500/10 to-neutral-500/10',
-    border: 'border-slate-500/25',
-    icon: 'text-slate-500',
+    gradient: 'from-red-500/25 via-rose-500/20 to-orange-500/15',
+    border: 'border-red-500/35',
+    icon: 'text-red-600',
   },
   reactivated: {
     gradient: 'from-teal-500/25 via-cyan-500/15 to-emerald-500/15',
@@ -111,5 +115,11 @@ export function formatTravelDate(date) {
 
 export function formatFollowUpDate(date) {
   if (!date) return '—';
-  return new Date(date).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return new Date(date).toLocaleString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Kolkata',
+  });
 }

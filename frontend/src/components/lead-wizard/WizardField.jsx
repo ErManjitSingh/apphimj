@@ -4,13 +4,13 @@ export default function WizardField({ label, required, error, hint, children, cl
   return (
     <div className={cn('space-y-1', className)}>
       {label && (
-        <label className={cn('block text-[12px] font-semibold text-slate-700', labelClassName)}>
+        <label className={cn('block text-[12px] font-semibold text-black', labelClassName)}>
           {label}
           {required && <span className="text-rose-500 ml-0.5">*</span>}
         </label>
       )}
       {children}
-      {hint && !error && <p className="text-[10px] text-slate-400 leading-tight">{hint}</p>}
+      {hint && !error && <p className="text-[10px] text-slate-700 leading-tight">{hint}</p>}
       {error && <p className="text-[10px] text-rose-500 font-medium">{error}</p>}
     </div>
   );
@@ -20,10 +20,10 @@ export function WizardInput({ className, error, readOnly, disabled, ...props }) 
   return (
     <input
       className={cn(
-        'w-full h-10 rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-800 placeholder:text-slate-400',
+        'w-full h-10 rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-black placeholder:text-slate-500',
         'focus:outline-none focus:ring-2 focus:ring-[#5D5FEF]/25 focus:border-[#5D5FEF]/50 transition-shadow',
         error && 'border-rose-300 focus:ring-rose-200 focus:border-rose-400',
-        (readOnly || disabled) && 'bg-slate-100 text-slate-500 cursor-not-allowed',
+        (readOnly || disabled) && 'bg-slate-100 text-slate-700 cursor-not-allowed',
         className
       )}
       readOnly={readOnly}
@@ -88,16 +88,16 @@ export function IconInput({
     >
       {prefix || (
         Icon ? (
-          <span className={cn('pl-3 pr-1.5 text-slate-400 shrink-0', iconClassName)}>
+          <span className={cn('pl-3 pr-1.5 text-slate-700 shrink-0', iconClassName)}>
             <Icon className="w-4 h-4" />
           </span>
         ) : null
       )}
       <input
         className={cn(
-          'flex-1 min-w-0 h-full bg-transparent px-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none',
+          'flex-1 min-w-0 h-full bg-transparent px-2 text-sm text-black placeholder:text-slate-500 focus:outline-none',
           !Icon && !prefix && 'pl-3.5',
-          (readOnly || disabled) && 'text-slate-500 cursor-not-allowed',
+          (readOnly || disabled) && 'text-slate-700 cursor-not-allowed',
           className
         )}
         readOnly={readOnly}
@@ -119,7 +119,7 @@ export function IconSelect({ icon: Icon, className, error, children, ...props })
       )}
     >
       {Icon && (
-        <span className="pl-3 pr-1.5 text-slate-400 shrink-0">
+        <span className="pl-3 pr-1.5 text-slate-700 shrink-0">
           <Icon className="w-4 h-4" />
         </span>
       )}

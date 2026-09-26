@@ -3,6 +3,7 @@ const {
   QUOTE_QUALIFICATION_FIELDS,
   LOST_REASON_VALUES,
   LOST_REASONS,
+  LOST_REASON_ALIASES,
 } = require('../constants/salesSop');
 const ApiError = require('../utils/apiError');
 
@@ -165,8 +166,13 @@ function assertValidLostReason(reason, { requireComment = false } = {}) {
 
   // Accept em/en dash or plain " - " between key and free-text comment
   const parts = value.split(/\s*[—–]\s*|\s+-\s+/).map((p) => p.trim()).filter(Boolean);
-  const key = parts[0] || '';
+  let key = String(parts[0] || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_');
   const comment = parts.slice(1).join(' — ').trim();
+
+  if (LOST_REASON_ALIASES[key]) key = LOST_REASON_ALIASES[key];
 
   if (!LOST_REASON_VALUES.includes(key)) {
     throw new ApiError(
@@ -174,8 +180,10 @@ function assertValidLostReason(reason, { requireComment = false } = {}) {
       `Invalid lost reason. Use one of: ${LOST_REASONS.map((r) => r.label).join(', ')}`
     );
   }
-  if (requireComment && !comment) {
-    throw new ApiError(400, 'Lost reason comment is required before marking lead as lost');
+  // Free-text comment only required for "Other"
+  const needsComment = requireComment || key === 'other';
+  if (needsComment && !comment) {
+    throw new ApiError(400, 'Please add a short comment for this lost reason');
   }
   return comment ? `${key} — ${comment}` : key;
 }

@@ -5,7 +5,6 @@ import {
   Pencil,
   UserCheck,
   UserPlus,
-  RefreshCw,
   Trash2,
   MoreHorizontal,
 } from 'lucide-react';
@@ -38,18 +37,6 @@ function MenuActionIcon({ icon: Icon, tone }) {
     >
       <Icon className="w-3.5 h-3.5" />
     </span>
-  );
-}
-
-function AssignedChip({ name }) {
-  return (
-    <div
-      title={name}
-      className="inline-flex h-8 max-w-[108px] items-center gap-1.5 rounded-l-xl border border-r-0 border-emerald-500/30 bg-gradient-to-r from-emerald-500/15 via-teal-500/10 to-transparent pl-1.5 pr-2"
-    >
-      <Avatar name={name} size="sm" className="!h-5 !w-5 !text-[8px] ring-2 ring-emerald-500/25 shrink-0" />
-      <span className="truncate text-[11px] font-semibold text-emerald-800 dark:text-emerald-300">{name}</span>
-    </div>
   );
 }
 
@@ -87,6 +74,37 @@ function AssignButton({ onClick }) {
   );
 }
 
+/** Shows assignee name in place of Assign — click opens assign modal to change. */
+function AssignedNameButton({ name, onClick, clickable }) {
+  const className = cn(
+    'inline-flex h-8 max-w-[120px] items-center gap-1.5 rounded-l-xl border border-r-0 border-emerald-500/30',
+    'bg-gradient-to-r from-emerald-500/15 via-teal-500/10 to-transparent pl-1.5 pr-2.5',
+    clickable && 'hover:from-emerald-500/25 hover:via-teal-500/15 cursor-pointer transition-colors'
+  );
+
+  if (!clickable) {
+    return (
+      <div title={name} className={className}>
+        <Avatar name={name} size="sm" className="!h-5 !w-5 !text-[8px] ring-2 ring-emerald-500/25 shrink-0" />
+        <span className="truncate text-[11px] font-semibold text-emerald-800 dark:text-emerald-300">{name}</span>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      title={`${name} — click to change`}
+      onClick={onClick}
+      onPointerDown={(e) => e.stopPropagation()}
+      className={className}
+    >
+      <Avatar name={name} size="sm" className="!h-5 !w-5 !text-[8px] ring-2 ring-emerald-500/25 shrink-0" />
+      <span className="truncate text-[11px] font-semibold text-emerald-800 dark:text-emerald-300">{name}</span>
+    </button>
+  );
+}
+
 const MoreMenuButton = forwardRef(function MoreMenuButton(
   { solo = false, className, onPointerDown, ...props },
   ref
@@ -115,55 +133,24 @@ const MoreMenuButton = forwardRef(function MoreMenuButton(
   );
 });
 
-function ReassignButton({ onClick, label = 'Reassign' }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      onPointerDown={(e) => e.stopPropagation()}
-      className={cn(
-        'inline-flex h-8 items-center gap-1.5 rounded-none px-2.5 text-[11px] font-semibold text-white',
-        'bg-gradient-to-r from-violet-600 via-indigo-600 to-brand-600',
-        'hover:brightness-110 active:scale-[0.98] transition-all',
-        'shadow-inner shadow-white/10'
-      )}
-    >
-      <UserCheck className="w-3.5 h-3.5 shrink-0" />
-      <span>{label}</span>
-    </button>
-  );
-}
-
 export default function LeadRowActions({
   lead,
   onRowClick,
   onDelete,
   onAssign,
-  onAccepted,
-  onAcceptExpired,
   canEditLead = true,
   actions,
   showAssignButton = true,
-  /** When true, show Accept in place of Assign for pending acceptance (executive lists) */
-  showAcceptButton = false,
 }) {
   const assignedName = lead.assignedTo?.name;
-  const isExpiredUnassigned =
-    lead.assignmentAcceptance === 'expired' && !assignedName;
-  const showReassignExpired = isExpiredUnassigned && actions.assign && onAssign;
-  const showAssign =
-    showAssignButton &&
-    actions.assign &&
-    !assignedName &&
-    !isExpiredUnassigned &&
-    onAssign;
-  const showAssignedName = Boolean(assignedName);
+  const canAssign = Boolean(actions.assign && onAssign);
+  const showAssign = showAssignButton && canAssign && !assignedName;
+  const showAssignedName = Boolean(assignedName) && (showAssignButton || canAssign);
   const showEdit = actions.edit && canEditLead;
-  const showAssignMenu = actions.assign && onAssign;
-  const showTransfer = false;
+  const showAssignMenu = canAssign;
   const showDelete = actions.delete && onDelete;
-  const hasMenuItems = actions.view || showEdit || showAssignMenu || showTransfer || showDelete;
-  const hasLeading = showAssign || showAssignedName || showReassignExpired;
+  const hasMenuItems = actions.view || showEdit || showAssignMenu || showDelete;
+  const hasLeading = showAssign || showAssignedName;
 
   const menuContent = (
     <DropdownMenuContent
@@ -207,10 +194,12 @@ export default function LeadRowActions({
           <MenuActionIcon icon={UserCheck} tone="emerald" />
           <div className="min-w-0 text-left">
             <p className="text-sm font-semibold text-content-primary">
-              {assignedName || isExpiredUnassigned ? 'Reassign Lead' : 'Assign Lead'}
+              {assignedName ? 'Reassign' : 'Assign Lead'}
             </p>
             <p className="text-[11px] text-content-muted">
-              {isExpiredUnassigned ? 'Pick executive to reassign' : 'Pick sales executive or manager'}
+              {assignedName
+                ? `Currently: ${assignedName}`
+                : 'Pick sales executive or manager'}
             </p>
           </div>
         </DropdownMenuItem>
@@ -252,11 +241,14 @@ export default function LeadRowActions({
   return (
     <div className="relative z-10" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
       <ActionCluster>
-        {showReassignExpired && (
-          <ReassignButton onClick={() => onAssign(lead)} />
-        )}
         {showAssign && <AssignButton onClick={() => onAssign(lead)} />}
-        {showAssignedName && !showAssign && !showReassignExpired && <AssignedChip name={assignedName} />}
+        {showAssignedName && (
+          <AssignedNameButton
+            name={assignedName}
+            clickable={canAssign}
+            onClick={() => onAssign(lead)}
+          />
+        )}
         {hasMenuItems && (
           <DropdownMenuRoot modal={false}>
             <DropdownMenuTrigger asChild>

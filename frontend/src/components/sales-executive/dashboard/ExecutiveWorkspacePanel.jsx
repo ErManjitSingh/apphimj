@@ -125,10 +125,12 @@ export default function ExecutiveWorkspacePanel({
       <div className="p-4">
         {tab === 'today-leads' && (
           todayLeads.length ? (
-            <div className="space-y-2">
-              {todayLeads.slice(0, 6).map((lead) => (
-                <LeadRow key={lead._id} lead={lead} />
-              ))}
+            <div>
+              <div className="max-h-[18.75rem] space-y-2 overflow-y-auto overscroll-contain pr-0.5 scrollbar-thin">
+                {todayLeads.map((lead) => (
+                  <LeadRow key={lead._id} lead={lead} />
+                ))}
+              </div>
               <div className="pt-2 text-center">
                 <Link
                   to="/sales-executive/leads/new"
@@ -150,10 +152,12 @@ export default function ExecutiveWorkspacePanel({
 
         {tab === 'follow-ups' && (
           upcomingFollowups.length ? (
-            <div className="space-y-2">
-              {upcomingFollowups.slice(0, 6).map((item) => (
-                <FollowUpRow key={item._id} item={item} />
-              ))}
+            <div>
+              <div className="max-h-[18.75rem] space-y-2 overflow-y-auto overscroll-contain pr-0.5 scrollbar-thin">
+                {upcomingFollowups.map((item) => (
+                  <FollowUpRow key={item._id} item={item} />
+                ))}
+              </div>
               <div className="pt-2 text-center">
                 <Link
                   to="/sales-executive/follow-ups"

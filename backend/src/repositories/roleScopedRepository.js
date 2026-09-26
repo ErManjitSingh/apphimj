@@ -359,19 +359,21 @@ async function findExecutiveLeadsPaginated(userId, query = {}, options = {}) {
   if (filterKey !== 'new') applyPeriodTouch(owned, query);
 
   const isRepeatedView = filterKey === 'duplicates' || filterKey === 'repeated';
-  // Repeated leads only appear under Repeated menu
-  if (!isRepeatedView) {
+  const isTotalView = filterKey === 'all' || !filterKey;
+  const isFreshView = filterKey === 'new';
+  // Repeated leads only appear under Repeated menu — except Total / Fresh (reassign keeps full data)
+  if (!isRepeatedView && !isTotalView && !isFreshView) {
     owned.isRepeatCustomer = { $ne: true };
   }
 
   if (filterKey === 'hot') {
     owned.isHot = true;
-    owned.status = { $nin: ['converted', 'lost', 'booked_from_another_company'] };
+    owned.status = { $nin: ['converted', 'booked', 'lost', 'booked_from_another_company'] };
   }
 
-  if (filterKey === 'all' || !filterKey || filterKey === 'package-shared' || filterKey === 'package_shared') {
+  if (isTotalView || filterKey === 'package-shared' || filterKey === 'package_shared') {
+    // Total Leads = all assigned (any status). Optional status query still applies.
     if (query.status) owned.status = query.status;
-    else owned.status = { $nin: ['lost', 'booked_from_another_company', 'converted', 'booked'] };
     if (query.destination) owned.destination = query.destination;
     if (query.state) owned.state = query.state;
     if (query.statusReason) {
@@ -385,7 +387,7 @@ async function findExecutiveLeadsPaginated(userId, query = {}, options = {}) {
     const src = String(query.source).trim().toLowerCase();
     const SOURCE_ALIASES = {
       google_ads: ['google_ads', 'google', 'website', 'dpw'],
-      facebook_ads: ['facebook_ads', 'facebook', 'meta', 'portal_lead', 'instagram'],
+      facebook_ads: ['facebook_ads', 'facebook', 'meta', 'website_2', 'dpw2', 'portal_lead', 'instagram'],
       website: ['website', 'dpw', 'dpw_wa', 'website_form'],
       organic: ['organic', 'direct', 'website'],
       manual: ['manual', 'manual_entry', 'call_lead', 'referral'],

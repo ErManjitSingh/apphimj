@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Users,
@@ -15,83 +15,102 @@ import {
 import { useSidebarCounts } from '../../hooks/useSidebarCounts';
 import { cn } from '../../lib/utils';
 
-/** Exact pipeline stage metric cards (Manohar / Agent CRM Total Leads). */
+/** Pipeline stage KPI strip — clean CRM cards (accent icon, readable numbers). */
 const CARDS = [
   {
     key: 'all',
     label: 'Total leads',
     path: '/sales-executive/leads/all',
     icon: Users,
-    card: 'bg-gradient-to-br from-slate-700 via-slate-800 to-violet-900 shadow-slate-700/30',
+    accent: 'bg-[#5D5FEF]/10 text-[#5D5FEF]',
+    rail: 'bg-[#5D5FEF]',
+    ringActive: 'ring-[#5D5FEF]/35 border-[#5D5FEF]/40',
   },
   {
     key: 'fresh',
     label: "Today's Fresh",
     path: '/sales-executive/leads/new',
     icon: Sparkles,
-    card: 'bg-gradient-to-br from-[#5D5FEF] via-[#6D5FF0] to-[#7C3AED] shadow-[#5D5FEF]/30',
+    accent: 'bg-[#5D5FEF]/10 text-[#5D5FEF]',
+    rail: 'bg-[#5D5FEF]',
+    ringActive: 'ring-[#5D5FEF]/35 border-[#5D5FEF]/40',
   },
   {
     key: 'newLead',
     label: 'New Leads',
     path: '/sales-executive/leads/new-lead',
     icon: UserPlus,
-    card: 'bg-gradient-to-br from-sky-500 via-sky-500 to-blue-600 shadow-sky-500/30',
+    accent: 'bg-sky-50 text-sky-600',
+    rail: 'bg-sky-500',
+    ringActive: 'ring-sky-300/50 border-sky-300',
   },
   {
     key: 'notReachable',
     label: 'Not Reachable',
     path: '/sales-executive/leads/not-reachable',
     icon: PhoneOff,
-    card: 'bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 shadow-amber-500/30',
+    accent: 'bg-amber-50 text-amber-600',
+    rail: 'bg-amber-500',
+    ringActive: 'ring-amber-300/50 border-amber-300',
   },
   {
     key: 'qualified',
     label: 'Qualified',
     path: '/sales-executive/leads/qualified',
     icon: BadgeCheck,
-    card: 'bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 shadow-emerald-500/30',
+    accent: 'bg-teal-50 text-teal-600',
+    rail: 'bg-teal-500',
+    ringActive: 'ring-teal-300/50 border-teal-300',
   },
   {
     key: 'packageSent',
     label: 'Package Sent',
     path: '/sales-executive/leads/package-sent',
     icon: FileText,
-    card: 'bg-gradient-to-br from-indigo-500 via-violet-500 to-purple-600 shadow-indigo-500/30',
+    accent: 'bg-indigo-50 text-indigo-600',
+    rail: 'bg-indigo-500',
+    ringActive: 'ring-indigo-300/50 border-indigo-300',
   },
   {
     key: 'followUp',
     label: 'Follow-up',
     path: '/sales-executive/leads/follow-up',
     icon: CalendarClock,
-    card: 'bg-gradient-to-br from-orange-500 via-amber-500 to-yellow-600 shadow-orange-500/30',
+    accent: 'bg-orange-50 text-orange-600',
+    rail: 'bg-orange-500',
+    ringActive: 'ring-orange-300/50 border-orange-300',
   },
   {
     key: 'booked',
     label: 'Booked',
     path: '/sales-executive/leads/converted',
     icon: Trophy,
-    card: 'bg-gradient-to-br from-emerald-600 via-green-500 to-teal-600 shadow-emerald-600/30',
+    accent: 'bg-emerald-50 text-emerald-600',
+    rail: 'bg-emerald-500',
+    ringActive: 'ring-emerald-300/50 border-emerald-300',
   },
   {
     key: 'postponed',
     label: 'Postponed',
     path: '/sales-executive/leads/postponed',
     icon: PauseCircle,
-    card: 'bg-gradient-to-br from-slate-500 via-zinc-500 to-neutral-600 shadow-slate-500/30',
+    accent: 'bg-slate-100 text-slate-600',
+    rail: 'bg-slate-400',
+    ringActive: 'ring-slate-300/50 border-slate-300',
   },
   {
     key: 'lost',
     label: 'Lost',
     path: '/sales-executive/leads/lost',
     icon: XCircle,
-    card: 'bg-gradient-to-br from-rose-600 via-red-500 to-orange-600 shadow-rose-500/30',
+    accent: 'bg-red-50 text-red-600',
+    rail: 'bg-red-500',
+    ringActive: 'ring-red-300/50 border-red-300',
   },
 ];
 
 function getCount(counts, key) {
   if (!counts) return 0;
-  // fresh = today's new (legacy key `new`); booked prefers booked then converted
   if (key === 'fresh') return counts.leads?.fresh ?? counts.leads?.new ?? 0;
   if (key === 'booked') return counts.leads?.booked ?? counts.leads?.converted ?? 0;
   return counts.leads?.[key] ?? 0;
@@ -99,11 +118,14 @@ function getCount(counts, key) {
 
 export default function ExecutiveLeadKpiStrip() {
   const counts = useSidebarCounts();
+  const { pathname } = useLocation();
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 w-full">
-      {CARDS.map(({ key, label, path, icon: Icon, card }, i) => {
+    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5 w-full">
+      {CARDS.map(({ key, label, path, icon: Icon, accent, rail, ringActive }, i) => {
         const value = getCount(counts, key);
+        const active = pathname === path || pathname.startsWith(`${path}/`);
+
         return (
           <motion.div
             key={key}
@@ -114,20 +136,36 @@ export default function ExecutiveLeadKpiStrip() {
             <Link
               to={path}
               className={cn(
-                'relative block cursor-pointer overflow-hidden rounded-xl p-2.5 min-h-[76px] shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg text-white',
-                card
+                'group relative flex min-h-[88px] flex-col overflow-hidden rounded-2xl border bg-white p-3 shadow-sm transition-all',
+                'hover:-translate-y-0.5 hover:shadow-md',
+                active
+                  ? cn('ring-2 shadow-md', ringActive)
+                  : 'border-slate-100/90 hover:border-slate-200'
               )}
             >
-              <div className="pointer-events-none absolute -right-4 -top-4 h-14 w-14 rounded-full bg-white/15" />
-              <div className="relative z-[1]">
-                <div className="mb-1.5 inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white/20 ring-1 ring-white/30">
-                  <Icon className="h-3.5 w-3.5" strokeWidth={2.25} />
+              <span
+                className={cn(
+                  'absolute inset-y-0 left-0 w-[3px] rounded-l-2xl transition-opacity',
+                  rail,
+                  active ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'
+                )}
+              />
+              <div className="flex items-start justify-between gap-2 pl-1">
+                <div
+                  className={cn(
+                    'inline-flex h-8 w-8 items-center justify-center rounded-xl',
+                    accent
+                  )}
+                >
+                  <Icon className="h-4 w-4" strokeWidth={2.25} />
                 </div>
-                <p className="text-[10px] font-semibold leading-tight text-white/85">{label}</p>
-                <p className="mt-0.5 text-xl font-bold tabular-nums leading-none tracking-tight">
-                  {value}
-                </p>
               </div>
+              <p className="mt-2.5 pl-1 text-[11px] font-semibold leading-tight text-slate-500">
+                {label}
+              </p>
+              <p className="mt-1 pl-1 text-[22px] font-bold tabular-nums leading-none tracking-tight text-slate-900">
+                {value}
+              </p>
             </Link>
           </motion.div>
         );

@@ -5,7 +5,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createColumnHelper } from '@tanstack/react-table';
 import API from '../../api/axios';
 import { toast } from '../../context/ToastContext';
-import { isLeadStatusLocked } from '../../utils/leadUtils';
 import { useRoleLeadsQuery } from '../../hooks/useRoleLeadsQuery';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import ExecutivePageShell from './ExecutivePageShell';
@@ -155,23 +154,25 @@ export default function MyLeadsPage() {
     const leadId = lead?._id;
     if (!leadId) throw new Error('Lead missing');
 
-    const { statusUpdate, leadOutcome, ...followUpData } = data;
+    const { statusUpdate, leadOutcome, skipFollowUp, ...followUpData } = data;
     void leadOutcome;
+    const isLostClose = skipFollowUp || ['lost', 'booked_from_another_company'].includes(statusUpdate?.status);
 
-    // Always persist the follow-up first — status update failures must not block it
-    await createExecutiveFollowUp(
-      buildFollowUpPayload({
-        ...followUpData,
-        lead: leadId,
-        statusReason:
-          statusUpdate?.statusReason ||
-          followUpData.outcome ||
-          followUpData.pickedOutcome ||
-          followUpData.notPickedReason ||
-          followUpData.coldReason ||
-          followUpData.lostReason,
-      })
-    );
+    if (!isLostClose) {
+      await createExecutiveFollowUp(
+        buildFollowUpPayload({
+          ...followUpData,
+          lead: leadId,
+          statusReason:
+            statusUpdate?.statusReason ||
+            followUpData.outcome ||
+            followUpData.pickedOutcome ||
+            followUpData.notPickedReason ||
+            followUpData.coldReason ||
+            followUpData.lostReason,
+        })
+      );
+    }
 
     if (statusUpdate) {
       try {
@@ -192,7 +193,7 @@ export default function MyLeadsPage() {
           err.response?.data?.message ||
           err.message ||
           'Lead status could not be updated';
-        toast.error(`Follow-up saved. ${msg}`);
+        toast.error(isLostClose ? msg : `Follow-up saved. ${msg}`);
       }
     }
 
@@ -384,7 +385,7 @@ export default function MyLeadsPage() {
         fixedLeadId={modal?.lead?._id}
         fixedLeadName={modal?.lead?.name}
         lead={modal?.lead}
-        showLeadOutcome={modal?.lead ? !isLeadStatusLocked(modal.lead.status) : false}
+        showLeadOutcome
         onSubmit={async (data) => {
           await saveFollowUpForLead(data, modal?.lead);
         }}

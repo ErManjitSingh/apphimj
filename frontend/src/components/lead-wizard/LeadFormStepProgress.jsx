@@ -31,12 +31,12 @@ export default function LeadFormStepProgress({ activeAnchorId }) {
                 <span
                   className={cn(
                     'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold transition-colors',
-                    active ? 'bg-[#5D5FEF] text-white shadow-sm shadow-[#5D5FEF]/30' : 'bg-slate-100 text-slate-400'
+                    active ? 'bg-[#5D5FEF] text-white shadow-sm shadow-[#5D5FEF]/30' : 'bg-slate-100 text-slate-700'
                   )}
                 >
                   {active ? <Icon className="h-3.5 w-3.5" /> : step.id}
                 </span>
-                <span className={cn('text-xs font-semibold whitespace-nowrap', active ? 'text-[#5D5FEF]' : 'text-slate-500')}>
+                <span className={cn('text-xs font-semibold whitespace-nowrap', active ? 'text-[#5D5FEF]' : 'text-slate-800')}>
                   {step.title}
                 </span>
               </button>
@@ -64,7 +64,7 @@ export default function LeadFormStepProgress({ activeAnchorId }) {
               <span
                 className={cn(
                   'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold transition-colors',
-                  active ? 'bg-[#5D5FEF] text-white shadow-sm shadow-[#5D5FEF]/30' : 'bg-slate-100 text-slate-400'
+                  active ? 'bg-[#5D5FEF] text-white shadow-sm shadow-[#5D5FEF]/30' : 'bg-slate-100 text-slate-700'
                 )}
               >
                 {active ? <Icon className="h-3.5 w-3.5" /> : step.id}
@@ -73,7 +73,7 @@ export default function LeadFormStepProgress({ activeAnchorId }) {
                 <span className={cn('block text-xs font-semibold', active ? 'text-[#5D5FEF]' : 'text-slate-600')}>
                   {step.title}
                 </span>
-                <span className="block text-[10px] text-slate-400 truncate">{step.subtitle}</span>
+                <span className="block text-[10px] text-slate-700 truncate">{step.subtitle}</span>
               </span>
             </button>
           );

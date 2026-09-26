@@ -13,6 +13,7 @@ export const LOST_REASONS = [
   { value: 'not_interested', label: 'Not interested' },
   { value: 'lost_contacted', label: 'Lost contacted' },
   { value: 'does_not_exist', label: 'Does not exist' },
+  { value: 'other', label: 'Other' },
 ];
 
 /** Selecting these outcomes always marks the lead Lost (or booked elsewhere). */

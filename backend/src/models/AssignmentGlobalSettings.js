@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const assignmentGlobalSettingsSchema = new mongoose.Schema(
   {
     key: { type: String, required: true, unique: true, default: 'global' },
-    leadAutoAssignmentEnabled: { type: Boolean, default: true },
+    leadAutoAssignmentEnabled: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

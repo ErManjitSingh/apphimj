@@ -1,4 +1,75 @@
-import { Download, Filter, RotateCcw, Search } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Download, Filter, MapPin, RotateCcw, Search, X } from 'lucide-react';
+
+function DestinationSearchInput({ value, onChange, options = [] }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+
+  const suggestions = useMemo(() => {
+    const q = String(value || '').trim().toLowerCase();
+    const list = q
+      ? options.filter((d) => String(d).toLowerCase().includes(q))
+      : options;
+    return list.slice(0, 12);
+  }, [options, value]);
+
+  useEffect(() => {
+    const onDoc = (e) => {
+      if (!rootRef.current?.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" />
+      <input
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        placeholder="Search destination..."
+        className="h-10 w-full rounded-xl border border-subtle bg-slate-50 pl-9 pr-9 text-sm text-content-primary outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500/40"
+        autoComplete="off"
+      />
+      {value ? (
+        <button
+          type="button"
+          onClick={() => {
+            onChange('');
+            setOpen(false);
+          }}
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-content-muted hover:bg-slate-100"
+          aria-label="Clear destination"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      ) : null}
+      {open && suggestions.length > 0 ? (
+        <ul className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-subtle bg-white py-1 shadow-lg">
+          {suggestions.map((d) => (
+            <li key={d}>
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(d);
+                  setOpen(false);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-content-primary hover:bg-blue-50"
+              >
+                <MapPin className="h-3.5 w-3.5 shrink-0 text-content-muted" />
+                <span className="truncate">{d}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
 
 export default function HotelFilterBar({
   filters,
@@ -7,6 +78,7 @@ export default function HotelFilterBar({
   onReset,
   onExport,
   categories = [],
+  destinations = [],
   locations = [],
   roomTypes = [],
   mealPlans = [],
@@ -59,7 +131,12 @@ export default function HotelFilterBar({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
+        <DestinationSearchInput
+          value={filters.destination || ''}
+          onChange={(val) => set('destination', val)}
+          options={destinations}
+        />
         <select
           value={filters.category}
           onChange={(e) => set('category', e.target.value)}

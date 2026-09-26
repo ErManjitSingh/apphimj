@@ -35,7 +35,7 @@ export default function LeadStatusPipeline({ status, lead, onUpdateStatus }) {
       <div className="mb-5 flex items-center justify-between gap-3">
         <div>
           <h3 className="text-[14px] font-bold text-slate-800">Lead Status</h3>
-          <p className="text-[11px] text-slate-500 mt-0.5">
+          <p className="text-[11px] text-slate-800 mt-0.5">
             {pipelineStatusLabel(current)}
             {tempLabel ? ` · ${tempLabel}` : ''}
             {display.reasonLabel ? ` · ${display.reasonLabel}` : ''}
@@ -48,7 +48,7 @@ export default function LeadStatusPipeline({ status, lead, onUpdateStatus }) {
             className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-[12px] font-semibold text-slate-600 hover:bg-slate-50"
           >
             <RefreshCw className="h-3.5 w-3.5" />
-            Update Status
+            Change Status
           </button>
         ) : null}
       </div>
@@ -73,13 +73,13 @@ export default function LeadStatusPipeline({ status, lead, onUpdateStatus }) {
                     <span
                       className={cn(
                         'mt-2.5 text-center text-[10px] font-semibold leading-tight',
-                        active ? 'text-orange-500' : 'text-slate-400'
+                        active ? 'text-orange-500' : 'text-slate-700'
                       )}
                     >
                       {stage.shortLabel || stage.label}
                     </span>
                     {active && dateLine ? (
-                      <span className="mt-0.5 text-center text-[9px] leading-tight text-slate-400">
+                      <span className="mt-0.5 text-center text-[9px] leading-tight text-slate-700">
                         {dateLine}
                         {timeLine ? (
                           <>

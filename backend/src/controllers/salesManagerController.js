@@ -134,8 +134,15 @@ const assignLeads = asyncHandler(async (req, res) => {
 
   await Lead.updateMany(
     { _id: { $in: ids }, ...(req.branchId ? { branchId: req.branchId } : {}) },
-    patch
+    { $set: patch }
   );
+
+  if (req.body.executiveId) {
+    await FollowUp.updateMany(
+      { lead: { $in: ids }, status: 'pending' },
+      { $set: { assignedTo: req.body.executiveId } }
+    );
+  }
 
   await logActivity({
     type: 'lead_assigned',

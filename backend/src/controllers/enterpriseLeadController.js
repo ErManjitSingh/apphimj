@@ -153,6 +153,77 @@ const permanentDeleteLead = asyncHandler(async (req, res) => {
   res.json({ message: 'Lead permanently deleted' });
 });
 
+function parseLeadIds(body = {}) {
+  const ids = Array.isArray(body.leadIds) ? body.leadIds : [];
+  const unique = [...new Set(ids.map((id) => String(id || '').trim()).filter(Boolean))];
+  if (!unique.length) throw new ApiError(400, 'Select at least one lead');
+  if (unique.length > 200) throw new ApiError(400, 'You can process at most 200 leads at once');
+  return unique;
+}
+
+const bulkRestoreLeads = asyncHandler(async (req, res) => {
+  const leadIds = parseLeadIds(req.body);
+  const filter = {
+    _id: { $in: leadIds },
+    isDeleted: true,
+    ...(req.branchId ? { branchId: req.branchId } : {}),
+  };
+  const leads = await Lead.find(filter);
+  if (!leads.length) throw new ApiError(404, 'No matching deleted leads found');
+
+  const now = new Date();
+  await Lead.updateMany(filter, {
+    $set: { isDeleted: false, deletedAt: null, deletedBy: null },
+  });
+
+  await Promise.all(
+    leads.map((lead) =>
+      Promise.all([
+        logLeadActivity({
+          leadId: lead._id,
+          branchId: lead.branchId,
+          type: 'lead_restored',
+          description: `Lead restored by ${req.user.name} (bulk)`,
+          actor: req.user,
+        }),
+        logAudit({
+          entityType: 'lead',
+          entityId: lead._id,
+          branchId: lead.branchId,
+          action: 'lead.restored',
+          actor: req.user,
+          ip: getClientIp(req),
+          meta: { bulk: true, at: now },
+        }),
+      ])
+    )
+  );
+
+  res.json({
+    message: `${leads.length} lead(s) restored`,
+    restored: leads.length,
+    requested: leadIds.length,
+  });
+});
+
+const bulkPermanentDeleteLeads = asyncHandler(async (req, res) => {
+  const leadIds = parseLeadIds(req.body);
+  const filter = {
+    _id: { $in: leadIds },
+    isDeleted: true,
+    ...(req.branchId ? { branchId: req.branchId } : {}),
+  };
+  const leads = await Lead.find(filter).select('_id').lean();
+  if (!leads.length) throw new ApiError(404, 'No matching deleted leads found');
+
+  const result = await Lead.deleteMany(filter);
+  res.json({
+    message: `${result.deletedCount || 0} lead(s) permanently deleted`,
+    deleted: result.deletedCount || 0,
+    requested: leadIds.length,
+  });
+});
+
 const getAgingAnalytics = asyncHandler(async (req, res) => {
   const match = { isDeleted: { $ne: true }, ...(req.branchId ? { branchId: req.branchId } : {}) };
   const buckets = await Lead.aggregate([
@@ -692,6 +763,8 @@ module.exports = {
   listRecycleBin,
   restoreLead,
   permanentDeleteLead,
+  bulkRestoreLeads,
+  bulkPermanentDeleteLeads,
   getAgingAnalytics,
   listCallNotes,
   addCallNote,

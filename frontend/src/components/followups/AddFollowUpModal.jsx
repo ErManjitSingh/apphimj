@@ -11,6 +11,7 @@ import {
   buildPipelineStatusPayload,
   normalizeLeadStatus,
   isBookedStatus,
+  isLostStatus,
 } from '../../lib/leadPipeline';
 import { cn } from '../../lib/utils';
 import { localTodayInput, localTimeInput, localDateTimeToIso } from '../../lib/localDateTime';
@@ -40,8 +41,9 @@ export default function AddFollowUpModal({
   editData = null,
   fixedLeadId = null,
   fixedLeadName = null,
-  /** When true, also pushes lead pipeline status / temperature / call outcome */
-  showLeadOutcome = false,
+  /** When true, also pushes lead pipeline status / temperature / call outcome.
+   * Default ON so Sales Executive sees the same Status + Temp + Call Outcome form as admin. */
+  showLeadOutcome = true,
   lead = null,
 }) {
   const [form, setForm] = useState(emptyForm);
@@ -88,12 +90,15 @@ export default function AddFollowUpModal({
   }, [editData, open, fixedLeadId, lead]);
 
   const isBooked = form.status === 'booked' || isBookedStatus(form.status);
+  const isLost = isLostStatus(form.status);
+  /** Lost / booked — no next follow-up to schedule */
+  const skipFollowUpSchedule = isBooked || isLost;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    if (!isBooked && !form.date) {
+    if (!skipFollowUpSchedule && !form.date) {
       setError('Please select follow-up date');
       return;
     }
@@ -101,7 +106,7 @@ export default function AddFollowUpModal({
       setError('Please select a lead');
       return;
     }
-    if (showLeadOutcome && form.status === 'lost' && !form.lostReason) {
+    if (showLeadOutcome && isLost && !form.lostReason) {
       setError('Select a lost reason');
       return;
     }
@@ -141,9 +146,9 @@ export default function AddFollowUpModal({
       const statusUpdate = showLeadOutcome
         ? buildPipelineStatusPayload({
             status: form.status,
-            temperature: form.temperature,
+            temperature: isLost || isBooked ? 'na' : form.temperature,
             callOutcome: form.callOutcome || undefined,
-            lostReason: form.status === 'lost' ? form.lostReason : undefined,
+            lostReason: isLost ? form.lostReason : undefined,
             postponedReason: form.status === 'postponed' ? form.postponedReason : undefined,
             postponedAt: form.status === 'postponed' ? form.postponedAt || undefined : undefined,
             comment: form.remarks,
@@ -155,20 +160,20 @@ export default function AddFollowUpModal({
         statusUpdate.tokenAmount = Number(form.tokenAmount);
       }
 
-      // FollowUp document category stays temperature-based for legacy reports
-      const category = isBooked ? 'converted' : form.temperature || 'warm';
+      const category = isBooked ? 'converted' : isLost ? 'lost' : form.temperature || 'warm';
 
       await onSubmit({
         ...form,
         lead: fixedLeadId || form.lead,
-        date: isBooked ? null : form.date,
-        time: isBooked ? null : form.time,
-        scheduledAt: isBooked ? null : localDateTimeToIso(form.date, form.time),
+        date: skipFollowUpSchedule ? null : form.date,
+        time: skipFollowUpSchedule ? null : form.time,
+        scheduledAt: skipFollowUpSchedule ? null : localDateTimeToIso(form.date, form.time),
         notes: remarks,
         category,
         outcome: form.callOutcome || undefined,
         callOutcome: form.callOutcome || undefined,
         statusUpdate,
+        skipFollowUp: isLost,
       });
       if (!editData) {
         setForm({ ...emptyForm, lead: fixedLeadId || '', date: localTodayInput() });
@@ -186,12 +191,16 @@ export default function AddFollowUpModal({
       <div className="flex items-center justify-between mb-5">
         <div>
           <h3 className="text-lg font-bold text-content-primary">
-            {editData ? 'Update Follow-up' : 'Lead follow up'}
+            {editData
+              ? 'Update Follow-up'
+              : showLeadOutcome
+                ? 'Update Status / Follow-up'
+                : 'Lead follow up'}
           </h3>
-          <p className="text-xs text-content-muted">
+          <p className="text-xs text-black/80">
             {fixedLeadName ||
               (showLeadOutcome
-                ? 'Status + Temperature + schedule'
+                ? 'Same form for status change and next follow-up'
                 : 'Schedule next follow-up')}
           </p>
         </div>
@@ -209,7 +218,7 @@ export default function AddFollowUpModal({
 
         {!editData && !fixedLeadId && (
           <div>
-            <label className="text-xs font-medium text-content-muted mb-1 block">Lead *</label>
+            <label className="text-xs font-semibold text-black mb-1 block">Lead *</label>
             <select
               value={form.lead}
               onChange={(e) => setForm({ ...form, lead: e.target.value })}
@@ -229,18 +238,31 @@ export default function AddFollowUpModal({
         {showLeadOutcome && (
           <>
             <div>
-              <label className="text-xs font-medium text-content-muted mb-1 block">Lead Status *</label>
+              <label className="text-xs font-semibold text-black mb-1 block">Lead Status *</label>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {LEAD_PIPELINE_STATUSES.map((s) => (
                   <button
                     key={s.value}
                     type="button"
-                    onClick={() => setForm((prev) => ({ ...prev, status: s.value }))}
+                    onClick={() =>
+                      setForm((prev) => ({
+                        ...prev,
+                        status: s.value,
+                        temperature:
+                          isLostStatus(s.value) || isBookedStatus(s.value) ? 'na' : prev.temperature === 'na' ? 'warm' : prev.temperature,
+                      }))
+                    }
                     className={cn(
                       'rounded-xl border px-2 py-2.5 text-xs font-bold transition-colors',
                       form.status === s.value
-                        ? 'border-violet-500 bg-violet-500 text-white'
-                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        ? s.value === 'lost'
+                          ? 'border-red-600 bg-red-600 text-white'
+                          : s.value === 'booked'
+                            ? 'border-emerald-600 bg-emerald-600 text-white'
+                            : 'border-violet-500 bg-violet-500 text-white'
+                        : s.value === 'lost'
+                          ? 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
+                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                     )}
                   >
                     {s.label}
@@ -250,9 +272,12 @@ export default function AddFollowUpModal({
             </div>
 
             <div>
-              <label className="text-xs font-medium text-content-muted mb-1 block">Temperature *</label>
+              <label className="text-xs font-semibold text-black mb-1 block">Temperature *</label>
               <div className="flex flex-wrap gap-2">
-                {LEAD_TEMPERATURE_OPTIONS.map((t) => (
+                {(isLost || isBooked
+                  ? LEAD_TEMPERATURE_OPTIONS.filter((t) => t.value === 'na')
+                  : LEAD_TEMPERATURE_OPTIONS.filter((t) => t.value !== 'na')
+                ).map((t) => (
                   <button
                     key={t.value}
                     type="button"
@@ -264,7 +289,9 @@ export default function AddFollowUpModal({
                           ? 'border-rose-400 bg-rose-50 text-rose-700'
                           : t.value === 'warm'
                             ? 'border-amber-400 bg-amber-50 text-amber-800'
-                            : 'border-sky-400 bg-sky-50 text-sky-800'
+                            : t.value === 'na'
+                              ? 'border-slate-400 bg-slate-100 text-slate-700'
+                              : 'border-sky-400 bg-sky-50 text-sky-800'
                         : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                     )}
                   >
@@ -274,8 +301,9 @@ export default function AddFollowUpModal({
               </div>
             </div>
 
+            {!isLost && (
             <div>
-              <label className="text-xs font-medium text-content-muted mb-1 block">Call Outcome</label>
+              <label className="text-xs font-semibold text-black mb-1 block">Call Outcome</label>
               <select
                 value={form.callOutcome}
                 onChange={(e) => setForm((prev) => ({ ...prev, callOutcome: e.target.value }))}
@@ -289,10 +317,11 @@ export default function AddFollowUpModal({
                 ))}
               </select>
             </div>
+            )}
 
-            {form.status === 'lost' && (
+            {isLost && (
               <div>
-                <label className="text-xs font-medium text-content-muted mb-1 block">Lost Reason *</label>
+                <label className="text-xs font-semibold text-black mb-1 block">Lost Reason *</label>
                 <select
                   required
                   value={form.lostReason}
@@ -312,7 +341,7 @@ export default function AddFollowUpModal({
             {form.status === 'postponed' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-content-muted mb-1 block">Postponed date</label>
+                  <label className="text-xs font-semibold text-black mb-1 block">Postponed date</label>
                   <input
                     type="date"
                     value={form.postponedAt}
@@ -321,7 +350,7 @@ export default function AddFollowUpModal({
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-content-muted mb-1 block">Reason *</label>
+                  <label className="text-xs font-semibold text-black mb-1 block">Reason *</label>
                   <input
                     required
                     value={form.postponedReason}
@@ -339,7 +368,7 @@ export default function AddFollowUpModal({
                   Booked starts the booking — enter total package cost and token amount received.
                 </p>
                 <div>
-                  <label className="text-xs font-medium text-content-muted mb-1 block">
+                  <label className="text-xs font-semibold text-black mb-1 block">
                     Total package cost (₹) *
                   </label>
                   <input
@@ -353,7 +382,7 @@ export default function AddFollowUpModal({
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-content-muted mb-1 block">
+                  <label className="text-xs font-semibold text-black mb-1 block">
                     Token amount received (₹) *
                   </label>
                   <input
@@ -380,9 +409,9 @@ export default function AddFollowUpModal({
 
         {!showLeadOutcome && (
           <div>
-            <label className="text-xs font-medium text-content-muted mb-1 block">Temperature</label>
+            <label className="text-xs font-semibold text-black mb-1 block">Temperature</label>
             <div className="flex flex-wrap gap-2">
-              {LEAD_TEMPERATURE_OPTIONS.map((t) => (
+              {LEAD_TEMPERATURE_OPTIONS.filter((t) => t.value !== 'na').map((t) => (
                 <button
                   key={t.value}
                   type="button"
@@ -405,64 +434,72 @@ export default function AddFollowUpModal({
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs font-medium text-content-muted mb-1 block">Type</label>
-            <select
-              value={form.type}
-              onChange={(e) => setForm({ ...form, type: e.target.value })}
-              className="input-premium w-full h-11 rounded-xl"
-            >
-              {FOLLOWUP_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-content-muted mb-1 block">Intent</label>
-            <select
-              value={form.priority}
-              onChange={(e) => setForm({ ...form, priority: e.target.value })}
-              className="input-premium w-full h-11 rounded-xl"
-            >
-              {FOLLOWUP_PRIORITIES.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+        {!skipFollowUpSchedule && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-black mb-1 block">Type</label>
+                <select
+                  value={form.type}
+                  onChange={(e) => setForm({ ...form, type: e.target.value })}
+                  className="input-premium w-full h-11 rounded-xl"
+                >
+                  {FOLLOWUP_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-black mb-1 block">Intent</label>
+                <select
+                  value={form.priority}
+                  onChange={(e) => setForm({ ...form, priority: e.target.value })}
+                  className="input-premium w-full h-11 rounded-xl"
+                >
+                  {FOLLOWUP_PRIORITIES.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
-        {!isBooked && (
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-content-muted mb-1 block">Date *</label>
-              <input
-                type="date"
-                value={form.date}
-                onChange={(e) => setForm({ ...form, date: e.target.value })}
-                required
-                className="input-premium w-full h-11 rounded-xl"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-black mb-1 block">Date *</label>
+                <input
+                  type="date"
+                  value={form.date}
+                  onChange={(e) => setForm({ ...form, date: e.target.value })}
+                  required
+                  className="input-premium w-full h-11 rounded-xl"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-black mb-1 block">Time *</label>
+                <input
+                  type="time"
+                  value={form.time}
+                  onChange={(e) => setForm({ ...form, time: e.target.value })}
+                  required
+                  className="input-premium w-full h-11 rounded-xl"
+                />
+              </div>
             </div>
-            <div>
-              <label className="text-xs font-medium text-content-muted mb-1 block">Time *</label>
-              <input
-                type="time"
-                value={form.time}
-                onChange={(e) => setForm({ ...form, time: e.target.value })}
-                required
-                className="input-premium w-full h-11 rounded-xl"
-              />
-            </div>
-          </div>
+          </>
+        )}
+
+        {isLost && (
+          <p className="rounded-xl border border-rose-100 bg-rose-50/60 px-3 py-2 text-xs font-medium text-rose-800">
+            Lost leads close the pipeline — no follow-up date is needed.
+          </p>
         )}
 
         <div>
-          <label className="text-xs font-medium text-content-muted mb-1 block">Comments (optional)</label>
+          <label className="text-xs font-semibold text-black mb-1 block">Comments (optional)</label>
           <textarea
             value={form.remarks}
             onChange={(e) => setForm({ ...form, remarks: e.target.value })}
@@ -477,7 +514,7 @@ export default function AddFollowUpModal({
             Cancel
           </Button>
           <Button type="submit" variant="violet" className="flex-1 rounded-xl" disabled={saving}>
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? 'Saving…' : isLost ? 'Mark as Lost' : 'Save'}
           </Button>
         </div>
       </form>

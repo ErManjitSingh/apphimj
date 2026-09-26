@@ -22,6 +22,7 @@ export const STATUS_STYLES = {
   reactivated: 'bg-amber-50 text-amber-800 ring-amber-200',
   active: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
   converted: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-  lost: 'bg-slate-50 text-slate-700 ring-slate-200',
-  booked_from_another_company: 'bg-slate-50 text-slate-700 ring-slate-200',
+  booked: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  lost: 'bg-red-50 text-red-700 ring-red-200',
+  booked_from_another_company: 'bg-red-50 text-red-700 ring-red-200',
 };

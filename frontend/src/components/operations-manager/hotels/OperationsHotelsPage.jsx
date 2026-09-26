@@ -18,6 +18,7 @@ import {
 
 const EMPTY_FILTERS = {
   search: '',
+  destination: '',
   category: '',
   location: '',
   roomType: '',
@@ -29,6 +30,7 @@ export default function OperationsHotelsPage() {
   const [summary, setSummary] = useState(null);
   const [filterOptions, setFilterOptions] = useState({
     categories: [],
+    destinations: [],
     locations: [],
     roomTypes: [],
     mealPlans: [],
@@ -45,6 +47,7 @@ export default function OperationsHotelsPage() {
         page: pagination.page,
         limit: pagination.limit,
         search: appliedFilters.search || undefined,
+        destination: appliedFilters.destination || undefined,
         category: appliedFilters.category || undefined,
         location: appliedFilters.location || undefined,
         roomType: appliedFilters.roomType || undefined,
@@ -58,6 +61,7 @@ export default function OperationsHotelsPage() {
         setSummary(payload.summary || null);
         setFilterOptions(payload.filters || {
           categories: [],
+          destinations: [],
           locations: [],
           roomTypes: [],
           mealPlans: [],
@@ -185,6 +189,7 @@ export default function OperationsHotelsPage() {
         onReset={handleReset}
         onExport={handleExport}
         categories={filterOptions.categories}
+        destinations={filterOptions.destinations}
         locations={filterOptions.locations}
         roomTypes={filterOptions.roomTypes}
         mealPlans={filterOptions.mealPlans}

@@ -70,12 +70,12 @@ function CardTitle({ icon: Icon, title, action }) {
 function Field({ icon: Icon, label, value, sub }) {
   return (
     <div className="min-w-0">
-      <p className="mb-1 inline-flex items-center gap-1 text-[11px] text-slate-400">
+      <p className="mb-1 inline-flex items-center gap-1 text-[11px] text-slate-700">
         {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
         {label}
       </p>
       <p className="truncate text-[13px] font-semibold text-slate-800">{value || '—'}</p>
-      {sub ? <p className="text-[11px] text-slate-400">{sub}</p> : null}
+      {sub ? <p className="text-[11px] text-slate-700">{sub}</p> : null}
     </div>
   );
 }
@@ -254,9 +254,9 @@ export default function LeadOverviewSection({
           </div>
           <div className="mt-4 rounded-xl bg-slate-50 px-4 py-3">
             <div className="mb-1 flex items-center justify-between">
-              <p className="text-[12px] font-semibold text-slate-500">Special Requirements</p>
+              <p className="text-[12px] font-semibold text-slate-800">Special Requirements</p>
               {canEditLead && editHref ? (
-                <Link to={editHref} className="text-slate-400 hover:text-orange-500">
+                <Link to={editHref} className="text-slate-700 hover:text-orange-500">
                   <Pencil className="h-3.5 w-3.5" />
                 </Link>
               ) : null}
@@ -353,7 +353,11 @@ export default function LeadOverviewSection({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               {onLogCallNote ? <DropdownMenuItem onClick={onLogCallNote}>Log Call Note</DropdownMenuItem> : null}
-              {onAssign ? <DropdownMenuItem onClick={onAssign}>Assign Lead</DropdownMenuItem> : null}
+              {onAssign ? (
+                <DropdownMenuItem onClick={onAssign}>
+                  {lead?.assignedTo ? 'Reassign' : 'Assign Lead'}
+                </DropdownMenuItem>
+              ) : null}
               {canEditLead && editHref ? (
                 <DropdownMenuItem asChild>
                   <Link to={editHref}>Edit Lead</Link>
@@ -381,7 +385,7 @@ export default function LeadOverviewSection({
           <div className="space-y-3 text-[13px]">
             <div className="flex items-center justify-between gap-2">
               <p className="inline-flex items-center gap-2 font-semibold text-slate-800">
-                <Phone className="h-3.5 w-3.5 text-slate-400" />
+                <Phone className="h-3.5 w-3.5 text-slate-700" />
                 {lead.phone || '—'}
               </p>
               <div className="flex items-center gap-1">
@@ -417,14 +421,14 @@ export default function LeadOverviewSection({
             </div>
             <div className="flex items-center justify-between gap-2">
               <p className="inline-flex min-w-0 items-center gap-2 text-slate-600">
-                <Mail className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                <Mail className="h-3.5 w-3.5 shrink-0 text-slate-700" />
                 <span className="truncate">{lead.email || '—'}</span>
               </p>
               {lead.email ? (
                 <button
                   type="button"
                   onClick={copyEmail}
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-slate-700 hover:bg-slate-50 hover:text-slate-600"
                   aria-label="Copy email"
                 >
                   <Copy className="h-3.5 w-3.5" />
@@ -432,13 +436,13 @@ export default function LeadOverviewSection({
               ) : null}
             </div>
             <p className="inline-flex items-center gap-2 text-slate-600">
-              <MapPin className="h-3.5 w-3.5 text-slate-400" />
+              <MapPin className="h-3.5 w-3.5 text-slate-700" />
               {[lead.city, lead.state].filter(Boolean).join(', ') || lead.destination || '—'}
             </p>
             <div>
-              <p className="mb-0.5 text-[11px] text-slate-400">Preferred Time to Contact</p>
+              <p className="mb-0.5 text-[11px] text-slate-700">Preferred Time to Contact</p>
               <p className="inline-flex items-center gap-2 text-slate-600">
-                <Clock className="h-3.5 w-3.5 text-slate-400" />
+                <Clock className="h-3.5 w-3.5 text-slate-700" />
                 {lead.preferredCallTime || '10:00 AM - 8:00 PM'}
               </p>
             </div>
@@ -466,7 +470,7 @@ export default function LeadOverviewSection({
                 <Avatar name={latestNote.user || 'AU'} size="sm" className="!h-7 !w-7 !text-[10px]" />
                 <div className="min-w-0">
                   <p className="text-[12px] font-semibold text-slate-800">{latestNote.user || 'Team'}</p>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-slate-700">
                     {latestNote.date
                       ? new Date(latestNote.date).toLocaleString('en-IN', {
                           day: 'numeric',
@@ -483,7 +487,7 @@ export default function LeadOverviewSection({
               <p className="text-[13px] leading-relaxed text-slate-600">{latestNote.message}</p>
             </div>
           ) : (
-            <p className="text-[13px] text-slate-400">No notes added yet.</p>
+            <p className="text-[13px] text-slate-700">No notes added yet.</p>
           )}
           {showNoteBox ? (
             <div className="mt-3 space-y-2">
@@ -513,7 +517,7 @@ export default function LeadOverviewSection({
                 <CalendarDays className="h-4 w-4 text-orange-500" />
                 Next Follow-up
               </p>
-              <p className="mt-1 text-[13px] text-slate-400">
+              <p className="mt-1 text-[13px] text-slate-700">
                 {upcoming?.scheduledAt
                   ? new Date(upcoming.scheduledAt).toLocaleString('en-IN', {
                       day: 'numeric',

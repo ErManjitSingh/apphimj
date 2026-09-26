@@ -10,6 +10,7 @@ const {
   recordIncomingWebhook,
   getConfig,
 } = require('../services/facebookLeadWebhookService');
+const { getPollerStatus, pollFacebookLeadsOnce } = require('../services/facebookLeadPollerService');
 
 /** Meta webhook verification (hub.challenge) — must return plain-text challenge */
 const verifyWebhook = asyncHandler(async (req, res) => {
@@ -83,7 +84,8 @@ const webhookDebug = asyncHandler(async (req, res) => {
   res.json({
     ...getDiagnostics(),
     pageToken,
-    note: 'If recentEvents has no Meta POSTs, the Callback URL is not subscribed/verified in Meta App → Webhooks (subscribed_apps alone does not deliver).',
+    poller: getPollerStatus(),
+    note: 'If recentEvents has no Meta POSTs, the Callback URL is not subscribed/verified in Meta App → Webhooks (subscribed_apps alone does not deliver). Poller backfills missing leads every ~2 min when token is valid.',
   });
 });
 

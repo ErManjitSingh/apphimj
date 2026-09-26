@@ -38,6 +38,16 @@ export async function restoreLead(leadId) {
   return data;
 }
 
+export async function bulkRestoreLeads(leadIds) {
+  const { data } = await API.post('/leads/recycle-bin/bulk-restore', { leadIds });
+  return data;
+}
+
+export async function bulkPermanentDeleteLeads(leadIds) {
+  const { data } = await API.post('/leads/recycle-bin/bulk-permanent', { leadIds });
+  return data;
+}
+
 export async function fetchLeadAgingAnalytics() {
   const { data } = await API.get('/leads/analytics/aging', { skipSuccessToast: true });
   return data;

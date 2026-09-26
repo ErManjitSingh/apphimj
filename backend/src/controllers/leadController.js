@@ -170,6 +170,11 @@ async function assignReactivatedLeadToExecutive(lead, executive, actor, note = '
     actor._id,
     note || `Assigned to ${executive.name}`
   );
+
+  await FollowUp.updateMany(
+    { lead: lead._id, status: 'pending' },
+    { $set: { assignedTo: executive._id } }
+  );
 }
 
 async function assertLeadReactivationAccess(req, lead) {
@@ -605,7 +610,7 @@ const updateLead = asyncHandler(async (req, res) => {
     const incoming = data.lostReason?.trim() || data.statusReason?.trim() || '';
     const reasonValue = assertValidLostReason(
       incoming || (data.status === 'booked_from_another_company' ? 'booked_elsewhere' : ''),
-      { requireComment: true }
+      { requireComment: false }
     );
     data.statusReason = reasonValue;
     data.lostReason = data.lostReason || reasonValue;
@@ -975,18 +980,31 @@ const assignLeads = asyncHandler(async (req, res) => {
     _id: { $in: ids },
     ...(branchId ? { branchId } : {}),
     isDeleted: { $ne: true },
-  }).select('_id assignedTo branchId');
+  }).select('_id assignedTo branchId status temperature callOutcome');
 
+  // Assignment fields only — never reset status / temperature / pipeline / notes.
+  // Reassign stamps assignedAt so the lead lands in Fresh / Today with its old status intact.
   await Lead.updateMany(
     { _id: { $in: ids }, ...(branchId ? { branchId } : {}), isDeleted: { $ne: true } },
-    patch
+    { $set: patch }
   );
 
+  // Pending follow-ups move with the lead so the new owner sees full history + schedule
   if (assigneeRole === 'sales_executive') {
+    await FollowUp.updateMany(
+      { lead: { $in: ids }, status: 'pending' },
+      { $set: { assignedTo: assignee._id } }
+    );
     await invalidateExecutiveLeadIdsCache(assigneeId, branchId);
+    for (const prev of leadsBefore) {
+      if (prev.assignedTo && String(prev.assignedTo) !== String(assigneeId)) {
+        await invalidateExecutiveLeadIdsCache(prev.assignedTo, branchId);
+      }
+    }
   }
 
-  const transferType = ids.length > 1 ? 'bulk_assign' : 'assign';
+  const transferType =
+    ids.length > 1 ? 'bulk_assign' : leadsBefore.some((l) => l.assignedTo) ? 'reassign' : 'assign';
   await Promise.all(
     leadsBefore.map((lead) =>
       Promise.all([
@@ -994,23 +1012,33 @@ const assignLeads = asyncHandler(async (req, res) => {
           leadId: lead._id,
           branchId: branchId || req.branchId,
           type: lead.assignedTo ? 'lead_reassigned' : 'lead_assigned',
-          description: `Assigned to ${assignee.name}`,
+          description: lead.assignedTo
+            ? `Reassigned to ${assignee.name} (status kept: ${String(lead.status || '—').replace(/_/g, ' ')})`
+            : `Assigned to ${assignee.name}`,
           actor: req.user,
-          meta: { assigneeId: assignee._id, role: assigneeRole },
+          meta: {
+            assigneeId: assignee._id,
+            role: assigneeRole,
+            preservedStatus: lead.status || undefined,
+            preservedTemperature: lead.temperature || undefined,
+          },
         }),
         logLeadTransfer({
           leadId: lead._id,
           branchId: lead.branchId || branchId || req.branchId,
-          type: transferType,
+          type: transferType === 'bulk_assign' ? 'bulk_assign' : lead.assignedTo ? 'reassign' : 'assign',
           actor: req.user,
           fromUserId: lead.assignedTo || null,
           toUserId: assignee._id,
           note: `Assigned to ${assignee.name} (${assigneeRole})`,
-          meta: { assigneeRole },
+          meta: { assigneeRole, preservedStatus: lead.status || undefined },
         }),
       ])
     )
   );
+
+  invalidateDashboardCache('nav:');
+  invalidateDashboardCache('sales_executive');
 
   await logActivity({
     type: 'lead_assigned',

@@ -108,6 +108,7 @@ async function pickExecutive(candidates, { branchId, poolKey, destinationId }) {
 async function applyExecutiveAssignment(lead, executive) {
   lead.assignedTo = executive._id;
   lead.assigneeRole = 'sales_executive';
+  // assignedAt refresh → Fresh/Today; status / notes / pipeline fields stay as-is
   stampPendingAcceptance(lead, lead);
 
   if (executive.teamId) {
@@ -119,6 +120,13 @@ async function applyExecutiveAssignment(lead, executive) {
   }
 
   await lead.save();
+
+  const FollowUp = require('../models/FollowUp');
+  await FollowUp.updateMany(
+    { lead: lead._id, status: 'pending' },
+    { $set: { assignedTo: executive._id } }
+  );
+
   await invalidateExecutiveLeadIdsCache(executive._id, lead.branchId);
 }
 

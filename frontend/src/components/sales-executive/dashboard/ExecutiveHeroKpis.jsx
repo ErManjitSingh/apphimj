@@ -16,7 +16,8 @@ const CARDS = [
     key: 'myLeads',
     label: 'Total Leads',
     icon: Users,
-    iconWrap: 'bg-orange-50 text-orange-500',
+    iconWrap: 'bg-[#5D5FEF]/10 text-[#5D5FEF]',
+    rail: 'bg-[#5D5FEF]',
     path: '/sales-executive/leads/all',
   },
   {
@@ -24,6 +25,7 @@ const CARDS = [
     label: 'Hot Leads',
     icon: Flame,
     iconWrap: 'bg-rose-50 text-rose-500',
+    rail: 'bg-rose-400',
     path: '/sales-executive/leads/hot',
   },
   {
@@ -31,6 +33,7 @@ const CARDS = [
     label: 'Follow-ups Today',
     icon: CalendarClock,
     iconWrap: 'bg-sky-50 text-sky-500',
+    rail: 'bg-sky-400',
     path: '/sales-executive/follow-ups',
   },
   {
@@ -38,13 +41,15 @@ const CARDS = [
     label: 'Connected',
     icon: Phone,
     iconWrap: 'bg-emerald-50 text-emerald-500',
+    rail: 'bg-emerald-500',
     path: '/sales-executive/leads/contacted',
   },
   {
     key: 'convertedLeads',
-    label: 'Converted',
+    label: 'Booked',
     icon: Trophy,
-    iconWrap: 'bg-rose-50 text-rose-500',
+    iconWrap: 'bg-emerald-50 text-emerald-600',
+    rail: 'bg-emerald-500',
     path: '/sales-executive/leads/converted',
   },
 ];
@@ -71,7 +76,7 @@ export default function ExecutiveHeroKpis({ kpis, trends }) {
 
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-      {CARDS.map(({ key, label, icon: Icon, iconWrap, path }, index) => (
+      {CARDS.map(({ key, label, icon: Icon, iconWrap, rail, path }, index) => (
         <motion.div
           key={key}
           initial={{ opacity: 0, y: 10 }}
@@ -80,14 +85,17 @@ export default function ExecutiveHeroKpis({ kpis, trends }) {
         >
           <Link
             to={path}
-            className="flex h-full items-start gap-3 rounded-2xl border border-slate-100 bg-white px-4 py-3.5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            className="group relative flex h-full items-start gap-3 overflow-hidden rounded-2xl border border-slate-100/90 bg-white px-4 py-3.5 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-200 hover:shadow-md"
           >
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${iconWrap}`}>
-              <Icon className="h-5 w-5" />
+            <span
+              className={`absolute inset-y-0 left-0 w-[3px] rounded-l-2xl opacity-70 transition-opacity group-hover:opacity-100 ${rail}`}
+            />
+            <div className={`ml-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${iconWrap}`}>
+              <Icon className="h-5 w-5" strokeWidth={2.25} />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-[12px] font-medium text-slate-500">{label}</p>
-              <p className="mt-0.5 text-2xl font-bold tabular-nums tracking-tight text-slate-900">
+              <p className="truncate text-[11px] font-semibold text-slate-500">{label}</p>
+              <p className="mt-0.5 text-[22px] font-bold tabular-nums tracking-tight text-slate-900">
                 {kpis[key] ?? 0}
               </p>
               <TrendLine trend={trends?.[key]} />

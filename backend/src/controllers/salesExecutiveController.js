@@ -354,10 +354,14 @@ const updateLead = asyncHandler(async (req, res) => {
     'paymentScreenshotBase64',
     'paymentScreenshotName',
     'paymentScreenshots',
-    // Allowed alongside status from follow-up outcome modal
+    // Allowed alongside status from follow-up / status modal
     'temperature',
     'coldReason',
     'isHot',
+    'callOutcome',
+    'lostReason',
+    'postponedReason',
+    'postponedAt',
   ]);
   const otherFields = Object.keys(req.body).filter((k) => !statusOnlyKeys.has(k));
   const isStatusOnlyUpdate = Boolean(status) && otherFields.length === 0;
@@ -379,9 +383,11 @@ const updateLead = asyncHandler(async (req, res) => {
   }
 
   if (isStatusOnlyUpdate) {
-    if (!LEAD_STATUSES.includes(status)) throw new ApiError(400, 'Invalid lead status');
+    const { normalizeLeadStatus, NOT_REACHABLE_CALL_OUTCOMES, normalizeCallOutcome } = require('../constants/leadPipeline');
+    let nextStatus = normalizeLeadStatus(status);
+    if (!LEAD_STATUSES.includes(nextStatus)) throw new ApiError(400, 'Invalid lead status');
     const trimmedReason = typeof statusReason === 'string' ? statusReason.trim() : '';
-    if (status === 'qualified') {
+    if (nextStatus === 'qualified') {
       const { getMissingQualificationFields } = require('../services/salesSopService');
       const missing = getMissingQualificationFields(lead);
       if (missing.length) {
@@ -391,7 +397,7 @@ const updateLead = asyncHandler(async (req, res) => {
         );
       }
     }
-    if (status === 'converted' || status === 'booked') {
+    if (nextStatus === 'converted' || nextStatus === 'booked') {
       // Sales Executive conversion no longer requires payment proof — just the deal numbers.
       // Remaining amount is always derived server-side (totalCost - token), never trusted from
       // the client.
@@ -407,16 +413,34 @@ const updateLead = asyncHandler(async (req, res) => {
         throw new ApiError(400, 'Token amount received cannot exceed total package cost');
       }
     }
+    // Booked stays locked. Lost can be reopened to an active pipeline status from this form.
+    const { isLostStatus: isLostStatusFn, isBookedStatus: isBookedStatusFn } = require('../constants/leadPipeline');
     if (isLeadStatusLocked(lead.status)) {
-      throw new ApiError(400, 'Lead status cannot be changed after conversion or closure');
+      const reopeningFromLost =
+        isLostStatusFn(lead.status) &&
+        !isLostStatusFn(nextStatus) &&
+        !isBookedStatusFn(nextStatus);
+      if (!reopeningFromLost) {
+        throw new ApiError(400, 'Lead status cannot be changed after conversion or closure');
+      }
     }
 
     const prevStatus = lead.status;
     const prevTemperature = String(lead.temperature || '').toLowerCase();
     const prevReason = String(lead.statusReason || '').trim();
 
-    const { normalizeLeadStatus } = require('../constants/leadPipeline');
-    const nextStatus = normalizeLeadStatus(status);
+    // Call not picked / busy / etc on a New Lead → Not Reachable
+    const mappedOutcome = req.body.callOutcome
+      ? normalizeCallOutcome(req.body.callOutcome) || String(req.body.callOutcome).trim().toLowerCase()
+      : '';
+    if (
+      mappedOutcome &&
+      NOT_REACHABLE_CALL_OUTCOMES.includes(mappedOutcome) &&
+      (nextStatus === 'new_lead' || nextStatus === 'new')
+    ) {
+      nextStatus = 'not_reachable';
+    }
+
     const nextReason = trimmedReason;
 
     lead.status = nextStatus;
@@ -432,10 +456,13 @@ const updateLead = asyncHandler(async (req, res) => {
 
     if (['lost', 'booked_from_another_company'].includes(nextStatus) || nextStatus === 'lost') {
       const { assertValidLostReason, lostReasonLabel } = require('../services/salesSopService');
-      const reasonValue = assertValidLostReason(
-        nextReason || lead.lostReason || (nextStatus === 'booked_from_another_company' ? 'booked_elsewhere' : ''),
-        { requireComment: true }
-      );
+      const rawReason =
+        req.body.lostReason ||
+        nextReason ||
+        lead.lostReason ||
+        (nextStatus === 'booked_from_another_company' ? 'booked_elsewhere' : '');
+      // Enum reason is enough; free-text comment only required for "other"
+      const reasonValue = assertValidLostReason(rawReason, { requireComment: false });
       lead.statusReason = reasonValue;
       lead.lostReason = reasonValue;
       req._lostReasonLabel = lostReasonLabel(reasonValue);
@@ -444,28 +471,37 @@ const updateLead = asyncHandler(async (req, res) => {
     }
     lead.statusReasonUpdatedAt = new Date();
 
-    // Stamp Warm / Hot / Cold from follow-up / status modal
-    if (req.body.temperature === 'cold' || req.body.coldReason) {
+    // Stamp Warm / Hot / Cold from follow-up / status modal.
+    // 'na' is a UI sentinel for booked/lost — do not write it (mongoose enum rejects it).
+    const tempRaw = String(req.body.temperature || '').toLowerCase();
+    if (tempRaw === 'na') {
+      // leave existing temperature; booked/lost are identified by status
+    } else if (tempRaw === 'cold' || req.body.coldReason) {
       lead.temperature = 'cold';
       lead.isHot = false;
       if (req.body.coldReason) lead.coldReason = String(req.body.coldReason).trim();
-    } else if (req.body.temperature === 'hot' || req.body.isHot === true) {
+    } else if (tempRaw === 'hot' || req.body.isHot === true) {
       lead.temperature = 'hot';
       lead.isHot = true;
       lead.coldReason = undefined;
-    } else if (req.body.temperature === 'warm') {
+    } else if (tempRaw === 'warm') {
       lead.temperature = 'warm';
       lead.isHot = false;
       lead.coldReason = undefined;
-    } else if (typeof req.body.isHot === 'boolean') {
+    } else if (typeof req.body.isHot === 'boolean' && tempRaw !== 'na') {
       lead.isHot = req.body.isHot;
     }
 
-    if (req.body.callOutcome) {
-      const { normalizeCallOutcome } = require('../constants/leadPipeline');
-      lead.callOutcome = normalizeCallOutcome(req.body.callOutcome) || req.body.callOutcome;
+    if (mappedOutcome) {
+      lead.callOutcome = mappedOutcome;
     }
-    if (req.body.lostReason) lead.lostReason = String(req.body.lostReason).trim();
+    if (
+      req.body.lostReason &&
+      nextStatus !== 'lost' &&
+      nextStatus !== 'booked_from_another_company'
+    ) {
+      lead.lostReason = String(req.body.lostReason).trim();
+    }
     if (req.body.postponedReason) lead.postponedReason = String(req.body.postponedReason).trim();
     if (req.body.postponedAt) {
       const d = new Date(req.body.postponedAt);

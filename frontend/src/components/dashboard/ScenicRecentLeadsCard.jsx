@@ -18,7 +18,7 @@ function digitsPhone(phone) {
 }
 
 export default function ScenicRecentLeadsCard({ leads = [] }) {
-  const rows = (leads || []).slice(0, 5);
+  const rows = leads || [];
 
   return (
     <div className="rounded-[24px] bg-white shadow-sm ring-1 ring-slate-100">
@@ -28,7 +28,7 @@ export default function ScenicRecentLeadsCard({ leads = [] }) {
           View All
         </Link>
       </div>
-      <div className="overflow-x-auto">
+      <div className="max-h-[22rem] overflow-auto overscroll-contain scrollbar-thin">
         <table className="w-full min-w-[760px] text-left">
           <thead>
             <tr className="border-y border-slate-100 text-[11px] font-semibold uppercase tracking-wide text-slate-400">

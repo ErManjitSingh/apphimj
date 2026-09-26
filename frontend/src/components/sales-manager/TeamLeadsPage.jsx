@@ -74,7 +74,6 @@ export default function TeamLeadsPage() {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const { dateFrom, dateTo, setPeriod } = useUrlPeriodFilter();
   const debouncedBucketSearch = useDebouncedValue(bucketSearch, 350);
-  const [assignLead, setAssignLead] = useState(null);
   const [reactivateLead, setReactivateLead] = useState(null);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: DEFAULT_PAGE_SIZE });
   const meta = TITLES[filter] || TITLES.all;
@@ -142,12 +141,12 @@ export default function TeamLeadsPage() {
     setAppliedFilters(next);
   };
 
-  const { assignees, assigneesLoading, handleAssign, assignConfirmDialog } = useLeadAssign({
-    onAssigned: () => {
-      setAssignLead(null);
-      fetchLeads();
-    },
-  });
+  const { assignees, assigneesLoading, assignModal, openAssign, closeAssign, handleAssign, assignConfirmDialog } =
+    useLeadAssign({
+      onAssigned: () => {
+        fetchLeads();
+      },
+    });
 
   const reactivate = useLeadReactivate({
     leadId: reactivateLead?._id,
@@ -162,7 +161,8 @@ export default function TeamLeadsPage() {
   const onConfirmAssign = async (payload) => {
     await handleAssign({
       ...payload,
-      leadIds: payload.leadIds || (assignLead?._id ? [assignLead._id] : []),
+      lead: assignModal,
+      leadIds: payload.leadIds || (assignModal?._id ? [assignModal._id] : []),
     });
   };
 
@@ -273,18 +273,19 @@ export default function TeamLeadsPage() {
               >
                 <RefreshCw className="w-3 h-3 mr-0.5" /> Reactivate
               </Button>
-            ) : row.original.assignmentAcceptance === 'expired' && !row.original.assignedTo ? (
+            ) : row.original.assignedTo?.name ? (
               <Button
                 size="sm"
-                variant="gradient"
-                className="h-8 px-2.5 text-[11px]"
-                onClick={() => setAssignLead(row.original)}
+                variant="outline"
+                className="h-8 px-2.5 text-[11px] max-w-[140px]"
+                onClick={() => openAssign(row.original)}
+                title={`${row.original.assignedTo.name} — click to change`}
               >
-                <UserPlus className="w-3 h-3 mr-0.5" /> Reassign
+                <span className="truncate">{row.original.assignedTo.name}</span>
               </Button>
             ) : (
-              <Button size="sm" variant="gradient" className="h-8 px-2.5 text-[11px]" onClick={() => setAssignLead(row.original)}>
-                <UserPlus className="w-3 h-3 mr-0.5" /> {row.original.assignedTo ? 'Reassign' : 'Assign'}
+              <Button size="sm" variant="gradient" className="h-8 px-2.5 text-[11px]" onClick={() => openAssign(row.original)}>
+                <UserPlus className="w-3 h-3 mr-0.5" /> Assign
               </Button>
             )}
           </div>
@@ -293,7 +294,7 @@ export default function TeamLeadsPage() {
     );
 
     return base;
-  }, [isAllView, reactivate, selectedIds, setReactivateLead, setAssignLead]);
+  }, [isAllView, reactivate, selectedIds, setReactivateLead, openAssign]);
 
   return (
     <div className="space-y-6">
@@ -377,11 +378,11 @@ export default function TeamLeadsPage() {
       )}
 
       <AdminAssignLeadModal
-        open={!!assignLead}
-        lead={assignLead}
+        open={!!assignModal}
+        lead={assignModal}
         assignees={assignees}
         loading={assigneesLoading}
-        onClose={() => setAssignLead(null)}
+        onClose={closeAssign}
         onAssign={onConfirmAssign}
         allowedRoles={['sales_manager', 'team_leader', 'sales_executive']}
       />

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -26,6 +26,7 @@ import {
   Waves,
   Coffee,
   Mountain,
+  X,
 } from 'lucide-react';
 import API from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -460,6 +461,76 @@ function HotelCard({ hotel, onEdit, onToggleStatus, onDelete, canEdit, canDelete
   );
 }
 
+function DestinationSearchField({ value, onChange, options = [] }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+
+  const suggestions = useMemo(() => {
+    const q = value.trim().toLowerCase();
+    const list = q
+      ? options.filter((d) => String(d).toLowerCase().includes(q))
+      : options;
+    return list.slice(0, 12);
+  }, [options, value]);
+
+  useEffect(() => {
+    const onDoc = (e) => {
+      if (!rootRef.current?.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
+
+  return (
+    <div ref={rootRef} className="relative min-w-[180px] xl:w-56">
+      <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      <input
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        placeholder="Search destination..."
+        className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-9 text-sm text-slate-700 outline-none focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
+        autoComplete="off"
+      />
+      {value ? (
+        <button
+          type="button"
+          onClick={() => {
+            onChange('');
+            setOpen(false);
+          }}
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+          aria-label="Clear destination"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      ) : null}
+      {open && suggestions.length > 0 ? (
+        <ul className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+          {suggestions.map((d) => (
+            <li key={d}>
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(d);
+                  setOpen(false);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-orange-50 hover:text-orange-700"
+              >
+                <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                <span className="truncate">{d}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 export default function HotelControlPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -558,9 +629,14 @@ export default function HotelControlPage() {
       });
     }
     if (applied.destination) {
-      list = list.filter(
-        (h) => (h.destination || h.displayCity || '') === applied.destination
-      );
+      const destQ = applied.destination.trim().toLowerCase();
+      list = list.filter((h) => {
+        const hay = [h.destination, h.displayCity, h.location]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return hay.includes(destQ);
+      });
     }
     if (applied.star) {
       const star = Number(applied.star);
@@ -763,18 +839,11 @@ export default function HotelControlPage() {
               className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
             />
           </div>
-          <select
+          <DestinationSearchField
             value={destination}
-            onChange={(e) => setDestination(e.target.value)}
-            className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700"
-          >
-            <option value="">All Destinations</option>
-            {destinations.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
+            onChange={setDestination}
+            options={destinations}
+          />
           <select
             value={starFilter}
             onChange={(e) => setStarFilter(e.target.value)}

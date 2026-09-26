@@ -83,7 +83,7 @@ async function getBranchSettings(branchId) {
   if (!settings) {
     settings = await BranchAssignmentSettings.create({
       branchId,
-      autoAssignEnabled: true,
+      autoAssignEnabled: false,
       fallbackUserIds: [],
     });
   }

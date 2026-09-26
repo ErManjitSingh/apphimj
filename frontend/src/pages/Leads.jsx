@@ -59,25 +59,36 @@ export default function Leads() {
   const isAdmin = user?.role === 'admin';
   const isSalesManager = user?.role === 'sales_manager';
   const isLeadProvider = user?.role === 'lead_provider';
+  const isTeamLeader = user?.role === 'team_leader';
   const isManagerRole = isAdmin || isSalesManager;
-  const isLimitedRole = ['team_leader', 'sales_executive'].includes(user?.role);
+  const isSalesExecutive = user?.role === 'sales_executive';
   const userCanAssignLeads = canAssignLeads(user?.role);
   const canEditLead = can('leads', 'edit');
   const canDeleteLead = can('leads', 'delete');
   const canImportExport = !isLeadProvider && (isManagerRole || isAdmin);
   const leadMenuActions = useMemo(
     () =>
-      isLimitedRole
-        ? { view: true, edit: false, assign: false,  delete: false }
-        : isLeadProvider
-          ? { view: true, edit: canEditLead, assign: userCanAssignLeads,  delete: false }
-          : {
-              view: true,
-              edit: isManagerRole,
-              assign: isManagerRole,
-                            delete: isManagerRole && canDeleteLead,
-            },
-    [isLimitedRole, isLeadProvider, canEditLead, userCanAssignLeads, isManagerRole, canDeleteLead]
+      isSalesExecutive
+        ? { view: true, edit: false, assign: false, delete: false }
+        : isTeamLeader
+          ? { view: true, edit: canEditLead, assign: true, delete: false }
+          : isLeadProvider
+            ? { view: true, edit: canEditLead, assign: userCanAssignLeads, delete: false }
+            : {
+                view: true,
+                edit: isManagerRole,
+                assign: isManagerRole || userCanAssignLeads,
+                delete: isManagerRole && canDeleteLead,
+              },
+    [
+      isSalesExecutive,
+      isTeamLeader,
+      isLeadProvider,
+      canEditLead,
+      userCanAssignLeads,
+      isManagerRole,
+      canDeleteLead,
+    ]
   );
   const config = pageConfig[location.pathname] || pageConfig['/leads'];
   const isAllLeadsPage = location.pathname === '/leads';

@@ -44,7 +44,6 @@ export default function LeadAssignmentPage() {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 500);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: DEFAULT_PAGE_SIZE });
-  const [modalLead, setModalLead] = useState(null);
   const [assignMode, setAssignMode] = useState('quick');
   const [loading, setLoading] = useState(true);
 
@@ -75,6 +74,9 @@ export default function LeadAssignmentPage() {
   const {
     assignees,
     assigneesLoading,
+    assignModal,
+    openAssign: openAssignModal,
+    closeAssign,
     handleAssign: submitAssign,
     assignConfirmDialog,
   } = useLeadAssign({ onAssigned: fetchData });
@@ -97,14 +99,18 @@ export default function LeadAssignmentPage() {
       assigneeRole: payload.assigneeRole,
       assigneeId: payload.assigneeId,
       leadIds: payload.leadIds || selected,
+      lead: assignModal,
     });
     setSelected([]);
-    setModalLead(null);
   };
 
   const openAssign = (lead) => {
     setAssignMode(teams.length ? 'team' : 'quick');
-    setModalLead(lead);
+    if (lead?.bulk) {
+      openAssignModal({ bulk: true, count: lead.count, leadIds: selected });
+    } else {
+      openAssignModal(lead);
+    }
   };
 
   const pageCount = Math.max(1, Math.ceil(total / pagination.pageSize) || 1);
@@ -124,7 +130,7 @@ export default function LeadAssignmentPage() {
     <div className="space-y-6">
       <PageHeader
         title="Lead Assignment"
-        description="Assign unassigned leads manually anytime — auto-assign also runs for new leads"
+        description="Assign unassigned leads manually — auto-assign is off"
         breadcrumbs={['Sales Manager', 'Lead Assignment']}
         actions={
           selected.length > 0 && (
@@ -286,21 +292,21 @@ export default function LeadAssignmentPage() {
 
       {(assignMode === 'quick' || !teams.length) && (
         <AdminAssignLeadModal
-          open={!!modalLead}
-          lead={modalLead}
+          open={!!assignModal}
+          lead={assignModal}
           assignees={assignees}
           loading={assigneesLoading}
-          onClose={() => setModalLead(null)}
+          onClose={closeAssign}
           onAssign={handleAssign}
           allowedRoles={['sales_manager', 'team_leader', 'sales_executive']}
         />
       )}
       {assignMode === 'team' && teams.length > 0 && (
         <AssignTeamLeadModal
-          open={!!modalLead}
-          lead={modalLead}
+          open={!!assignModal}
+          lead={assignModal}
           teams={teams}
-          onClose={() => setModalLead(null)}
+          onClose={closeAssign}
           onAssign={handleAssign}
         />
       )}

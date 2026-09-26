@@ -28,7 +28,9 @@ async function getLeaderLeadScopeFilter(leaderId) {
     ? team.members.filter((m) => m.role === 'sales_executive').map((m) => m._id)
     : [];
 
+  // Include unassigned pool leads so TLs can pick up and assign them.
   const or = [
+    { assignedTo: null },
     { assignedTo: { $in: execIds } },
     { assignedTo: leaderId },
     { assignedTeamLeader: leaderId },

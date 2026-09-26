@@ -563,7 +563,17 @@ async function listHotels(query = {}, { branchId } = {}) {
     filter.mealPlan = { $regex: query.mealPlan.trim(), $options: 'i' };
   }
   if (query.destination?.trim()) {
-    filter.destination = { $regex: query.destination.trim(), $options: 'i' };
+    const dest = query.destination.trim();
+    filter.$and = [
+      ...(filter.$and || []),
+      {
+        $or: [
+          { destination: { $regex: dest, $options: 'i' } },
+          { location: { $regex: dest, $options: 'i' } },
+          { displayCity: { $regex: dest, $options: 'i' } },
+        ],
+      },
+    ];
   }
   if (query.status?.trim()) {
     filter.status = query.status.trim();
@@ -582,11 +592,12 @@ async function listHotels(query = {}, { branchId } = {}) {
   }
 
   const baseFilter = withBranch({}, branchId);
-  const [rows, total, summary, categories, locations, roomTypes, mealPlans] = await Promise.all([
+  const [rows, total, summary, categories, destinations, locations, roomTypes, mealPlans] = await Promise.all([
     Hotel.find(filter).sort({ name: 1 }).skip(skip).limit(limit).lean(),
     Hotel.countDocuments(filter),
     aggregateHotelSummary(filter),
     Hotel.distinct('category', baseFilter),
+    Hotel.distinct('destination', { ...baseFilter, destination: { $nin: [null, ''] } }),
     Hotel.distinct('location', baseFilter),
     Hotel.distinct('roomType', { ...baseFilter, roomType: { $nin: [null, ''] } }),
     Hotel.distinct('mealPlan', { ...baseFilter, mealPlan: { $nin: [null, ''] } }),
@@ -599,6 +610,7 @@ async function listHotels(query = {}, { branchId } = {}) {
     summary,
     filters: {
       categories: categories.filter(Boolean).sort(),
+      destinations: destinations.filter(Boolean).sort((a, b) => String(a).localeCompare(String(b))),
       locations: locations.filter(Boolean).sort(),
       roomTypes: [...new Set([...roomTypes, ...roomTypeNames].filter(Boolean))].sort(),
       mealPlans: mealPlans.filter(Boolean).sort(),

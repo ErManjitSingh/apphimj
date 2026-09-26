@@ -8,6 +8,9 @@ function stampExecutiveAssignment(target = {}) {
   const now = new Date();
   target.assignedAt = now;
   target.executiveLastViewedAt = null;
+  // New assignee must get a fresh "opened" timeline — previous owner's open stamp does not carry over.
+  target.firstOpenedAt = null;
+  target.firstOpenedBy = null;
   return target;
 }
 

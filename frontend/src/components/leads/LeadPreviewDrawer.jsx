@@ -178,7 +178,18 @@ export default function LeadPreviewDrawer({
                 </div>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1.5">
-                {onAssign ? (
+                {assignedName ? (
+                  <button
+                    type="button"
+                    onClick={() => onAssign?.(lead)}
+                    disabled={!onAssign}
+                    title={onAssign ? `${assignedName} — click to change` : assignedName}
+                    className="inline-flex max-w-[140px] items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 py-1 pl-1 pr-2.5 hover:bg-emerald-100 disabled:cursor-default"
+                  >
+                    <Avatar name={assignedName} size="sm" className="!h-5 !w-5 !text-[8px]" />
+                    <span className="truncate text-[11px] font-semibold text-emerald-800">{assignedName}</span>
+                  </button>
+                ) : onAssign ? (
                   <button
                     type="button"
                     onClick={() => onAssign(lead)}
@@ -187,12 +198,6 @@ export default function LeadPreviewDrawer({
                     Assign
                     <ChevronDown className="h-3 w-3" />
                   </button>
-                ) : null}
-                {assignedName ? (
-                  <span className="inline-flex max-w-[140px] items-center gap-1.5 rounded-full bg-slate-50 py-0.5 pl-0.5 pr-2 ring-1 ring-slate-100">
-                    <Avatar name={assignedName} size="sm" className="!h-5 !w-5 !text-[8px]" />
-                    <span className="truncate text-[10px] font-semibold text-slate-700">{assignedName}</span>
-                  </span>
                 ) : null}
               </div>
             </div>
@@ -267,7 +272,7 @@ export default function LeadPreviewDrawer({
                   {onAssign && (
                     <DropdownMenuItem onClick={() => onAssign(lead)} className="gap-2 rounded-lg cursor-pointer">
                       <UserCheck className="w-4 h-4" />
-                      {assignedName ? 'Reassign Lead' : 'Assign Lead'}
+                      {assignedName ? 'Reassign' : 'Assign Lead'}
                     </DropdownMenuItem>
                   )}
                   {onDelete && (

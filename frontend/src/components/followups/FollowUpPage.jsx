@@ -131,17 +131,26 @@ export default function FollowUpPage() {
 
   const handleAdd = async (data) => {
     if (!canCreate) throw new Error('Not allowed');
+    const { statusUpdate, skipFollowUp, ...followUpData } = data;
+    const isLostClose =
+      skipFollowUp || ['lost', 'booked_from_another_company'].includes(statusUpdate?.status);
+
     if (editFollowup) {
       await updateExecutiveFollowUp(editFollowup._id, {
         action: 'reschedule',
-        scheduledAt: normalizeScheduledAt(data.scheduledAt),
-        remarks: data.notes,
-        category: data.category,
-        priority: data.priority,
+        scheduledAt: normalizeScheduledAt(followUpData.scheduledAt || data.scheduledAt),
+        remarks: followUpData.notes || data.notes,
+        category: followUpData.category || data.category,
+        priority: followUpData.priority || data.priority,
       });
-    } else {
-      await createExecutiveFollowUp(buildFollowUpPayload(data));
+    } else if (!isLostClose) {
+      await createExecutiveFollowUp(buildFollowUpPayload(followUpData));
     }
+
+    if (!editFollowup && statusUpdate && followUpData.lead) {
+      await API.put(`/sales-executive/leads/${followUpData.lead}`, statusUpdate);
+    }
+
     setEditFollowup(null);
     invalidate();
   };
@@ -249,6 +258,7 @@ export default function FollowUpPage() {
           onSubmit={handleAdd}
           leads={leads}
           editData={editFollowup}
+          showLeadOutcome={!editFollowup}
         />
       )}
 

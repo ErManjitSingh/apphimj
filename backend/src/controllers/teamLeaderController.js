@@ -151,6 +151,7 @@ const updateLead = asyncHandler(async (req, res) => {
   }
   lead.assignedTo = executiveId;
   lead.assigneeRole = 'sales_executive';
+  // Stamp assignedAt — lead appears in Fresh/Today with existing status & data unchanged
   stampPendingAcceptance(lead, lead);
   const team = await getTeamForLeader(req.user._id);
   if (team) {
@@ -158,6 +159,11 @@ const updateLead = asyncHandler(async (req, res) => {
     lead.assignedTeamLeader = req.user._id;
   }
   await lead.save();
+
+  await FollowUp.updateMany(
+    { lead: lead._id, status: 'pending' },
+    { $set: { assignedTo: executiveId } }
+  );
 
   notifyLeadAssigned({
     assigneeId: executiveId,

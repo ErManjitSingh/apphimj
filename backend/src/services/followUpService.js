@@ -47,7 +47,11 @@ function describeFollowUp(payloadOrDoc, body = {}) {
   const category = payloadOrDoc.category || body.category || 'warm';
   const type = (payloadOrDoc.type || body.type || 'call').replace(/_/g, ' ');
   const when = payloadOrDoc.scheduledAt
-    ? new Date(payloadOrDoc.scheduledAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+    ? new Date(payloadOrDoc.scheduledAt).toLocaleString('en-IN', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone: 'Asia/Kolkata',
+      })
     : '';
   const outcome = body.outcome || body.warmOutcome || body.hotOutcome || body.coldReason || payloadOrDoc.outcome || '';
   const notes = body.notes || body.remarks || payloadOrDoc.notes || '';
@@ -201,7 +205,7 @@ async function updateFollowUpRecord({ followup, body, user } = {}) {
       description = `Follow-up completed${remarks || followup.outcome ? ` — ${remarks || followup.outcome}` : ''}`;
     } else if (action === 'reschedule' || (scheduledAt && String(prevScheduled) !== String(followup.scheduledAt))) {
       activityType = 'followup_rescheduled';
-      description = `Follow-up rescheduled${followup.scheduledAt ? ` to ${new Date(followup.scheduledAt).toLocaleString('en-IN')}` : ''}${remarks ? ` — ${remarks}` : ''}`;
+      description = `Follow-up rescheduled${followup.scheduledAt ? ` to ${new Date(followup.scheduledAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}` : ''}${remarks ? ` — ${remarks}` : ''}`;
     } else if (action || body.notes !== undefined || body.outcome !== undefined || body.status) {
       activityType = 'followup_created';
       description = `Follow-up updated · ${description}`;

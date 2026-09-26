@@ -274,17 +274,18 @@ async function aggregateExecutiveLeadCounts(userId, branchId) {
     userId && mongoose.Types.ObjectId.isValid(userId)
       ? new mongoose.Types.ObjectId(String(userId))
       : userId;
-  // Repeated leads live only under Repeated menu — exclude from Total / pipeline KPIs
+  // Repeated leads live only under Repeated menu — exclude from pipeline stage KPIs
   const notRepeated = { isRepeatCustomer: { $ne: true } };
   const activeOpen = {
     ...notRepeated,
-    status: { $nin: ['lost', 'booked_from_another_company', 'converted'] },
+    status: { $nin: ['lost', 'booked_from_another_company', 'converted', 'booked'] },
   };
   const [row] = await Lead.aggregate([
     { $match: match },
     {
       $facet: {
-        all: [{ $match: activeOpen }, { $count: 'n' }],
+        // Total Leads = every lead assigned to this executive (not deleted)
+        all: [{ $count: 'n' }],
         selfAdded: [
           {
             $match: {
@@ -295,10 +296,10 @@ async function aggregateExecutiveLeadCounts(userId, branchId) {
           { $count: 'n' },
         ],
         repeated: [{ $match: { isRepeatCustomer: true } }, { $count: 'n' }],
+        // Fresh / Today = created OR assigned today (any pipeline status — reassign keeps old status)
         new: [
           {
             $match: {
-              ...activeOpen,
               $or: [
                 { createdAt: { $gte: startOfToday, $lte: endOfToday } },
                 { assignedAt: { $gte: startOfToday, $lte: endOfToday } },
@@ -310,7 +311,6 @@ async function aggregateExecutiveLeadCounts(userId, branchId) {
         fresh: [
           {
             $match: {
-              ...activeOpen,
               $or: [
                 { createdAt: { $gte: startOfToday, $lte: endOfToday } },
                 { assignedAt: { $gte: startOfToday, $lte: endOfToday } },

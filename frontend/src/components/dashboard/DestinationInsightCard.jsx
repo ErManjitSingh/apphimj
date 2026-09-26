@@ -48,7 +48,7 @@ export default function DestinationInsightCard() {
     placeholderData: (prev) => prev,
   });
 
-  const rows = (data?.rows || []).slice(0, 8);
+  const rows = data?.rows || [];
   const totals = data?.totals || {
     queries: 0,
     hot: 0,
@@ -109,7 +109,7 @@ export default function DestinationInsightCard() {
         ) : !rows.length ? (
           <p className="px-3 py-8 text-center text-sm text-slate-400">No destination queries yet</p>
         ) : (
-          <ul className="space-y-0.5">
+          <ul className="max-h-[18.75rem] space-y-0.5 overflow-y-auto overscroll-contain pr-0.5 scrollbar-thin">
             {rows.map((row, index) => {
               const queries = Number(row.queries || 0);
               const width = Math.max(6, (queries / maxQueries) * 100);

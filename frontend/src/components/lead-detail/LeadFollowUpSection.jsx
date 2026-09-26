@@ -5,6 +5,8 @@ import AddFollowUpModal from '../followups/AddFollowUpModal';
 import FollowUpCategoryBadge from '../followups/FollowUpCategoryBadge';
 import { createExecutiveFollowUp, buildFollowUpPayload } from '../followups/followupApi';
 import { FOLLOWUP_CATEGORY_OPTIONS } from '../followups/constants';
+import API from '../../api/axios';
+import { toast } from '../../context/ToastContext';
 
 function fmt(iso) {
   if (!iso) return '—';
@@ -52,18 +54,41 @@ export default function LeadFollowUpSection({
     if (!canCreate || !lead?._id) {
       throw new Error('Cannot add follow-up');
     }
-    const created = await createExecutiveFollowUp(buildFollowUpPayload({ ...form, lead: lead._id }));
-    setFollowUps((prev) => [
-      {
-        id: created._id,
-        date: created.scheduledAt,
-        category: created.category || 'warm',
-        type: created.type,
-        remarks: created.notes || '',
-      },
-      ...prev,
-    ]);
-    onFollowUpAdded?.(created);
+    const { statusUpdate, skipFollowUp, ...followUpData } = form;
+    const isLostClose =
+      skipFollowUp || ['lost', 'booked_from_another_company'].includes(statusUpdate?.status);
+
+    let created = null;
+    if (!isLostClose) {
+      created = await createExecutiveFollowUp(
+        buildFollowUpPayload({ ...followUpData, lead: lead._id })
+      );
+      setFollowUps((prev) => [
+        {
+          id: created._id,
+          date: created.scheduledAt,
+          category: created.category || 'warm',
+          type: created.type,
+          remarks: created.notes || '',
+        },
+        ...prev,
+      ]);
+      onFollowUpAdded?.(created);
+    }
+
+    if (statusUpdate) {
+      try {
+        const base = String(window.location.pathname || '');
+        const endpoint = base.includes('/sales-executive/')
+          ? `/sales-executive/leads/${lead._id}`
+          : `/leads/${lead._id}`;
+        await API.put(endpoint, statusUpdate);
+      } catch (err) {
+        const msg = err.response?.data?.message || err.message || 'Status could not be updated';
+        toast.error(isLostClose ? msg : `Follow-up saved. ${msg}`);
+      }
+    }
+
     await onRefresh?.({ silent: true });
     return created;
   };
@@ -131,6 +156,8 @@ export default function LeadFollowUpSection({
           onSubmit={handleAdd}
           fixedLeadId={lead?._id}
           fixedLeadName={lead?.name}
+          lead={lead}
+          showLeadOutcome
         />
       )}
     </>

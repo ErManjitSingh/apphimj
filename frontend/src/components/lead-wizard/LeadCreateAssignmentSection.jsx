@@ -36,6 +36,21 @@ export default function LeadCreateAssignmentSection() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (loading || assignmentMode !== 'assign') return;
+    const counts = {
+      sales_manager: assignees.salesManagers.length,
+      team_leader: assignees.teamLeaders.length,
+      sales_executive: assignees.salesExecutives.length,
+    };
+    if (counts[assigneeRole] > 0) return;
+    const fallback = ['sales_executive', 'team_leader', 'sales_manager'].find((r) => counts[r] > 0);
+    if (fallback) {
+      setValue('assigneeRole', fallback);
+      setValue('assignedTo', '');
+    }
+  }, [loading, assignmentMode, assignees, assigneeRole, setValue]);
+
   const people =
     assigneeRole === 'sales_manager'
       ? assignees.salesManagers

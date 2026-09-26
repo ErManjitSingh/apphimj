@@ -22,6 +22,8 @@ export default function AppModal({
   panelClassName,
   closeOnBackdrop = true,
   lockDismiss = false,
+  /** Stacking order — raise for dialogs that open above another modal (e.g. confirm). */
+  zIndexClass = 'z-[200]',
 }) {
   useEffect(() => {
     if (!open) return undefined;
@@ -42,7 +44,13 @@ export default function AppModal({
   return createPortal(
     <AnimatePresence mode="wait">
       {open && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6" role="presentation">
+        <div
+          className={cn(
+            'fixed inset-0 flex items-end justify-center p-0 sm:items-center sm:p-4 md:p-6',
+            zIndexClass
+          )}
+          role="presentation"
+        >
           <motion.div
             key="app-modal-backdrop"
             initial={{ opacity: 0 }}
@@ -61,13 +69,18 @@ export default function AppModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.94, y: 20 }}
             transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-            className={cn('relative z-10 w-full', SIZES[size] || size, panelClassName)}
+            className={cn(
+              'relative z-10 w-full',
+              SIZES[size] || size,
+              'max-h-[min(100dvh,100vh)] sm:max-h-[min(calc(100vh-2rem),920px)]',
+              panelClassName
+            )}
             onClick={(e) => e.stopPropagation()}
           >
             <div
               className={cn(
-                'rounded-2xl border border-subtle/80 bg-surface shadow-2xl shadow-black/50',
-                'max-h-[min(calc(100vh-2rem),920px)] overflow-y-auto',
+                'rounded-t-2xl border border-subtle/80 bg-surface shadow-2xl shadow-black/50 sm:rounded-2xl',
+                'max-h-[inherit] overflow-y-auto',
                 className,
               )}
             >

@@ -3,11 +3,12 @@
  * Manual assignment (admin / sales manager / team leader) remains always available.
  *
  * Runtime value is stored in DB (AssignmentGlobalSettings) and can be toggled from the UI.
- * Env LEAD_AUTO_ASSIGNMENT_ENABLED seeds the default when no DB row exists yet.
+ * Env LEAD_AUTO_ASSIGNMENT_ENABLED=true seeds ON only when no DB row exists yet.
+ * Default is OFF — leads stay unassigned until someone assigns manually.
  */
 const AssignmentGlobalSettings = require('../models/AssignmentGlobalSettings');
 
-const ENV_DEFAULT = process.env.LEAD_AUTO_ASSIGNMENT_ENABLED !== 'false';
+const ENV_DEFAULT = process.env.LEAD_AUTO_ASSIGNMENT_ENABLED === 'true';
 
 let cachedEnabled = null;
 let cacheAt = 0;

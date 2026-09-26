@@ -1,4 +1,4 @@
-/* HIM JOURNEY TOURS Quotation PDF — MakeMyTrip-inspired premium holiday layout */
+/* HIM JOURNEY TOURS — Premium travel quotation PDF */
 
 .quote-pdf-preview-shell {
   padding: 28px 16px 48px;
@@ -6,38 +6,41 @@
   justify-content: center;
   align-items: flex-start;
   min-height: calc(100vh - 56px);
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(93, 95, 239, 0.12), transparent 55%),
+    linear-gradient(180deg, #eef0f8 0%, #e4e7f2 100%);
 }
 
 .quote-pdf-preview-paper {
   width: 100%;
   max-width: 794px;
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.06),
-    0 28px 70px -18px rgba(0, 0, 0, 0.55);
-  border-radius: 6px;
+    0 0 0 1px rgba(15, 23, 42, 0.06),
+    0 32px 80px -24px rgba(15, 23, 42, 0.45);
+  border-radius: 8px;
   overflow: hidden;
 }
 
 .quote-ht-pdf {
-  --quote-black: #0f172a;
-  --quote-navy: #1e293b;
-  --quote-orange: #ff6b00;
-  --quote-orange-bright: #ff8a1f;
-  --quote-orange-deep: #e05a00;
-  --quote-orange-light: #fff4eb;
-  --quote-orange-soft: #ffd4b0;
-  --quote-border: #e2e8f0;
+  --quote-ink: #0b1220;
+  --quote-navy: #151c2e;
+  --quote-brand: #5d5fef;
+  --quote-brand-deep: #4547d4;
+  --quote-brand-soft: #eef0ff;
+  --quote-brand-mist: #f5f6ff;
+  --quote-gold: #c9a227;
+  --quote-border: #e4e7f0;
   --quote-muted: #64748b;
   --quote-text: #334155;
-  --quote-gray-bg: #f8fafc;
-  --quote-section-gap: 20px;
-  --quote-radius: 10px;
+  --quote-gray-bg: #f7f8fc;
+  --quote-section-gap: 22px;
+  --quote-radius: 12px;
   width: 100%;
   max-width: 794px;
   margin: 0 auto;
   background: #ffffff;
   color: var(--quote-text);
-  font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+  font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   font-size: 11px;
   line-height: 1.55;
 }
@@ -46,41 +49,67 @@
   box-sizing: border-box;
 }
 
-/* ── Topbar ── */
+/* ── Masthead ── */
 .quote-ht-topbar {
-  background: #fff;
-  color: var(--quote-black);
-  padding: 10px 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #fafbff 100%);
+  color: var(--quote-ink);
+  padding: 14px 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
   border-bottom: 1px solid var(--quote-border);
+  position: relative;
+}
+
+.quote-ht-topbar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--quote-brand) 0%, #8b8df5 45%, #c9a227 100%);
 }
 
 .quote-ht-brand-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  min-width: 0;
 }
 
 .quote-ht-logo-img {
-  height: 48px;
-  width: 48px;
+  height: 52px;
+  width: 52px;
   border-radius: 50%;
   object-fit: cover;
   background: #000;
   display: block;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 3px rgba(93, 95, 239, 0.35);
+}
+
+.quote-ht-brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.quote-ht-brand-name {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--quote-ink);
+  line-height: 1.2;
 }
 
 .quote-ht-brand-tagline {
   font-size: 9px;
   font-weight: 600;
   color: var(--quote-muted);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  border-left: 1px solid var(--quote-border);
-  padding-left: 10px;
 }
 
 .quote-ht-quote-meta {
@@ -88,19 +117,34 @@
   font-size: 9px;
   line-height: 1.45;
   color: var(--quote-muted);
+  flex-shrink: 0;
+}
+
+.quote-ht-meta-pill {
+  display: inline-block;
+  font-size: 7.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--quote-brand-deep);
+  background: var(--quote-brand-soft);
+  padding: 3px 8px;
+  border-radius: 999px;
+  margin-bottom: 4px;
 }
 
 .quote-ht-quote-meta .qnum {
   font-weight: 800;
-  font-size: 11px;
-  color: var(--quote-orange-deep);
+  font-size: 12px;
+  color: var(--quote-brand-deep);
+  letter-spacing: -0.01em;
 }
 
-/* ── Full-bleed cover ── */
+/* ── Cinematic cover ── */
 .quote-ht-cover {
   position: relative;
-  min-height: 236px;
-  height: 236px;
+  min-height: 280px;
+  height: 280px;
   overflow: hidden;
   background: var(--quote-navy);
   page-break-inside: avoid;
@@ -114,54 +158,77 @@
   height: 100%;
   object-fit: cover;
   display: block;
+  transform: scale(1.02);
 }
 
 .quote-ht-cover-fallback {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, #1e293b 0%, #0f172a 55%, #c2410c 130%);
+  background:
+    radial-gradient(ellipse at 70% 30%, rgba(93, 95, 239, 0.45), transparent 55%),
+    linear-gradient(135deg, #0b1220 0%, #1a1f3a 50%, #2d2f7a 100%);
 }
 
 .quote-ht-cover-shade {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(90deg, rgba(15, 23, 42, 0.88) 0%, rgba(15, 23, 42, 0.45) 55%, rgba(15, 23, 42, 0.25) 100%),
-    linear-gradient(0deg, rgba(15, 23, 42, 0.75) 0%, transparent 55%);
+    linear-gradient(105deg, rgba(11, 18, 32, 0.92) 0%, rgba(11, 18, 32, 0.55) 48%, rgba(11, 18, 32, 0.28) 100%),
+    linear-gradient(0deg, rgba(11, 18, 32, 0.82) 0%, transparent 48%);
+}
+
+.quote-ht-cover-ornament {
+  position: absolute;
+  left: 22px;
+  top: 22px;
+  width: 36px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--quote-gold), transparent);
+  z-index: 2;
 }
 
 .quote-ht-cover-content {
   position: relative;
   z-index: 1;
-  padding: 28px 22px 22px;
+  padding: 36px 22px 24px;
   color: #fff;
-  max-width: 72%;
+  max-width: 68%;
 }
 
 .quote-ht-cover-badge {
   display: inline-block;
-  background: var(--quote-orange);
+  background: var(--quote-brand);
   color: #fff;
   font-size: 8px;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  padding: 4px 9px;
-  border-radius: 4px;
+  padding: 5px 11px;
+  border-radius: 6px;
   margin-bottom: 10px;
+  box-shadow: 0 6px 16px rgba(93, 95, 239, 0.45);
+}
+
+.quote-ht-cover-kicker {
+  margin: 0 0 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .quote-ht-cover-title {
-  margin: 0 0 6px;
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 1.2;
+  margin: 0 0 8px;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.15;
   letter-spacing: -0.02em;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
 }
 
 .quote-ht-cover-route {
-  margin: 0 0 12px;
+  margin: 0 0 14px;
   font-size: 12px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.88);
@@ -176,11 +243,10 @@
 .quote-ht-cover-chips span {
   font-size: 9px;
   font-weight: 700;
-  padding: 4px 9px;
+  padding: 5px 10px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.28);
-  backdrop-filter: blur(4px);
 }
 
 .quote-ht-cover-price {
@@ -189,12 +255,23 @@
   bottom: 18px;
   z-index: 2;
   background: #fff;
-  border-radius: 12px;
-  padding: 12px 16px;
-  min-width: 138px;
+  border-radius: 14px;
+  padding: 14px 18px;
+  min-width: 148px;
   text-align: center;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
-  border-top: 3px solid var(--quote-orange);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.32);
+  border: 1px solid rgba(93, 95, 239, 0.15);
+  overflow: hidden;
+}
+
+.quote-ht-cover-price::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--quote-brand), var(--quote-gold));
 }
 
 .quote-ht-cover-price .price-label {
@@ -202,25 +279,26 @@
   font-size: 8px;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.1em;
   color: var(--quote-muted);
-  margin-bottom: 2px;
+  margin-bottom: 3px;
 }
 
 .quote-ht-cover-price .price-value {
   display: block;
-  font-size: 22px;
+  font-size: 23px;
   font-weight: 900;
-  color: var(--quote-black);
+  color: var(--quote-ink);
   line-height: 1.1;
+  letter-spacing: -0.02em;
 }
 
 .quote-ht-cover-price .price-note {
   display: block;
-  font-size: 8px;
-  color: var(--quote-orange-deep);
+  font-size: 7.5px;
+  color: var(--quote-brand-deep);
   font-weight: 700;
-  margin-top: 3px;
+  margin-top: 4px;
 }
 
 /* ── Glance tiles ── */
@@ -230,7 +308,7 @@
   gap: 0;
   margin: 0;
   border-bottom: 1px solid var(--quote-border);
-  background: #fff;
+  background: linear-gradient(180deg, #fff 0%, var(--quote-brand-mist) 100%);
   page-break-inside: avoid;
   break-inside: avoid;
 }
@@ -238,8 +316,8 @@
 .quote-ht-glance-item {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 12px 14px;
+  gap: 10px;
+  padding: 14px 14px;
   border-right: 1px solid var(--quote-border);
   min-width: 0;
 }
@@ -249,17 +327,18 @@
 }
 
 .quote-ht-glance-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: var(--quote-orange-light);
-  color: var(--quote-orange-deep);
-  font-size: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--quote-brand-soft);
+  color: var(--quote-brand-deep);
+  font-size: 12px;
   font-weight: 900;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  border: 1px solid rgba(93, 95, 239, 0.18);
 }
 
 .quote-ht-glance-item .lbl {
@@ -267,15 +346,15 @@
   font-size: 8px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   color: var(--quote-muted);
 }
 
 .quote-ht-glance-item .val {
   display: block;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 800;
-  color: var(--quote-black);
+  color: var(--quote-ink);
   line-height: 1.25;
   word-break: break-word;
 }
@@ -284,35 +363,46 @@
 .quote-ht-highlights {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  padding: 12px 18px 4px;
+  gap: 10px;
+  padding: 14px 18px 2px;
   page-break-inside: avoid;
   break-inside: avoid;
 }
 
 .quote-ht-highlight-card {
   margin: 0;
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
   border: 1px solid var(--quote-border);
   background: var(--quote-gray-bg);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
 }
 
 .quote-ht-highlight-img {
   display: block;
   width: 100%;
-  height: 72px;
+  height: 84px;
   object-fit: cover;
 }
 
 .quote-ht-highlight-card figcaption {
-  padding: 5px 7px;
-  font-size: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  font-size: 8.5px;
   font-weight: 700;
   color: var(--quote-navy);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.quote-ht-highlight-num {
+  font-size: 8px;
+  font-weight: 800;
+  color: var(--quote-brand);
+  letter-spacing: 0.04em;
 }
 
 /* ── Sections ── */
@@ -327,10 +417,10 @@
 .quote-ht-section-title {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  margin-bottom: 10px;
-  padding-bottom: 8px;
-  border-bottom: 2px solid var(--quote-orange);
+  gap: 3px;
+  margin-bottom: 12px;
+  padding-bottom: 0;
+  border-bottom: none;
   page-break-after: avoid;
   break-after: avoid;
 }
@@ -338,16 +428,27 @@
 .quote-ht-section-eyebrow {
   font-size: 8px;
   font-weight: 800;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--quote-orange-deep);
+  color: var(--quote-brand-deep);
 }
 
 .quote-ht-section-heading {
-  font-size: 15px;
-  font-weight: 800;
-  color: var(--quote-black);
-  letter-spacing: -0.01em;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--quote-ink);
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+
+.quote-ht-section-rule {
+  display: block;
+  width: 42px;
+  height: 3px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--quote-brand), rgba(93, 95, 239, 0.15));
 }
 
 .quote-ht-section-content {
@@ -359,15 +460,19 @@
 }
 
 .quote-ht-section--flush .quote-ht-section-title {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 /* Welcome */
 .quote-ht-welcome {
   font-size: 11px;
   color: #475569;
-  line-height: 1.65;
-  padding: 2px 0;
+  line-height: 1.7;
+  padding: 14px 16px;
+  background: var(--quote-brand-mist);
+  border: 1px solid rgba(93, 95, 239, 0.12);
+  border-radius: var(--quote-radius);
+  border-left: 3px solid var(--quote-brand);
 }
 
 .quote-ht-welcome p {
@@ -377,13 +482,13 @@
 .quote-ht-welcome-contact {
   margin-top: 4px !important;
   padding-top: 10px;
-  border-top: 1px dashed var(--quote-border);
+  border-top: 1px dashed rgba(93, 95, 239, 0.25);
   font-size: 10px;
   color: var(--quote-muted);
 }
 
 .quote-ht-welcome-contact strong {
-  color: var(--quote-orange-deep);
+  color: var(--quote-brand-deep);
 }
 
 /* Snapshot grid */
@@ -395,11 +500,16 @@
   border: 1px solid var(--quote-border);
   border-radius: var(--quote-radius);
   overflow: hidden;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.03);
 }
 
 .quote-ht-snapshot-cell {
   background: #fff;
-  padding: 10px 12px;
+  padding: 11px 13px;
+}
+
+.quote-ht-snapshot-cell:nth-child(odd) {
+  background: linear-gradient(180deg, #fafbff 0%, #fff 100%);
 }
 
 .quote-ht-snapshot-cell .lbl {
@@ -407,16 +517,16 @@
   font-size: 8px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   color: var(--quote-muted);
-  margin-bottom: 2px;
+  margin-bottom: 3px;
 }
 
 .quote-ht-snapshot-cell .val {
   display: block;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
-  color: var(--quote-black);
+  color: var(--quote-ink);
   line-height: 1.35;
 }
 
@@ -431,31 +541,32 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--quote-border);
+  padding: 13px 14px;
+  border: 1px solid rgba(93, 95, 239, 0.18);
   border-radius: var(--quote-radius);
-  background: linear-gradient(90deg, var(--quote-orange-light) 0%, #fff 28%);
+  background: linear-gradient(90deg, var(--quote-brand-soft) 0%, #fff 32%);
 }
 
 .quote-ht-transport-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: var(--quote-orange);
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  background: linear-gradient(145deg, var(--quote-brand) 0%, var(--quote-brand-deep) 100%);
   color: #fff;
   font-size: 9px;
   font-weight: 900;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: 0 6px 14px rgba(93, 95, 239, 0.35);
 }
 
 .quote-ht-transport-name {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 800;
-  color: var(--quote-black);
+  color: var(--quote-ink);
 }
 
 .quote-ht-transport-meta {
@@ -474,7 +585,7 @@
 
 .quote-ht-timeline-item {
   display: grid;
-  grid-template-columns: 36px 1fr;
+  grid-template-columns: 38px 1fr;
   gap: 10px;
   page-break-inside: avoid;
   break-inside: avoid;
@@ -488,10 +599,10 @@
 }
 
 .quote-ht-timeline-dot {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  background: var(--quote-orange);
+  background: linear-gradient(145deg, var(--quote-brand) 0%, var(--quote-brand-deep) 100%);
   color: #fff;
   font-size: 10px;
   font-weight: 900;
@@ -499,7 +610,7 @@
   align-items: center;
   justify-content: center;
   z-index: 1;
-  box-shadow: 0 0 0 4px var(--quote-orange-light);
+  box-shadow: 0 0 0 4px var(--quote-brand-soft);
   flex-shrink: 0;
 }
 
@@ -507,7 +618,7 @@
   flex: 1;
   width: 2px;
   min-height: 24px;
-  background: linear-gradient(180deg, var(--quote-orange-soft), #e2e8f0);
+  background: linear-gradient(180deg, rgba(93, 95, 239, 0.55), #e2e8f0);
   margin: 4px 0 0;
 }
 
@@ -515,9 +626,9 @@
   border: 1px solid var(--quote-border);
   border-radius: var(--quote-radius);
   background: #fff;
-  padding: 12px 14px 12px;
+  padding: 13px 14px;
   margin-bottom: 14px;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
 }
 
 .quote-ht-timeline-item.is-last .quote-ht-timeline-card {
@@ -534,9 +645,9 @@
 
 .quote-ht-day-title {
   margin: 0;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 800;
-  color: var(--quote-black);
+  color: var(--quote-ink);
   line-height: 1.3;
 }
 
@@ -551,10 +662,10 @@
   flex-shrink: 0;
   font-size: 8.5px;
   font-weight: 800;
-  color: var(--quote-orange-deep);
-  background: var(--quote-orange-light);
-  border: 1px solid var(--quote-orange-soft);
-  padding: 5px 9px;
+  color: var(--quote-brand-deep);
+  background: var(--quote-brand-soft);
+  border: 1px solid rgba(93, 95, 239, 0.22);
+  padding: 5px 10px;
   border-radius: 999px;
   white-space: nowrap;
 }
@@ -562,7 +673,7 @@
 .quote-ht-day-body {
   font-size: 10.5px;
   color: #475569;
-  line-height: 1.6;
+  line-height: 1.65;
   margin-bottom: 8px;
 }
 
@@ -570,13 +681,14 @@
   font-size: 10px;
   color: #64748b;
   margin-bottom: 8px;
-  padding: 8px 10px;
+  padding: 9px 11px;
   background: var(--quote-gray-bg);
-  border-radius: 8px;
+  border-radius: 9px;
+  border: 1px solid var(--quote-border);
 }
 
 .quote-ht-day-extra strong {
-  color: var(--quote-black);
+  color: var(--quote-ink);
 }
 
 .quote-ht-day-note {
@@ -587,20 +699,21 @@
 /* ── Hotel voucher card ── */
 .quote-ht-stay-card {
   display: grid;
-  grid-template-columns: 128px 1fr;
+  grid-template-columns: 136px 1fr;
   gap: 0;
   border: 1px solid var(--quote-border);
-  border-radius: 10px;
+  border-radius: 11px;
   overflow: hidden;
   background: #fff;
   margin-top: 4px;
   page-break-inside: avoid;
   break-inside: avoid;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
 }
 
 .quote-ht-stay-photo {
   position: relative;
-  min-height: 110px;
+  min-height: 118px;
   background: var(--quote-navy);
 }
 
@@ -624,25 +737,25 @@
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  background: linear-gradient(135deg, #334155, #0f172a);
+  background: linear-gradient(135deg, #2a2f55, #0b1220);
 }
 
 .quote-ht-stay-photo-tag {
   position: absolute;
   left: 8px;
   bottom: 8px;
-  background: rgba(15, 23, 42, 0.78);
+  background: rgba(93, 95, 239, 0.92);
   color: #fff;
   font-size: 7.5px;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  padding: 3px 6px;
+  padding: 3px 7px;
   border-radius: 4px;
 }
 
 .quote-ht-stay-body {
-  padding: 10px 12px;
+  padding: 11px 13px;
   min-width: 0;
 }
 
@@ -650,16 +763,16 @@
   font-size: 8px;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--quote-orange-deep);
+  letter-spacing: 0.1em;
+  color: var(--quote-brand-deep);
   margin-bottom: 2px;
 }
 
 .quote-ht-stay-name {
   margin: 0;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 800;
-  color: var(--quote-black);
+  color: var(--quote-ink);
   line-height: 1.3;
 }
 
@@ -671,7 +784,7 @@
 }
 
 .quote-ht-stay-stars {
-  color: #f59e0b;
+  color: var(--quote-gold);
   font-size: 9px;
   letter-spacing: -1px;
 }
@@ -679,15 +792,15 @@
 .quote-ht-stay-rating-val {
   font-size: 9px;
   font-weight: 800;
-  color: var(--quote-black);
+  color: var(--quote-ink);
 }
 
 .quote-ht-stay-meta {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 6px;
-  margin-top: 8px;
-  padding-top: 8px;
+  margin-top: 9px;
+  padding-top: 9px;
   border-top: 1px solid var(--quote-border);
 }
 
@@ -705,7 +818,7 @@
   display: block;
   font-size: 9.5px;
   font-weight: 800;
-  color: var(--quote-black);
+  color: var(--quote-ink);
   line-height: 1.3;
   word-break: break-word;
 }
@@ -718,19 +831,19 @@
 }
 
 .quote-ht-inc-exc > div {
-  padding: 12px 14px;
+  padding: 13px 14px;
   border-radius: var(--quote-radius);
   border: 1px solid var(--quote-border);
 }
 
 .quote-ht-inc-exc .inc {
-  background: linear-gradient(180deg, #f0fdf4 0%, #fff 55%);
-  border-color: #bbf7d0;
+  background: linear-gradient(180deg, #ecfdf5 0%, #fff 60%);
+  border-color: #a7f3d0;
 }
 
 .quote-ht-inc-exc .exc {
-  background: linear-gradient(180deg, #fff7ed 0%, #fff 55%);
-  border-color: #fed7aa;
+  background: linear-gradient(180deg, #fef2f2 0%, #fff 60%);
+  border-color: #fecaca;
 }
 
 .quote-ht-inc-exc h4 {
@@ -744,7 +857,7 @@
 }
 
 .quote-ht-inc-exc .exc h4 {
-  color: #9a3412;
+  color: #991b1b;
 }
 
 .quote-ht-inc-exc ul {
@@ -773,23 +886,26 @@
   content: '✕';
   position: absolute;
   left: 0;
-  color: #ea580c;
+  color: #dc2626;
   font-weight: 900;
 }
 
 /* Fare strip */
 .quote-ht-fare {
-  margin: 18px;
+  margin: 20px 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 14px 18px;
-  border-radius: 12px;
-  background: linear-gradient(105deg, #0f172a 0%, #1e293b 55%, #9a3412 140%);
+  padding: 16px 20px;
+  border-radius: 14px;
+  background:
+    radial-gradient(ellipse at 90% 20%, rgba(201, 162, 39, 0.28), transparent 45%),
+    linear-gradient(110deg, #0b1220 0%, #1a1f3a 48%, #3d3fbf 120%);
   color: #fff;
   page-break-inside: avoid;
   break-inside: avoid;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.22);
 }
 
 .quote-ht-fare-label {
@@ -797,15 +913,15 @@
   font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.65);
   margin-bottom: 3px;
 }
 
 .quote-ht-fare-sub {
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .quote-ht-fare-right {
@@ -814,17 +930,18 @@
 
 .quote-ht-fare-amount {
   display: block;
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 900;
   color: #fff;
   line-height: 1.1;
+  letter-spacing: -0.02em;
 }
 
 .quote-ht-fare-note {
   display: block;
   font-size: 8px;
-  color: var(--quote-orange-soft);
-  margin-top: 3px;
+  color: #e8d48a;
+  margin-top: 4px;
   font-weight: 600;
 }
 
@@ -836,21 +953,21 @@
 }
 
 .quote-ht-policy {
-  border-bottom: 1px solid var(--quote-border);
-  padding-bottom: 6px;
+  border: 1px solid var(--quote-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
   page-break-inside: avoid;
   break-inside: avoid;
-}
-
-.quote-ht-policy:last-child {
-  border-bottom: none;
 }
 
 .quote-ht-policy-head {
   font-weight: 800;
   font-size: 10.5px;
-  color: var(--quote-black);
-  padding: 2px 0 4px;
+  color: var(--quote-ink);
+  padding: 0 0 5px;
+  border-bottom: 1px solid var(--quote-border);
+  margin-bottom: 6px;
 }
 
 .quote-ht-policy ul {
@@ -877,18 +994,18 @@
 .quote-ht-bank-table th,
 .quote-ht-bank-table td {
   border-bottom: 1px solid var(--quote-border);
-  padding: 7px 8px;
+  padding: 8px 8px;
   text-align: left;
 }
 
 .quote-ht-bank-table th {
-  background: var(--quote-gray-bg);
+  background: linear-gradient(180deg, var(--quote-brand-soft) 0%, #f7f8fc 100%);
   font-weight: 800;
   font-size: 7.5px;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--quote-muted);
-  border-bottom: 2px solid var(--quote-orange);
+  letter-spacing: 0.04em;
+  color: var(--quote-brand-deep);
+  border-bottom: 2px solid var(--quote-brand);
 }
 
 .quote-ht-bank-table tr:last-child td {
@@ -896,7 +1013,7 @@
 }
 
 .quote-ht-bank-table tr:nth-child(even) td {
-  background: #fafbfc;
+  background: #fafbff;
 }
 
 /* Planner */
@@ -911,26 +1028,28 @@
   border-radius: var(--quote-radius);
   border: 1px solid var(--quote-border);
   font-size: 10px;
+  background: #fff;
 }
 
+.quote-ht-planner-box--accent,
 .quote-ht-planner-box:first-child {
-  background: var(--quote-orange-light);
-  border-color: var(--quote-orange-soft);
+  background: linear-gradient(160deg, var(--quote-brand-soft) 0%, #fff 70%);
+  border-color: rgba(93, 95, 239, 0.28);
 }
 
 .quote-ht-planner-box h4 {
   margin: 0 0 6px;
   font-size: 8.5px;
-  color: var(--quote-orange-deep);
+  color: var(--quote-brand-deep);
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
 }
 
 .quote-ht-planner-name {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 800;
-  color: var(--quote-black);
+  color: var(--quote-ink);
   margin-bottom: 4px;
 }
 
@@ -943,35 +1062,62 @@
 /* Footer */
 .quote-ht-footer {
   margin-top: var(--quote-section-gap);
-  background: var(--quote-black);
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(93, 95, 239, 0.35), transparent 55%),
+    var(--quote-ink);
   color: rgba(255, 255, 255, 0.82);
-  padding: 18px 20px;
+  padding: 22px 20px 20px;
   font-size: 9.5px;
   text-align: center;
-  border-top: 3px solid var(--quote-orange);
+  border-top: none;
   page-break-inside: avoid;
   break-inside: avoid;
+  position: relative;
+}
+
+.quote-ht-footer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--quote-brand), var(--quote-gold), var(--quote-brand));
+}
+
+.quote-ht-footer-inner {
+  max-width: 420px;
+  margin: 0 auto;
 }
 
 .quote-ht-footer-logo {
-  height: 48px;
-  width: 48px;
+  height: 52px;
+  width: 52px;
   object-fit: cover;
   display: block;
-  margin: 0 auto 8px;
+  margin: 0 auto 10px;
   background: #000;
   border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
 }
 
 .quote-ht-footer-price {
   font-size: 11px;
-  margin: 0 0 6px !important;
+  margin: 0 0 8px !important;
   color: #fff;
 }
 
 .quote-ht-footer-price strong {
-  color: var(--quote-orange-bright);
-  font-size: 14px;
+  color: #f0d878;
+  font-size: 15px;
+}
+
+.quote-ht-footer-brand {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #fff;
+  margin: 0 0 4px !important;
 }
 
 .quote-ht-footer p {
@@ -979,11 +1125,12 @@
 }
 
 .quote-ht-footer-thanks {
-  margin-top: 8px !important;
-  opacity: 0.72;
+  margin-top: 10px !important;
+  opacity: 0.7;
+  font-style: italic;
 }
 
-/* Print — seamless page breaks (no cut cards / torn borders) */
+/* Print — seamless page breaks */
 @media print {
   .quote-pdf-preview-shell,
   .quote-pdf-preview-paper {
@@ -992,6 +1139,7 @@
     box-shadow: none;
     max-width: none;
     border-radius: 0;
+    background: #fff;
   }
 
   .quote-ht-pdf {
@@ -1009,7 +1157,6 @@
     margin-right: 0;
   }
 
-  /* Keep visual blocks whole so a page never tears through a card */
   .quote-ht-topbar,
   .quote-ht-cover,
   .quote-ht-glance,
@@ -1036,7 +1183,6 @@
     break-inside: avoid !important;
   }
 
-  /* Title never sits alone at page bottom */
   .quote-ht-section-title {
     page-break-after: avoid !important;
     break-after: avoid !important;
@@ -1047,13 +1193,11 @@
     break-before: avoid !important;
   }
 
-  /* Day head sticks with following body start */
   .quote-ht-day-head {
     page-break-after: avoid !important;
     break-after: avoid !important;
   }
 
-  /* If browser still splits a box, redraw border/bg on each fragment */
   .quote-ht-stay-card,
   .quote-ht-transport-card,
   .quote-ht-inc-exc > div,
@@ -1065,7 +1209,6 @@
     box-decoration-break: clone;
   }
 
-  /* Timeline connector cuts across pages — hide so join is invisible */
   .quote-ht-timeline-line {
     display: none !important;
   }
@@ -1074,10 +1217,6 @@
     margin-bottom: 12px;
   }
 
-  /*
-   * Itinerary prose can span pages. Remove card chrome on print so
-   * the page join is just white → white (no half-border / torn box).
-   */
   .quote-ht-timeline-card {
     margin-bottom: 0 !important;
     box-shadow: none !important;
@@ -1093,7 +1232,6 @@
     box-shadow: none !important;
   }
 
-  /* Soften edges on compact blocks */
   .quote-ht-stay-card,
   .quote-ht-transport-card,
   .quote-ht-inc-exc > div,
@@ -1121,7 +1259,9 @@
   .quote-ht-glance-icon,
   .quote-ht-footer,
   .quote-ht-inc-exc .inc,
-  .quote-ht-inc-exc .exc {
+  .quote-ht-inc-exc .exc,
+  .quote-ht-topbar,
+  .quote-ht-welcome {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -1148,15 +1288,24 @@
     grid-template-columns: 1fr 1fr;
   }
 
+  .quote-ht-cover {
+    height: auto;
+    min-height: 300px;
+  }
+
   .quote-ht-cover-content {
     max-width: 100%;
-    padding-bottom: 88px;
+    padding-bottom: 100px;
   }
 
   .quote-ht-cover-price {
     left: 14px;
     right: 14px;
     bottom: 12px;
+  }
+
+  .quote-ht-cover-title {
+    font-size: 22px;
   }
 
   .quote-ht-stay-card {

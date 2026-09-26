@@ -56,7 +56,7 @@ export default function ExecutiveInsightCard() {
   const maxQueries = Math.max(...visible.map((r) => Number(r.queries || 0)), 1);
 
   return (
-    <div className="flex h-full min-h-[420px] flex-col overflow-hidden rounded-[24px] bg-white shadow-sm ring-1 ring-slate-100">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[24px] bg-white shadow-sm ring-1 ring-slate-100">
       <div className="border-b border-slate-100 bg-gradient-to-r from-violet-50/80 via-white to-emerald-50/50 px-5 py-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -108,7 +108,7 @@ export default function ExecutiveInsightCard() {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto px-2 py-2">
+      <div className="min-h-0 flex-1 overflow-hidden px-2 py-2">
         {isLoading && !visible.length ? (
           <div className="space-y-2 p-3">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -120,7 +120,7 @@ export default function ExecutiveInsightCard() {
             No executive leads in this period
           </p>
         ) : (
-          <ul className="space-y-1.5 p-2">
+          <ul className="max-h-[22.5rem] space-y-1.5 overflow-y-auto overscroll-contain p-2 pr-1 scrollbar-thin">
             {visible.map((row, index) => {
               const queries = Number(row.queries || 0);
               const width = Math.max(8, (queries / maxQueries) * 100);

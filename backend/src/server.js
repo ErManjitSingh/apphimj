@@ -17,6 +17,7 @@ const { purgeOldActivityLogs } = require('./services/activityService');
 const { startEmailInboxPoller } = require('./services/emailInboxService');
 const { archiveOldTrips } = require('./services/operationsArchiveService');
 const { validateEnvOnBoot: validateFacebookEnv } = require('./services/facebookLeadWebhookService');
+const { startFacebookLeadPoller } = require('./services/facebookLeadPollerService');
 const channels = require('./config/channels');
 const {
   reconcileSessions,
@@ -118,6 +119,7 @@ async function start() {
     if (channels.facebook) {
       console.log('[API] Facebook webhook: /api/facebook/webhook');
       validateFacebookEnv();
+      startFacebookLeadPoller();
     } else {
       console.log('[API] Meta lead webhook disconnected');
     }

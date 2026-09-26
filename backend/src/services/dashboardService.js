@@ -1461,19 +1461,15 @@ async function buildExecutiveDashboard(userId, options = {}) {
   };
 
   // All-time keeps live pipeline counts; date filters scope activity to the range.
-  // Total / myLeads = active assigned only (exclude lost + converted + repeated).
-  const activeLeadScope = isAllTime
+  // Total / myLeads = every lead assigned to this executive (not deleted).
+  const myLeadsScope = isAllTime
     ? {
         ...leadScope,
         isDeleted: { $ne: true },
-        isRepeatCustomer: { $ne: true },
-        status: { $nin: ['lost', 'booked_from_another_company', 'converted', 'booked'] },
       }
     : {
         ...leadScope,
         isDeleted: { $ne: true },
-        isRepeatCustomer: { $ne: true },
-        status: { $nin: ['lost', 'booked_from_another_company', 'converted', 'booked'] },
         ...periodTouch,
       };
   const freshLeadScope = isAllTime
@@ -1594,7 +1590,7 @@ async function buildExecutiveDashboard(userId, options = {}) {
     coldCallRemindersRaw,
     destinationWise,
   ] = await Promise.all([
-    Lead.countDocuments(activeLeadScope),
+    Lead.countDocuments(myLeadsScope),
     Lead.countDocuments(freshLeadScope),
     Lead.countDocuments(connectedScope),
     FollowUp.countDocuments(followPendingScope),
@@ -1624,7 +1620,7 @@ async function buildExecutiveDashboard(userId, options = {}) {
     ]),
     Lead.aggregate([
       {
-        $match: activeLeadScope,
+        $match: myLeadsScope,
       },
       { $group: { _id: null, total: { $sum: { $ifNull: ['$budget', 0] } } } },
     ]),
@@ -1648,7 +1644,7 @@ async function buildExecutiveDashboard(userId, options = {}) {
     ]),
     Lead.countDocuments({
       ...leadScope,
-      status: { $nin: ['lost', 'booked_from_another_company'] },
+      isDeleted: { $ne: true },
       ...prevTouch,
     }),
     FollowUp.countDocuments({

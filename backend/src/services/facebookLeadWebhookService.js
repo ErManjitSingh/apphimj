@@ -405,8 +405,8 @@ function mapLeadFields(graphLead = {}, meta = {}) {
       .map(([k, v]) => `${k}: ${v}`),
   ].filter(Boolean);
 
-  // Campaign stays on landingPage; CRM source badge is Portal Lead
-  const sourceLabel = 'Portal Lead';
+  // Campaign stays on landingPage; CRM source badge is always Website 2 for Meta ads
+  const sourceLabel = 'Website 2';
 
   return {
     name,
@@ -420,9 +420,9 @@ function mapLeadFields(graphLead = {}, meta = {}) {
     notes: noteLines.join('\n'),
     landingPage: campaignLabel || formName || undefined,
     channel: 'facebook',
-    source: 'portal_lead',
+    source: 'website_2',
     sourceLabel,
-    sourceKey: 'portal_lead',
+    sourceKey: 'website_2',
     captureType: 'facebook_lead_ads',
     externalLeadSource: 'facebook_leadgen',
     externalLeadId: String(graphLead.id || meta.leadgenId || ''),

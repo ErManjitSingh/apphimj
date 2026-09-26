@@ -25,7 +25,6 @@ import LeadEmailHistory from '../components/email/LeadEmailHistory';
 import AddFollowUpModal from '../components/followups/AddFollowUpModal';
 import { createExecutiveFollowUp, buildFollowUpPayload } from '../components/followups/followupApi';
 import MobileLeadDetailSummary from '../components/lead-detail/MobileLeadDetailSummary';
-import LeadPipelineUpdateModal from '../components/leads/LeadPipelineUpdateModal';
 import { toast } from '../context/ToastContext';
 
 export default function LeadDetail() {
@@ -40,9 +39,7 @@ export default function LeadDetail() {
   const canCreateFollowUp = canManageFollowUps(user);
   const canEditLead = can('leads', 'edit');
 
-  const [followUpModalOpen, setFollowUpModalOpen] = useState(false);
-  const [pipelineModalOpen, setPipelineModalOpen] = useState(false);
-  const [pipelineSaving, setPipelineSaving] = useState(false);
+  const [outcomeModalOpen, setOutcomeModalOpen] = useState(false);
   const [reactivationMode, setReactivationMode] = useState('');
   const [reactivationExecs, setReactivationExecs] = useState([]);
   const [callNoteOpen, setCallNoteOpen] = useState(false);
@@ -181,8 +178,12 @@ export default function LeadDetail() {
             ? () => navigate(`/quotations/new?leadId=${id}`)
             : undefined
         }
-        onScheduleFollowUp={canCreateFollowUp ? () => setFollowUpModalOpen(true) : undefined}
-        onChangeStatus={canEditLead ? () => setPipelineModalOpen(true) : undefined}
+        onScheduleFollowUp={
+          canCreateFollowUp || canEditLead ? () => setOutcomeModalOpen(true) : undefined
+        }
+        onChangeStatus={
+          canEditLead || canCreateFollowUp ? () => setOutcomeModalOpen(true) : undefined
+        }
         onContactLogged={refreshLead}
         onEmailSent={refreshLead}
         onLogCallNote={() => setCallNoteOpen(true)}
@@ -214,35 +215,42 @@ export default function LeadDetail() {
       ) : null}
       {assignConfirmDialog}
 
-      {canCreateFollowUp && followUpModalOpen ? (
+      {(canCreateFollowUp || canEditLead) && outcomeModalOpen ? (
         <AddFollowUpModal
-          open={followUpModalOpen}
-          onClose={() => setFollowUpModalOpen(false)}
+          open={outcomeModalOpen}
+          onClose={() => setOutcomeModalOpen(false)}
           fixedLeadId={lead._id}
           fixedLeadName={lead.name}
-          onSubmit={async (data) => {
-            await createExecutiveFollowUp(buildFollowUpPayload({ ...data, lead: lead._id }));
-            setFollowUpModalOpen(false);
-            refreshLead();
-          }}
-        />
-      ) : null}
-
-      {pipelineModalOpen ? (
-        <LeadPipelineUpdateModal
-          open={pipelineModalOpen}
-          onClose={() => setPipelineModalOpen(false)}
           lead={lead}
-          saving={pipelineSaving}
-          onSave={async (payload) => {
-            setPipelineSaving(true);
-            try {
-              await API.put(`/leads/${id}`, payload);
-              toast.success('Lead updated');
-              refreshLead();
-            } finally {
-              setPipelineSaving(false);
+          showLeadOutcome={Boolean(canEditLead)}
+          onSubmit={async (data) => {
+            const { statusUpdate, skipFollowUp, ...followUpData } = data;
+            const isLostClose =
+              skipFollowUp || ['lost', 'booked_from_another_company'].includes(statusUpdate?.status);
+            if (canCreateFollowUp && !isLostClose) {
+              await createExecutiveFollowUp(
+                buildFollowUpPayload({
+                  ...followUpData,
+                  lead: lead._id,
+                  statusReason:
+                    statusUpdate?.statusReason ||
+                    followUpData.outcome ||
+                    followUpData.callOutcome ||
+                    followUpData.lostReason,
+                })
+              );
             }
+            if (statusUpdate && canEditLead) {
+              try {
+                await API.put(`/leads/${id}`, statusUpdate);
+                toast.success(isLostClose ? 'Lead marked as lost' : 'Lead updated');
+              } catch (err) {
+                const msg = err.response?.data?.message || err.message || 'Status could not be updated';
+                toast.error(canCreateFollowUp && !isLostClose ? `Follow-up saved. ${msg}` : msg);
+              }
+            }
+            setOutcomeModalOpen(false);
+            refreshLead();
           }}
         />
       ) : null}

@@ -194,16 +194,26 @@ export default function LeaderTeamLeadsPage() {
               <RefreshCw className="w-3 h-3 mr-0.5" /> Reactivate
             </Button>
           )}
-          {row.original.assignmentAcceptance === 'expired' && !row.original.assignedTo && (
+          {row.original.assignedTo?.name ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 px-2.5 text-[11px] max-w-[120px]"
+              onClick={() => openAssign(row.original)}
+              title={`${row.original.assignedTo.name} — click to change`}
+            >
+              <span className="truncate">{row.original.assignedTo.name}</span>
+            </Button>
+          ) : !reactivate.isLost(row.original) ? (
             <Button
               size="sm"
               variant="gradient"
               className="h-8 px-2.5 text-[11px]"
               onClick={() => openAssign(row.original)}
             >
-              <UserPlus className="w-3 h-3 mr-0.5" /> Reassign
+              <UserPlus className="w-3 h-3 mr-0.5" /> Assign
             </Button>
-          )}
+          ) : null}
         <DropdownMenuRoot>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="h-8 w-8 p-0"><MoreHorizontal className="w-4 h-4" /></Button>
@@ -234,7 +244,7 @@ export default function LeaderTeamLeadsPage() {
             ) : (
               <DropdownMenuItem onClick={() => openAssign(row.original)} className="flex items-center gap-2 cursor-pointer">
                 <UserPlus className="w-4 h-4" />
-                {row.original.assignmentAcceptance === 'expired' ? 'Reassign Lead' : 'Assign to Executive'}
+                {row.original.assignedTo ? 'Reassign' : 'Assign to Executive'}
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>

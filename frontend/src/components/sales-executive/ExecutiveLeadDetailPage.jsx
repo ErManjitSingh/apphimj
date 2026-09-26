@@ -8,9 +8,7 @@ import { Button } from '../ui/button';
 import { LeadDetailLayout } from '../lead-detail';
 import AddFollowUpModal from '../followups/AddFollowUpModal';
 import { createExecutiveFollowUp, buildFollowUpPayload } from '../followups/followupApi';
-import { isLeadStatusLocked } from '../../utils/leadUtils';
 import PostConvertCommercialModal from '../leads/PostConvertCommercialModal';
-import LeadPipelineUpdateModal from '../leads/LeadPipelineUpdateModal';
 
 export default function ExecutiveLeadDetailPage() {
   const { id } = useParams();
@@ -20,9 +18,7 @@ export default function ExecutiveLeadDetailPage() {
   const [loading, setLoading] = useState(true);
   const [flashMessage, setFlashMessage] = useState(location.state?.message || '');
   const [highlightQuotationId] = useState(location.state?.quotationId || null);
-  const [followUpModalOpen, setFollowUpModalOpen] = useState(false);
-  const [pipelineModalOpen, setPipelineModalOpen] = useState(false);
-  const [pipelineSaving, setPipelineSaving] = useState(false);
+  const [outcomeModalOpen, setOutcomeModalOpen] = useState(false);
   const [markingCallDone, setMarkingCallDone] = useState(false);
   const [commercialOpen, setCommercialOpen] = useState(false);
 
@@ -96,23 +92,26 @@ export default function ExecutiveLeadDetailPage() {
   };
 
   const saveFollowUp = async (data) => {
-    const { statusUpdate, leadOutcome, ...followUpData } = data;
+    const { statusUpdate, leadOutcome, skipFollowUp, ...followUpData } = data;
     void leadOutcome;
     const becameConverted = statusUpdate?.status === 'converted';
+    const isLostClose = skipFollowUp || ['lost', 'booked_from_another_company'].includes(statusUpdate?.status);
 
-    await createExecutiveFollowUp(
-      buildFollowUpPayload({
-        ...followUpData,
-        lead: lead._id,
-        statusReason:
-          statusUpdate?.statusReason ||
-          followUpData.outcome ||
-          followUpData.pickedOutcome ||
-          followUpData.notPickedReason ||
-          followUpData.coldReason ||
-          followUpData.lostReason,
-      })
-    );
+    if (!isLostClose) {
+      await createExecutiveFollowUp(
+        buildFollowUpPayload({
+          ...followUpData,
+          lead: lead._id,
+          statusReason:
+            statusUpdate?.statusReason ||
+            followUpData.outcome ||
+            followUpData.pickedOutcome ||
+            followUpData.notPickedReason ||
+            followUpData.coldReason ||
+            followUpData.lostReason,
+        })
+      );
+    }
 
     if (statusUpdate) {
       try {
@@ -125,11 +124,11 @@ export default function ExecutiveLeadDetailPage() {
         });
       } catch (err) {
         const msg = err.response?.data?.message || err.message || 'Lead status could not be updated';
-        toast.error(`Follow-up saved. ${msg}`);
+        toast.error(isLostClose ? msg : `Follow-up saved. ${msg}`);
       }
     }
 
-    setFollowUpModalOpen(false);
+    setOutcomeModalOpen(false);
     await loadLead();
     if (becameConverted) setCommercialOpen(true);
   };
@@ -180,41 +179,23 @@ export default function ExecutiveLeadDetailPage() {
         flashMessage={flashMessage}
         highlightQuotationId={highlightQuotationId}
         onCreateQuote={() => navigate(`/sales-executive/quotations/new?leadId=${id}`)}
-        onScheduleFollowUp={() => setFollowUpModalOpen(true)}
-        onChangeStatus={() => setPipelineModalOpen(true)}
+        onScheduleFollowUp={() => setOutcomeModalOpen(true)}
+        onChangeStatus={() => setOutcomeModalOpen(true)}
         onContactLogged={loadLead}
         onEmailSent={loadLead}
+        canCreateFollowUp
         canEditLead
         editHref={`/sales-executive/leads/${id}/edit`}
       />
 
-      {pipelineModalOpen ? (
-        <LeadPipelineUpdateModal
-          open={pipelineModalOpen}
-          onClose={() => setPipelineModalOpen(false)}
-          lead={lead}
-          saving={pipelineSaving}
-          onSave={async (payload) => {
-            setPipelineSaving(true);
-            try {
-              await API.put(`/sales-executive/leads/${id}`, payload);
-              toast.success('Lead updated');
-              await loadLead({ silent: true });
-            } finally {
-              setPipelineSaving(false);
-            }
-          }}
-        />
-      ) : null}
-
-      {followUpModalOpen ? (
+      {outcomeModalOpen ? (
         <AddFollowUpModal
-          open={followUpModalOpen}
-          onClose={() => setFollowUpModalOpen(false)}
+          open={outcomeModalOpen}
+          onClose={() => setOutcomeModalOpen(false)}
           fixedLeadId={lead._id}
           fixedLeadName={lead.name}
           lead={lead}
-          showLeadOutcome={!isLeadStatusLocked(lead.status)}
+          showLeadOutcome
           onSubmit={saveFollowUp}
         />
       ) : null}

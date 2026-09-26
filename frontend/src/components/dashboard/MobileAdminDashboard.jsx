@@ -628,8 +628,8 @@ export default function MobileAdminDashboard({
                 View All
               </Link>
             </div>
-            <div className="space-y-2">
-              {executives.slice(0, 3).map((executive, index) => (
+            <div className="max-h-[16.25rem] space-y-2 overflow-y-auto overscroll-contain pr-0.5 scrollbar-thin">
+              {executives.map((executive, index) => (
                 <div
                   key={executive._id || executive.name}
                   className="flex items-center gap-1.5"
@@ -707,8 +707,8 @@ export default function MobileAdminDashboard({
                   <span className="text-[6px] text-slate-400">Total</span>
                 </div>
               </div>
-              <div className="min-w-0 flex-1 space-y-1">
-                {sources.slice(0, 4).map((source, index) => (
+              <div className="max-h-[8.5rem] min-w-0 flex-1 space-y-1 overflow-y-auto overscroll-contain scrollbar-thin">
+                {sources.map((source, index) => (
                   <div
                     key={source.key || source.name}
                     className="flex items-center gap-1 text-[7px]"
@@ -749,8 +749,8 @@ export default function MobileAdminDashboard({
               View All
             </Link>
           </div>
-          <div className="divide-y divide-slate-100">
-            {recentLeads.slice(0, 5).map((lead, index) => (
+          <div className="max-h-[17.5rem] divide-y divide-slate-100 overflow-y-auto overscroll-contain scrollbar-thin">
+            {recentLeads.map((lead, index) => (
               <Link
                 key={lead._id}
                 to={`/leads/${lead._id}`}
