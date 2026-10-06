@@ -26,6 +26,11 @@ import {
   isLikelyMongoId,
 } from '../../lib/localHotelCatalog';
 import {
+  enrichHotelsWithSelectionMeta,
+  recordHotelSelection,
+  sortHotelsByRecent,
+} from '../../lib/recentHotelSelections';
+import {
   ensureMealPlanOptions,
   mealPlanNightlyRate,
   normalizeMealPlanKey,
@@ -128,13 +133,21 @@ function formatRelativePrice(amount, basePrice, { isCurrent = false } = {}) {
 }
 
 function hotelBadge(option, index) {
+  if (option.isPopular) return BADGE_STYLES[1];
   if (option.isDefault) return BADGE_STYLES[0];
   if (Number(option.starRating) >= 5) return BADGE_STYLES[2];
   if (Number(option.starRating) >= 4) return BADGE_STYLES[1];
   return BADGE_STYLES[(index % 2) + 1];
 }
 
-function HotelStepHeader({ step, onClose, title, lockHotel = false }) {
+function HotelStepHeader({
+  step,
+  onClose,
+  title,
+  lockHotel = false,
+  hotelSeason = 'onSeason',
+  onHotelSeasonChange,
+}) {
   const steps = lockHotel ? HOTEL_STEPS.filter((s) => s.key !== 'hotel') : HOTEL_STEPS;
   const idx = steps.findIndex((s) => s.key === step);
   return (
@@ -154,7 +167,44 @@ function HotelStepHeader({ step, onClose, title, lockHotel = false }) {
         </button>
       </div>
 
-      <div className="px-5 pb-4">
+      <div className="px-5 pb-3">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-200 bg-violet-50/80 px-3 py-2">
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-violet-600">
+              Rate season
+            </p>
+            <p className="text-[11px] text-slate-600">
+              Applies to all hotels in this quotation
+            </p>
+          </div>
+          <div className="inline-flex rounded-xl border border-violet-200 bg-white p-0.5 shadow-sm">
+            <button
+              type="button"
+              onClick={() => onHotelSeasonChange?.('onSeason')}
+              className={cn(
+                'h-8 rounded-[10px] px-3 text-[11px] font-bold transition-colors',
+                hotelSeason !== 'offSeason'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-50'
+              )}
+            >
+              On Season
+            </button>
+            <button
+              type="button"
+              onClick={() => onHotelSeasonChange?.('offSeason')}
+              className={cn(
+                'h-8 rounded-[10px] px-3 text-[11px] font-bold transition-colors',
+                hotelSeason === 'offSeason'
+                  ? 'bg-amber-500 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-50'
+              )}
+            >
+              Off Season
+            </button>
+          </div>
+        </div>
+
         <div className={cn('grid gap-2', lockHotel ? 'grid-cols-2' : 'grid-cols-3')}>
           {steps.map((s, i) => {
             const active = s.key === step;
@@ -319,7 +369,14 @@ function HotelListRow({ option, selected, loading, onSelect, showDay, index, bas
 
         <div className="flex-1 min-w-0 p-3.5 sm:p-4 flex flex-col sm:flex-row gap-3 sm:items-center">
           <div className="min-w-0 flex-1 space-y-1.5">
-            <p className="text-[15px] font-bold text-slate-900 leading-snug">{option.name}</p>
+            <p className="text-[15px] font-bold text-slate-900 leading-snug inline-flex items-center gap-2 flex-wrap">
+              <span>{option.name}</span>
+              {option.isPopular && (
+                <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded-md bg-sky-500/10 text-sky-700">
+                  Popular
+                </span>
+              )}
+            </p>
             <p className="text-xs text-slate-500 inline-flex items-center gap-1 min-w-0">
               <MapPin className="w-3 h-3 shrink-0 text-violet-400" />
               <span className="truncate">
@@ -424,13 +481,19 @@ function HotelListRow({ option, selected, loading, onSelect, showDay, index, bas
   );
 }
 
-function RoomListRow({ room, hotel, selected, onSelect, basePrice = 0, defaultMealPlanKey = 'map' }) {
+function RoomListRow({ room, hotel, selected, onSelect, basePrice = 0, defaultMealPlanKey = 'map', hotelSeason = 'onSeason' }) {
   const image = room.images?.[0] || hotel?.thumbnailUrl || hotel?.images?.[0] || hotel?.image;
   const preferred = pickPreferredMealPlan(ensureMealPlanOptions(room), room, defaultMealPlanKey);
-  const price = mealPlanNightlyRate(preferred, room) || Number(room.pricePerNight || room.epPrice || 0);
+  const seasonKey = hotelSeason === 'offSeason' ? 'offSeason' : 'onSeason';
+  const price = mealPlanNightlyRate(preferred, room, seasonKey) || Number(room.pricePerNight || room.epPrice || 0);
   const rel = formatRelativePrice(price, basePrice, { isCurrent: false });
   const mealKey = normalizeMealPlanKey(preferred?.key || defaultMealPlanKey) || 'map';
   const extraBed = resolveExtraBedNightRate(room, mealKey);
+  const seasonLabel = seasonKey === 'offSeason' ? 'Off Season Price' : 'On Season Price';
+  const seasonClass =
+    seasonKey === 'offSeason'
+      ? 'rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800'
+      : 'rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800';
 
   return (
     <button
@@ -466,17 +529,14 @@ function RoomListRow({ room, hotel, selected, onSelect, basePrice = 0, defaultMe
                 <Users className="w-3 h-3" /> Max {room.maxOccupancy}
               </span>
             )}
-            <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
-              {mealKey.toUpperCase()} default
-            </span>
-            {room.rates?.ep > 0 && (
-              <span className="rounded-md bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">
-                EP {formatINR(room.rates.ep)}
+            {price > 0 && (
+              <span className={seasonClass}>
+                {seasonLabel} {formatINR(price)}
               </span>
             )}
             {extraBed > 0 && (
-              <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
-                Mattress {formatINR(extraBed)}/n
+              <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-800">
+                Extra Mattress {formatINR(extraBed)}/n
               </span>
             )}
           </div>
@@ -500,12 +560,18 @@ function RoomListRow({ room, hotel, selected, onSelect, basePrice = 0, defaultMe
   );
 }
 
-function MealPlanCard({ plan, room, nights, onSelect, basePrice = 0, selected = false }) {
-  const perNight = mealPlanNightlyRate(plan, room);
+function MealPlanCard({ plan, room, nights, onSelect, basePrice = 0, selected = false, hotelSeason = 'onSeason' }) {
+  const seasonKey = hotelSeason === 'offSeason' ? 'offSeason' : 'onSeason';
+  const perNight = mealPlanNightlyRate(plan, room, seasonKey);
   const extraBed = resolveExtraBedNightRate(room, plan?.key || plan?.label);
   const total = perNight * Math.max(1, nights);
   const rel = formatRelativePrice(perNight, basePrice, { isCurrent: false });
   const hasSupplement = Number(plan.price || 0) > 0;
+  const seasonLabel = seasonKey === 'offSeason' ? 'Off Season Price' : 'On Season Price';
+  const seasonClass =
+    seasonKey === 'offSeason'
+      ? 'rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800'
+      : 'rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800';
 
   return (
     <button
@@ -527,8 +593,19 @@ function MealPlanCard({ plan, room, nights, onSelect, basePrice = 0, selected = 
               : Number(plan.absolutePrice || 0) > 0
                 ? 'Room only rate'
                 : 'No meal supplement'}
-            {extraBed > 0 ? ` · Extra mattress ${formatINR(extraBed)}/night` : ''}
           </p>
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {perNight > 0 && (
+              <span className={seasonClass}>
+                {seasonLabel} {formatINR(perNight)}
+              </span>
+            )}
+            {extraBed > 0 && (
+              <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-800">
+                Extra Mattress {formatINR(extraBed)}/n
+              </span>
+            )}
+          </div>
         </div>
         {selected ? (
           <Check className="w-4 h-4 text-violet-600 shrink-0" />
@@ -665,6 +742,9 @@ export default function PackageResourcePickerDrawer({
   nights = 1,
   destination = '',
   basePrice = 0,
+  /** Active hotel rate season for this quotation — onSeason | offSeason */
+  hotelSeason = 'onSeason',
+  onHotelSeasonChange,
   /** Package API meal for this day (map/ep/…). Defaults picker + costing baseline. */
   defaultMealPlanKey = 'map',
   checkIn = '',
@@ -677,6 +757,7 @@ export default function PackageResourcePickerDrawer({
   lead = null,
   pkg = null,
 }) {
+  const seasonKey = hotelSeason === 'offSeason' ? 'offSeason' : 'onSeason';
   const [query, setQuery] = useState('');
   const [starFilter, setStarFilter] = useState(0); // 0 = all, 1-5 = star rating
   const [step, setStep] = useState(lockHotel || initialHotel ? 'room' : 'hotel');
@@ -688,6 +769,7 @@ export default function PackageResourcePickerDrawer({
   const [detailError, setDetailError] = useState('');
   const [localCatalogOptions, setLocalCatalogOptions] = useState([]);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
+  const [selectionTick, setSelectionTick] = useState(0);
   const isCab = mode === 'cab';
   const stayNights = Math.max(1, Number(nights) || 1);
   const locationLabel = resolveCity(options[0], destination) || destination || 'Destination';
@@ -757,7 +839,7 @@ export default function PackageResourcePickerDrawer({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return catalogOptions.filter((opt) => {
+    const matched = catalogOptions.filter((opt) => {
       if (starFilter > 0) {
         const stars = Number(opt.starRating || opt.starCategory || 0);
         if (Math.round(stars) !== starFilter) return false;
@@ -769,7 +851,11 @@ export default function PackageResourcePickerDrawer({
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [catalogOptions, query, starFilter]);
+    if (isCab) return matched;
+    return enrichHotelsWithSelectionMeta(sortHotelsByRecent(matched));
+    // selectionTick refreshes Popular / order after a pick
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalogOptions, query, starFilter, isCab, selectionTick]);
 
   const rooms = (hotelDetail?.rooms?.length
     ? hotelDetail.rooms
@@ -793,7 +879,7 @@ export default function PackageResourcePickerDrawer({
 
   const selectedMealNightly =
     selectedRoom && resolvedMealPlan
-      ? mealPlanNightlyRate(resolvedMealPlan, selectedRoom)
+      ? mealPlanNightlyRate(resolvedMealPlan, selectedRoom, seasonKey)
       : 0;
 
   const packageMealOnRoom = selectedRoom
@@ -801,7 +887,7 @@ export default function PackageResourcePickerDrawer({
     : null;
   const packageMealNightly =
     selectedRoom && packageMealOnRoom
-      ? mealPlanNightlyRate(packageMealOnRoom, selectedRoom)
+      ? mealPlanNightlyRate(packageMealOnRoom, selectedRoom, seasonKey)
       : 0;
   // Compare meal cards vs package-included meal rate (MAP), not EP / stale base.
   const mealCompareBase =
@@ -818,7 +904,11 @@ export default function PackageResourcePickerDrawer({
     onClose?.();
   };
 
-  const selectHotelOption = async (option) => {
+  const selectHotelOption = async (option, { record = true } = {}) => {
+    if (record) {
+      recordHotelSelection(option);
+      setSelectionTick((n) => n + 1);
+    }
     setPackageHotel(option);
     setSelectedRoom(null);
     setSelectedMealPlan(null);
@@ -866,7 +956,7 @@ export default function PackageResourcePickerDrawer({
     if (!open || isCab || !initialHotel) return;
     const key = initialHotel.id || initialHotel.hotelId || initialHotel.name;
     if (!key) return;
-    selectHotelOption(initialHotel);
+    selectHotelOption(initialHotel, { record: false });
     // Only when drawer opens / hotel identity changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -884,9 +974,9 @@ export default function PackageResourcePickerDrawer({
     const plans = ensureMealPlanOptions(room);
     // Always apply the priced list entry (never a zero/EP stub with same key).
     const applied = resolveSelectedMealPlan(plan, plans, room, packageMealKey) || plan;
-    const absolutePerNight = mealPlanNightlyRate(applied, room);
+    const absolutePerNight = mealPlanNightlyRate(applied, room, seasonKey);
     const packageMealPlan = pickPreferredMealPlan(plans, room, packageMealKey);
-    const packageMealAbs = mealPlanNightlyRate(packageMealPlan, room);
+    const packageMealAbs = mealPlanNightlyRate(packageMealPlan, room, seasonKey);
     const hotelDelta =
       Number(packageHotel.priceDelta ?? packageHotel.upgrade_price ?? packageHotel.perNight ?? 0) || 0;
     const mealDelta =
@@ -1064,6 +1154,8 @@ export default function PackageResourcePickerDrawer({
             onClose={resetClose}
             title={title || 'Change Hotel'}
             lockHotel={hotelLocked}
+            hotelSeason={hotelSeason}
+            onHotelSeasonChange={onHotelSeasonChange}
           />
 
           <div className="flex-1 min-h-0 overflow-y-auto bg-[#F7F6FB]">
@@ -1214,6 +1306,7 @@ export default function PackageResourcePickerDrawer({
                           onSelect={selectRoom}
                           basePrice={basePrice}
                           defaultMealPlanKey={packageMealKey}
+                          hotelSeason={hotelSeason}
                         />
                       ))}
                     </div>
@@ -1288,6 +1381,7 @@ export default function PackageResourcePickerDrawer({
                           selectMealPlan(priced || nextPlan);
                         }}
                         basePrice={mealCompareBase}
+                        hotelSeason={hotelSeason}
                       />
                     ))}
                   </div>

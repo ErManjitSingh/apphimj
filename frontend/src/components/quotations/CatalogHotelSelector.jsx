@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   BedDouble,
@@ -25,6 +25,11 @@ import {
   mapLocalHotelToCatalogOption,
   mapLocalHotelToCatalogDetail,
 } from '../../lib/localHotelCatalog';
+import {
+  enrichHotelsWithSelectionMeta,
+  recordHotelSelection,
+  sortHotelsByRecent,
+} from '../../lib/recentHotelSelections';
 import { cn } from '../../lib/utils';
 
 const SUB_STEPS = [
@@ -139,6 +144,11 @@ function HotelListRow({ hotel, selected, disabled, onSelect }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <p className="font-semibold text-sm line-clamp-1">{hotel.name}</p>
+          {hotel.isPopular && (
+            <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded-md bg-sky-500/10 text-sky-700">
+              Popular
+            </span>
+          )}
           {stars > 0 && (
             <span className="text-[10px] font-semibold text-amber-700 bg-amber-500/10 px-1.5 py-0.5 rounded-md">
               {stars}★
@@ -274,9 +284,26 @@ function RoomCard({ room, hotel, selected, onSelect }) {
               })}
             </div>
           )}
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {(Number(room.rates?.onSeason?.map || room.rates?.map || 0) > 0) && (
+              <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
+                On Season Price {formatINR(Number(room.rates?.onSeason?.map || room.rates?.map || 0))}
+              </span>
+            )}
+            {(Number(room.rates?.offSeason?.map || 0) > 0) && (
+              <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                Off Season Price {formatINR(Number(room.rates?.offSeason?.map || 0))}
+              </span>
+            )}
+            {(Number(room.extraBedRate || room.extraBedRates?.map || 0) > 0) && (
+              <span className="rounded-md bg-teal-50 px-2 py-0.5 text-[10px] font-semibold text-teal-800">
+                Extra Mattress {formatINR(Number(room.extraBedRate || room.extraBedRates?.map || 0))}/n
+              </span>
+            )}
+          </div>
           <p className="text-base font-bold text-amber-700 mt-3">
             {formatINR(room.pricePerNight)}
-            <span className="text-xs font-normal text-content-muted"> / night</span>
+            <span className="text-xs font-normal text-content-muted"> / night (On Season Price)</span>
           </p>
         </div>
       </div>
@@ -322,6 +349,7 @@ export default function CatalogHotelSelector({
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [starFilter, setStarFilter] = useState(0);
+  const [selectionTick, setSelectionTick] = useState(0);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchInput.trim()), 350);
@@ -358,7 +386,16 @@ export default function CatalogHotelSelector({
     };
   }, [destination, debouncedSearch, starFilter]);
 
+  const rankedHotels = useMemo(
+    () => enrichHotelsWithSelectionMeta(sortHotelsByRecent(hotels)),
+    // selectionTick refreshes Popular / order after a pick
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [hotels, selectionTick]
+  );
+
   const selectHotel = async (hotel) => {
+    recordHotelSelection(hotel);
+    setSelectionTick((n) => n + 1);
     setLoadingDetail(true);
     setHotelDetail(null);
     onChange(null);
@@ -479,7 +516,7 @@ export default function CatalogHotelSelector({
               <Loader2 className="w-8 h-8 animate-spin text-amber-600" />
               <p className="text-sm">{debouncedSearch ? 'Searching hotels...' : 'Finding hotels...'}</p>
             </div>
-          ) : hotels.length === 0 ? (
+          ) : rankedHotels.length === 0 ? (
             <div className="text-center py-16 rounded-2xl border border-dashed border-subtle">
               <Building2 className="w-10 h-10 mx-auto text-content-muted/40 mb-3" />
               <p className="text-sm font-medium">
@@ -493,7 +530,7 @@ export default function CatalogHotelSelector({
             </div>
           ) : (
             <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
-              {hotels.map((hotel) => (
+              {rankedHotels.map((hotel) => (
                 <HotelListRow
                   key={hotel.id}
                   hotel={hotel}
@@ -571,6 +608,8 @@ export default function CatalogHotelSelector({
                 String(value?.mealPlan?.key || '').toLowerCase() ===
                 String(plan.key || '').toLowerCase();
               const perNight = mealPlanNightlyRate(plan, value.room);
+              const offNight = mealPlanNightlyRate(plan, value.room, 'offSeason');
+              const mattress = Number(value.room?.extraBedRate || value.room?.extraBedRates?.map || 0) || 0;
               const total = perNight * Math.max(1, nights);
               return (
                 <button
@@ -588,9 +627,26 @@ export default function CatalogHotelSelector({
                     <p className="font-semibold">{plan.label}</p>
                     {selected && <Check className="w-4 h-4 text-emerald-600 shrink-0" />}
                   </div>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {perNight > 0 && (
+                      <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                        On Season Price {formatINR(perNight)}
+                      </span>
+                    )}
+                    {offNight > 0 && (
+                      <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                        Off Season Price {formatINR(offNight)}
+                      </span>
+                    )}
+                    {mattress > 0 && (
+                      <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-[10px] font-bold text-teal-800">
+                        Extra Mattress {formatINR(mattress)}/n
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm font-bold text-emerald-700 mt-1.5">
                     {formatINR(perNight)}
-                    <span className="text-xs font-medium text-content-muted"> / night</span>
+                    <span className="text-xs font-medium text-content-muted"> / night (On Season Price)</span>
                   </p>
                   <p className="text-xs text-content-muted mt-1">
                     {Number(plan.price || 0) > 0
