@@ -12,10 +12,16 @@ import { buildListParams, unwrapPagination } from '../../utils/apiHelpers';
 import { fetchPublicPackages, fetchPublicPackageDetail, matchesPackageNameSearch } from '../../lib/publicPackages';
 import { logSelectedPackageDebug } from '../../lib/logPackageDebug';
 import { resolvePackageItinerary, seedDayWiseHotelsFromItinerary } from '../../lib/packageItineraryMapper';
+import { applyHotelSeasonToSelections } from '../../lib/mealPlanDefaults';
+import {
+  isLikelyMongoId,
+  mapLocalHotelToCatalogDetail,
+} from '../../lib/localHotelCatalog';
 import { shortLeadMealPlan } from '../lead-wizard/leadWizardUtils';
 import { resolvePackageCabs } from '../../lib/packageCabMapper';
 import { suggestCompanionCabs } from '../../lib/packageCabCompanions';
 import InclusionExclusionEditor, { cleanInclusionExclusionLines } from './InclusionExclusionEditor';
+import { pickInclusionExclusionList } from '../../lib/inclusionExclusionLines';
 import { buildSelectedCabSnapshot } from './CatalogCabSelector';
 import { parsePackageNights } from './CatalogHotelSelector';
 import { WIZARD_STEPS } from './constants';
@@ -147,6 +153,9 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
   const [dayWiseHotels, setDayWiseHotels] = useState([]);
   const [extraCabs, setExtraCabs] = useState([]);
   const [stayWithMattress, setStayWithMattress] = useState(false);
+  /** Global hotel rate season for quotation — onSeason | offSeason */
+  const [hotelSeason, setHotelSeason] = useState('onSeason');
+  const hotelSeasonInitRef = useRef(true);
   const [loadingPackageDetail, setLoadingPackageDetail] = useState(false);
   const [openingPackageMeta, setOpeningPackageMeta] = useState({ name: '', destination: '' });
   const [packageSearch, setPackageSearch] = useState('');
@@ -299,6 +308,70 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
       cancelled = true;
     };
   }, [editQuoteId, config, navigate, isEditMode]);
+
+  const dayWiseHotelsRef = useRef(dayWiseHotels);
+  dayWiseHotelsRef.current = dayWiseHotels;
+
+  // When On/Off season toggles, enrich room rates from Hotel Control then remap rack.
+  useEffect(() => {
+    if (hotelSeasonInitRef.current) {
+      hotelSeasonInitRef.current = false;
+      return undefined;
+    }
+    let cancelled = false;
+
+    (async () => {
+      const current = Array.isArray(dayWiseHotelsRef.current) ? dayWiseHotelsRef.current : [];
+      setDayWiseHotels(applyHotelSeasonToSelections(current, hotelSeason));
+
+      const enriched = await Promise.all(
+        current.map(async (entry) => {
+          const off = entry?.room?.rates?.offSeason;
+          const on = entry?.room?.rates?.onSeason;
+          const hasOff =
+            off && typeof off === 'object' && Object.values(off).some((n) => Number(n) > 0);
+          const hasOn =
+            on && typeof on === 'object' && Object.values(on).some((n) => Number(n) > 0);
+          if (hasOff && hasOn) return entry;
+          const id = entry?.hotel?.localHotelId || entry?.hotel?._id || entry?.hotel?.id || '';
+          if (!isLikelyMongoId(id)) return entry;
+          try {
+            const res = await API.get(`/hotels/${id}`, { skipErrorToast: true });
+            if (cancelled) return entry;
+            const detail = mapLocalHotelToCatalogDetail(res.data);
+            const rooms = detail?.rooms || [];
+            const match =
+              rooms.find(
+                (r) =>
+                  String(r.id) === String(entry?.room?.id) ||
+                  String(r.name || '').toLowerCase() ===
+                    String(entry?.room?.name || '').toLowerCase()
+              ) || rooms[0];
+            if (!match?.rates) return entry;
+            return {
+              ...entry,
+              room: {
+                ...(entry.room || {}),
+                ...match,
+                rates: match.rates,
+                extraBedRates: match.extraBedRates || entry.room?.extraBedRates,
+                extraBedRate: match.extraBedRate || entry.room?.extraBedRate,
+              },
+            };
+          } catch {
+            return entry;
+          }
+        })
+      );
+
+      if (cancelled) return;
+      setDayWiseHotels(applyHotelSeasonToSelections(enriched, hotelSeason));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hotelSeason]);
 
   useEffect(() => {
     if (!initialLeadId || isEditMode) return undefined;
@@ -478,6 +551,13 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
     inclusions: cleanInclusionExclusionLines(customInclusions),
     exclusions: cleanInclusionExclusionLines(customExclusions),
     cabCategory: selectedPackageCab?.cabCategory || selectedPackageCab?.vehicleType || pkg?.cabCategory || '',
+    guestName: selectedLead?.name || selectedLead?.customerName || pkg?.guestName || '',
+    preparedFor: selectedLead?.name || selectedLead?.customerName || pkg?.preparedFor || '',
+    guestPhone: selectedLead?.phone || '',
+    guestEmail: selectedLead?.email || '',
+    travelDate: selectedLead?.travelDate || pkg?.travelDate || '',
+    adults: selectedLead?.adults,
+    children: selectedLead?.children,
   });
 
   const selectLead = (lead) => {
@@ -531,10 +611,22 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
       ),
     };
     logSelectedPackageDebug(normalized, meta);
-    setSelectedPkgDetail(normalized);
+    const inclusions = pickInclusionExclusionList(
+      normalized.inclusions,
+      normalized.includes,
+      normalized._apiRaw?.package?.inclusions,
+      normalized._apiRaw?.package?.includes
+    );
+    const exclusions = pickInclusionExclusionList(
+      normalized.exclusions,
+      normalized.excludes,
+      normalized._apiRaw?.package?.exclusions,
+      normalized._apiRaw?.package?.excludes
+    );
+    setSelectedPkgDetail({ ...normalized, inclusions, exclusions });
     setCustomItinerary(itinerary.map((d) => ({ ...d })));
-    setCustomInclusions(normalized.inclusions?.length ? [...normalized.inclusions] : ['']);
-    setCustomExclusions(normalized.exclusions?.length ? [...normalized.exclusions] : ['']);
+    setCustomInclusions(inclusions.length ? [...inclusions] : ['']);
+    setCustomExclusions(exclusions.length ? [...exclusions] : ['']);
     setCustomizeTab('itinerary');
 
     // Seed day-wise hotels — package MAP (same as website), not lead meal override
@@ -759,6 +851,7 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
       requiredRooms: capacity.requiredRooms,
       requiredCabs: capacity.requiredCabs,
       occupancyOverride: capacity.occupancyOverride,
+      hotelSeason,
     });
     const party = aligned.party;
     const rawPricing = {
@@ -863,6 +956,7 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
     extraCabs,
     customItinerary,
     stayWithMattress,
+    hotelSeason,
     isEditMode,
   ]);
 
@@ -995,8 +1089,14 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
   const draftQuote = selectedLead && activePkg ? {
     quoteNumber: isEditMode && editMeta.quoteNumber ? editMeta.quoteNumber : 'PREVIEW',
     createdAt: new Date().toISOString(),
-    lead: selectedLead,
+    lead: {
+      ...selectedLead,
+      name: selectedLead.name || selectedLead.customerName || selectedLead.fullName || '',
+      phone: selectedLead.phone || selectedLead.mobile || selectedLead.whatsapp || '',
+    },
+    leadName: selectedLead.name || selectedLead.customerName || selectedLead.fullName || '',
     package: buildPackageSnapshot(activePkg),
+    packageSnapshot: buildPackageSnapshot(activePkg),
     pricing: state.pricing,
     selectedHotels: buildSelectedHotelsSnapshot(dayWiseHotels, {
       rooms: state.pricing?.party?.rooms || 1,
@@ -1014,8 +1114,8 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
   if (loadingEdit) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-24">
-        <div className="h-9 w-9 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
-        <p className="text-sm text-content-muted">Loading quotation for edit…</p>
+        <div className="h-9 w-9 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
+        <p className="text-sm text-slate-500">Loading quotation for edit…</p>
       </div>
     );
   }
@@ -1024,81 +1124,58 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
     <div className={cn(
       inBuilder
         ? 'mx-auto max-w-[1440px] pb-0'
-        : 'mx-auto max-w-4xl px-3 pt-3 pb-28 sm:px-0 sm:pt-0 xl:pb-12',
+        : 'mx-auto max-w-5xl px-3 pt-3 pb-28 sm:px-4 sm:pt-4 xl:pb-12',
     )}
     >
       {!inBuilder && (
         <>
-          <div className="mb-4 flex items-start gap-3 sm:mb-6">
+          <div className="mb-3 flex items-center gap-2.5 rounded-2xl border border-slate-200 bg-slate-950 px-3 py-2.5 sm:px-4">
             <Link
               to={config.backPath}
-              className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-violet-500/30 bg-violet-500/10 text-violet-600"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white hover:bg-white/20"
               aria-label="Back"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-3.5 w-3.5" />
             </Link>
             <div className="min-w-0 flex-1">
-              <h1 className="text-xl font-bold text-content-primary sm:text-2xl">
+              <h1 className="truncate text-[15px] font-bold text-white sm:text-base">
                 {isEditMode ? 'Edit Quotation' : config.title}
               </h1>
-              <p className="mt-0.5 text-xs text-content-muted sm:text-sm line-clamp-2">
+              <p className="truncate text-[11px] text-slate-400">
                 {isEditMode && editMeta.quoteNumber
-                  ? `Updating ${editMeta.quoteNumber} — change package, hotels, pricing and resave`
-                  : config.subtitle}
+                  ? `Updating ${editMeta.quoteNumber}`
+                  : 'Lead → Package → Builder'}
               </p>
-              {config.approvalNote && !isEditMode && (
-                <p className="mt-2 max-w-xl rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-700 sm:text-xs">
-                  {config.approvalNote}
-                </p>
-              )}
             </div>
-          </div>
-
-          <div className="mb-4 rounded-2xl border border-subtle bg-surface/80 p-3 sm:mb-6 sm:p-4">
-            <div className="flex gap-1 overflow-x-auto pb-0.5">
-              {WIZARD_STEPS.filter((s) => s.id <= 3 || s.id === 8).map((s, idx, arr) => (
-                <div key={s.id} className={cn('flex items-center shrink-0', idx < arr.length - 1 && 'flex-1')}>
-                  <button
-                    type="button"
-                    onClick={() => s.id <= step && setStep(s.id === 8 ? 3 : s.id)}
-                    className={cn(
-                      'flex flex-col items-center gap-1 px-1.5 sm:px-2',
-                      s.id <= step || (s.id === 8 && step >= 3) ? 'cursor-pointer' : 'opacity-40',
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        'flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold',
-                        step === s.id || (s.id === 3 && step >= 3)
-                          ? 'bg-violet-600 text-white ring-4 ring-violet-500/20'
-                          : s.id < step
-                            ? 'bg-emerald-500 text-white'
-                            : 'bg-surface-elevated text-content-muted',
-                      )}
-                    >
-                      {idx + 1}
-                    </div>
-                    <span
-                      className={cn(
-                        'text-[9px] font-medium',
-                        (step === s.id || (s.id === 3 && step >= 3)) && 'text-violet-600',
-                      )}
-                    >
-                      {s.id === 3 ? 'Builder' : s.id === 1 ? 'Lead' : s.id === 2 ? 'Package' : s.title}
-                    </span>
-                  </button>
-                  {idx < arr.length - 1 && (
-                    <div
-                      className={cn(
-                        'mx-1 h-0.5 min-w-[12px] flex-1',
-                        s.id < step || step >= 3 ? 'bg-emerald-500' : 'bg-surface-elevated',
-                      )}
-                    />
+            <div className="hidden sm:flex items-center gap-1 shrink-0">
+              {WIZARD_STEPS.filter((s) => s.id <= 3 || s.id === 8).map((s, idx) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => s.id <= step && setStep(s.id === 8 ? 3 : s.id)}
+                  className={cn(
+                    'inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[10px] font-bold',
+                    step === s.id || (s.id === 3 && step >= 3)
+                      ? 'bg-teal-400 text-slate-950'
+                      : s.id < step
+                        ? 'bg-emerald-500/20 text-emerald-300'
+                        : 'bg-white/10 text-slate-400',
+                    s.id > step && 'opacity-50 cursor-default'
                   )}
-                </div>
+                >
+                  <span>{idx + 1}</span>
+                  <span className="hidden md:inline">
+                    {s.id === 3 ? 'Builder' : s.id === 1 ? 'Lead' : s.id === 2 ? 'Package' : s.title}
+                  </span>
+                </button>
               ))}
             </div>
           </div>
+          {config.approvalNote && !isEditMode && (
+            <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 sm:text-xs">
+              {config.approvalNote}
+            </p>
+          )}
         </>
       )}
 
@@ -1120,6 +1197,8 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
           onExtraCabsChange={setExtraCabs}
           stayWithMattress={stayWithMattress}
           onStayWithMattressChange={setStayWithMattress}
+          hotelSeason={hotelSeason}
+          onHotelSeasonChange={setHotelSeason}
           packageCabs={resolvePackageCabs(activePkg || {})}
           pricing={state.pricing}
           onPricingChange={(p) => setState((s) => ({ ...s, pricing: p }))}
@@ -1142,49 +1221,51 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
           }
         />
       ) : (
-      <div className="min-h-[360px] rounded-2xl border border-subtle bg-surface p-4 shadow-lg sm:min-h-[400px] sm:p-8">
+      <div className="min-h-[360px] rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_20px_50px_-28px_rgba(15,23,42,0.35)] sm:min-h-[400px] sm:p-7">
         <AnimatePresence mode="wait">
           <motion.div key={step} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
             {step === 1 && (
-              <div className="space-y-3">
+              <div className="space-y-3.5">
                 <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-base font-bold sm:text-lg">Select Lead</h2>
+                  <div>
+                    <h2 className="text-lg font-black tracking-tight text-slate-900 sm:text-xl">Select Lead</h2>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      {debouncedLeadSearch.trim().length >= 2
+                        ? 'Search results'
+                        : 'Leads that already received a package / quotation — search to find others'}
+                    </p>
+                  </div>
                   {state.leadId && config.leadViewPath && (
                     <Link
                       to={config.leadViewPath(state.leadId)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs font-medium text-sky-600 hover:text-sky-700 hover:underline"
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800 hover:bg-teal-100"
                     >
                       View Lead <ExternalLink className="h-3.5 w-3.5" />
                     </Link>
                   )}
                 </div>
-                <p className="text-xs text-content-muted">
-                  {debouncedLeadSearch.trim().length >= 2
-                    ? 'Search results'
-                    : 'Leads that already received a package / quotation — search to find others'}
-                </p>
                 {selectedLead && (
-                  <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 px-3.5 py-3 text-sm sm:px-4">
-                    <p className="font-semibold text-content-primary">{selectedLead.name}</p>
-                    <p className="mt-0.5 text-xs text-content-muted">{selectedLead.destination} · {shortLeadMealPlan(selectedLead)}</p>
+                  <div className="rounded-2xl border border-teal-200 bg-gradient-to-r from-teal-50 to-white px-4 py-3.5 text-sm">
+                    <p className="font-bold text-slate-900">{selectedLead.name}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">{selectedLead.destination} · {shortLeadMealPlan(selectedLead)}</p>
                   </div>
                 )}
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" />
+                  <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
                     type="search"
                     value={leadSearch}
                     onChange={(e) => setLeadSearch(e.target.value)}
                     placeholder="Search name, phone, destination…"
-                    className="w-full rounded-xl border border-subtle bg-surface py-3 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-violet-500/30"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-11 pr-4 text-sm outline-none transition focus:border-teal-400 focus:bg-white focus:ring-4 focus:ring-teal-100"
                   />
                 </div>
                 {loadingLeads ? (
-                  <p className="py-8 text-center text-sm text-content-muted">Searching leads…</p>
+                  <p className="py-8 text-center text-sm text-slate-500">Searching leads…</p>
                 ) : leads.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-content-muted">
+                  <p className="py-8 text-center text-sm text-slate-500">
                     {debouncedLeadSearch.trim().length >= 2
                       ? 'No leads found'
                       : 'No package-shared leads yet — type at least 2 characters to search all leads'}
@@ -1200,16 +1281,16 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
                       type="button"
                       onClick={() => selectLead(l)}
                       className={cn(
-                        'flex w-full items-center gap-3 rounded-xl border p-3.5 text-left transition-all sm:p-4',
+                        'flex w-full items-center gap-3 rounded-2xl border p-3.5 text-left transition-all sm:p-4',
                         state.leadId === l._id
-                          ? 'border-violet-500/50 bg-violet-500/10 ring-2 ring-violet-500/20'
-                          : 'border-subtle hover:bg-surface-elevated',
+                          ? 'border-teal-400 bg-teal-50 ring-2 ring-teal-200/70 shadow-sm'
+                          : 'border-slate-200 bg-white hover:border-teal-200 hover:bg-slate-50',
                       )}
                     >
                       <Avatar name={l.name} size="sm" />
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold">{l.name}</p>
-                        <p className="text-xs text-content-muted">{l.destination} · {formatINR(l.budget)}</p>
+                        <p className="font-bold text-slate-900">{l.name}</p>
+                        <p className="text-xs text-slate-500">{l.destination} · {formatINR(l.budget)}</p>
                       </div>
                     </button>
                   )}
@@ -1222,17 +1303,17 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h2 className="text-base font-bold sm:text-lg">Select Package</h2>
-                    <p className="text-xs text-content-muted">
-                      Packages related to lead destination (state and its cities)
+                    <p className="text-xs text-slate-500">
+                      Packages related to lead destination
                       {selectedLead?.destination ? (
-                        <> — <span className="font-medium text-content-primary">{selectedLead.destination}</span></>
+                        <> — <span className="font-medium text-slate-800">{selectedLead.destination}</span></>
                       ) : null}
                     </p>
                   </div>
                   {canCreatePackage ? (
                     <Button
                       type="button"
-                      className="shrink-0 gap-1.5 rounded-xl"
+                      className="shrink-0 gap-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white border-0 font-semibold"
                       onClick={() => setCreatePackageOpen(true)}
                       disabled={creatingPackage || loadingPackageDetail}
                     >
@@ -1242,7 +1323,7 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
                   ) : null}
                 </div>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" />
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
                     type="search"
                     value={packageSearch}
@@ -1251,17 +1332,17 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
                       setPackagePage(0);
                     }}
                     placeholder="Search by name or days (e.g. Goa, 3 days, 3D)…"
-                    className="w-full rounded-xl border border-subtle bg-surface py-3 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-amber-500/30"
+                    className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-teal-500/30"
                   />
                 </div>
                 {loadingPackages ? (
-                  <p className="py-8 text-center text-sm text-content-muted">Loading packages...</p>
+                  <p className="py-8 text-center text-sm text-slate-500">Loading packages...</p>
                 ) : (
                 <>
                 <div className="max-h-[min(50dvh,420px)] space-y-2 overflow-y-auto">
                   {filteredPackages.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-subtle bg-surface-elevated/40 px-4 py-10 text-center">
-                      <p className="text-sm text-content-muted">
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center">
+                      <p className="text-sm text-slate-500">
                         {packages.length === 0
                           ? 'No packages found for this lead destination.'
                           : 'No packages match your search. Try another keyword from the package name.'}
@@ -1269,7 +1350,7 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
                       {canCreatePackage ? (
                         <Button
                           type="button"
-                          className="mt-4 gap-1.5 rounded-xl"
+                          className="mt-4 gap-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white border-0 font-semibold"
                           onClick={() => setCreatePackageOpen(true)}
                           disabled={creatingPackage || loadingPackageDetail}
                         >
@@ -1286,23 +1367,23 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
                       className={cn(
                         'flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-all',
                         state.packageId === p._id
-                          ? 'border-amber-500/50 bg-amber-500/10 ring-2 ring-amber-500/20'
-                          : 'border-subtle hover:bg-surface-elevated',
+                          ? 'border-teal-400 bg-teal-50 ring-2 ring-teal-200/70'
+                          : 'border-slate-200 hover:bg-slate-50',
                       )}
                     >
                       {p.coverImage ? (
-                        <img src={p.coverImage} alt="" className="h-14 w-14 shrink-0 rounded-lg border border-subtle object-cover" loading="lazy" />
+                        <img src={p.coverImage} alt="" className="h-14 w-14 shrink-0 rounded-lg border border-slate-200 object-cover" loading="lazy" />
                       ) : (
-                        <div className="h-14 w-14 shrink-0 rounded-lg border border-subtle bg-surface-elevated" />
+                        <div className="h-14 w-14 shrink-0 rounded-lg border border-slate-200 bg-slate-100" />
                       )}
                       <div className="min-w-0 flex-1">
-                        <p className="line-clamp-1 text-sm font-semibold">{p.name}</p>
-                        <p className="mt-0.5 text-xs text-content-muted">
+                        <p className="line-clamp-1 text-sm font-semibold text-slate-900">{p.name}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">
                           {p.destination} · {p.durationLabel || `${p.duration}D`} · from {formatINR(p.startingPrice)}
                         </p>
                       </div>
                       {p.catalogSource === 'custom' && (
-                        <span className="shrink-0 rounded-full border border-violet-400/30 bg-violet-500/10 px-2 py-1 text-[10px] font-bold uppercase text-violet-700">
+                        <span className="shrink-0 rounded-full border border-teal-200 bg-teal-50 px-2 py-1 text-[10px] font-bold uppercase text-teal-800">
                           Your copy
                         </span>
                       )}
@@ -1311,7 +1392,7 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
                 </div>
                 {filteredPackages.length > PACKAGES_PAGE_SIZE && (
                   <div className="flex items-center justify-between gap-2 pt-1">
-                    <p className="text-xs text-content-muted">
+                    <p className="text-xs text-slate-500">
                       Showing {packageShowingFrom}–{packageShowingTo} of {filteredPackages.length}
                     </p>
                     <div className="flex items-center gap-1">
@@ -1319,19 +1400,19 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
                         type="button"
                         disabled={safePackagePage <= 0}
                         onClick={() => setPackagePage((p) => Math.max(0, p - 1))}
-                        className="inline-flex h-8 items-center gap-1 rounded-lg border border-subtle bg-white px-2.5 text-xs font-medium disabled:opacity-40 dark:bg-slate-950"
+                        className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium disabled:opacity-40"
                       >
                         <ChevronLeft className="h-3.5 w-3.5" />
                         Prev
                       </button>
-                      <span className="px-2 text-xs font-semibold tabular-nums text-content-secondary">
+                      <span className="px-2 text-xs font-semibold tabular-nums text-slate-600">
                         {safePackagePage + 1}/{packagePageCount}
                       </span>
                       <button
                         type="button"
                         disabled={safePackagePage >= packagePageCount - 1}
                         onClick={() => setPackagePage((p) => Math.min(packagePageCount - 1, p + 1))}
-                        className="inline-flex h-8 items-center gap-1 rounded-lg border border-subtle bg-white px-2.5 text-xs font-medium disabled:opacity-40 dark:bg-slate-950"
+                        className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium disabled:opacity-40"
                       >
                         Next
                         <ChevronRight className="h-3.5 w-3.5" />
@@ -1347,12 +1428,12 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
         </AnimatePresence>
 
         {/* Desktop footer */}
-        <div className="mt-8 hidden justify-between border-t border-subtle pt-6 xl:flex">
-          <Button type="button" variant="outline" className="gap-2 rounded-xl" disabled={step === 1} onClick={() => setStep((s) => s - 1)}><ArrowLeft className="h-4 w-4" /> Back</Button>
+        <div className="mt-8 hidden justify-between border-t border-slate-100 pt-6 xl:flex">
+          <Button type="button" variant="outline" className="gap-2 rounded-2xl h-11 border-slate-200" disabled={step === 1} onClick={() => setStep((s) => s - 1)}><ArrowLeft className="h-4 w-4" /> Back</Button>
           {step === 1 ? (
-            <Button type="button" variant="sky" className="gap-2 rounded-xl" onClick={() => setStep(2)} disabled={!state.leadId}>Continue <ArrowRight className="h-4 w-4" /></Button>
+            <Button type="button" className="gap-2 rounded-2xl h-11 bg-teal-600 hover:bg-teal-500 text-white border-0 font-bold shadow-lg shadow-teal-700/20" onClick={() => setStep(2)} disabled={!state.leadId}>Continue <ArrowRight className="h-4 w-4" /></Button>
           ) : (
-            <Button type="button" variant="sky" className="gap-2 rounded-xl" disabled={!state.packageId || loadingPackageDetail} onClick={() => state.packageId && setStep(3)}>
+            <Button type="button" className="gap-2 rounded-2xl h-11 bg-orange-500 hover:bg-orange-400 text-slate-950 border-0 font-bold shadow-lg shadow-orange-600/25" disabled={!state.packageId || loadingPackageDetail} onClick={() => state.packageId && setStep(3)}>
               Open Builder <ArrowRight className="h-4 w-4" />
             </Button>
           )}
@@ -1361,12 +1442,12 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
       )}
 
       {!inBuilder ? (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-violet-100/80 bg-white/95 px-3 pt-2.5 pb-[max(0.65rem,env(safe-area-inset-bottom))] shadow-[0_-10px_32px_rgba(15,23,42,0.14)] backdrop-blur-md xl:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-white/95 px-3 pt-2.5 pb-[max(0.65rem,env(safe-area-inset-bottom))] shadow-[0_-10px_32px_rgba(15,23,42,0.14)] backdrop-blur-md xl:hidden">
           <div className="flex items-center gap-2">
             <Button
               type="button"
               variant="outline"
-              className="h-11 shrink-0 gap-1.5 rounded-xl px-3"
+              className="h-11 shrink-0 gap-1.5 rounded-2xl px-3 border-slate-200"
               disabled={step === 1}
               onClick={() => setStep((s) => s - 1)}
             >
@@ -1376,8 +1457,7 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
             {step === 1 ? (
               <Button
                 type="button"
-                variant="sky"
-                className="h-11 flex-1 gap-2 rounded-xl"
+                className="h-11 flex-1 gap-2 rounded-2xl bg-teal-600 hover:bg-teal-500 text-white border-0 font-bold"
                 onClick={() => setStep(2)}
                 disabled={!state.leadId}
               >
@@ -1386,8 +1466,7 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
             ) : (
               <Button
                 type="button"
-                variant="sky"
-                className="h-11 flex-1 gap-2 rounded-xl"
+                className="h-11 flex-1 gap-2 rounded-2xl bg-orange-500 hover:bg-orange-400 text-slate-950 border-0 font-bold"
                 disabled={!state.packageId || loadingPackageDetail}
                 onClick={() => state.packageId && setStep(3)}
               >

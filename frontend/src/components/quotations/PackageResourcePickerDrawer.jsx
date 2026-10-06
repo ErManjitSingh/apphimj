@@ -180,7 +180,11 @@ function HotelStepHeader({
           <div className="inline-flex rounded-xl border border-violet-200 bg-white p-0.5 shadow-sm">
             <button
               type="button"
-              onClick={() => onHotelSeasonChange?.('onSeason')}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onHotelSeasonChange?.('onSeason');
+              }}
               className={cn(
                 'h-8 rounded-[10px] px-3 text-[11px] font-bold transition-colors',
                 hotelSeason !== 'offSeason'
@@ -192,7 +196,11 @@ function HotelStepHeader({
             </button>
             <button
               type="button"
-              onClick={() => onHotelSeasonChange?.('offSeason')}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onHotelSeasonChange?.('offSeason');
+              }}
               className={cn(
                 'h-8 rounded-[10px] px-3 text-[11px] font-bold transition-colors',
                 hotelSeason === 'offSeason'
@@ -485,7 +493,14 @@ function RoomListRow({ room, hotel, selected, onSelect, basePrice = 0, defaultMe
   const image = room.images?.[0] || hotel?.thumbnailUrl || hotel?.images?.[0] || hotel?.image;
   const preferred = pickPreferredMealPlan(ensureMealPlanOptions(room), room, defaultMealPlanKey);
   const seasonKey = hotelSeason === 'offSeason' ? 'offSeason' : 'onSeason';
-  const price = mealPlanNightlyRate(preferred, room, seasonKey) || Number(room.pricePerNight || room.epPrice || 0);
+  const seasonalPrice = mealPlanNightlyRate(preferred, room, seasonKey);
+  // Never fall back to on-season pricePerNight while Off Season is selected.
+  const price =
+    seasonalPrice > 0
+      ? seasonalPrice
+      : seasonKey === 'onSeason'
+        ? Number(room.pricePerNight || room.epPrice || 0)
+        : 0;
   const rel = formatRelativePrice(price, basePrice, { isCurrent: false });
   const mealKey = normalizeMealPlanKey(preferred?.key || defaultMealPlanKey) || 'map';
   const extraBed = resolveExtraBedNightRate(room, mealKey);

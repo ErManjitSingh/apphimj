@@ -75,11 +75,12 @@ export function mealPlanNightlyRate(plan = {}, room = {}, season = 'onSeason') {
     const fromSeason = Number(seasonal[key] || 0);
     if (fromSeason > 0) return fromSeason;
   }
-  // Flat rates.* are on-season; skip when season is off.
-  if (seasonKey === 'onSeason') {
-    const fromRates = key ? Number(rates[key] || 0) : 0;
-    if (fromRates > 0) return fromRates;
+  // Flat rates.* are on-season; never use them (or meal absolutePrice) for off-season.
+  if (seasonKey === 'offSeason') {
+    return 0;
   }
+  const fromRates = key ? Number(rates[key] || 0) : 0;
+  if (fromRates > 0) return fromRates;
 
   const absolute = Number(plan?.absolutePrice || 0);
   const supplement = Number(plan?.price || 0);
@@ -99,11 +100,7 @@ export function mealPlanNightlyRate(plan = {}, room = {}, season = 'onSeason') {
     if (rebuilt > 0) return rebuilt;
     return Math.round((roomBase + supplement) * 100) / 100;
   }
-  // absolutePrice on meal plans is usually on-season — skip when asking for off-season.
-  if (absolute > 0 && seasonKey === 'onSeason') return absolute;
-  if (absolute > 0 && seasonKey === 'offSeason' && !(seasonal && typeof seasonal === 'object')) {
-    return absolute;
-  }
+  if (absolute > 0) return absolute;
   return Math.round((roomBase + supplement) * 100) / 100;
 }
 
@@ -308,15 +305,16 @@ export function applyHotelSeasonToSelections(selections = [], season = 'onSeason
     const mealKey =
       entry?.mealPlan?.key || entry?.mealPlanKey || entry?.meals || 'map';
     const rate = resolveHotelNightDisplayRate(entry, null, mealKey, seasonKey);
-    if (!(rate > 0)) return entry;
+    // Always rewrite absolute so UI/pricing never keep a stale opposite-season rack.
     return {
       ...entry,
-      absolutePerNight: rate,
+      absolutePerNight: rate > 0 ? rate : 0,
+      hotelSeason: seasonKey,
       mealPlan: entry.mealPlan
-        ? { ...entry.mealPlan, absolutePrice: rate }
+        ? { ...entry.mealPlan, absolutePrice: rate > 0 ? rate : 0 }
         : entry.mealPlan,
       room: entry.room
-        ? { ...entry.room, pricePerNight: rate }
+        ? { ...entry.room, pricePerNight: rate > 0 ? rate : Number(entry.room.pricePerNight || 0) }
         : entry.room,
     };
   });

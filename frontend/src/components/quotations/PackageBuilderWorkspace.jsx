@@ -1031,6 +1031,44 @@ export default function PackageBuilderWorkspace({
             subtitle="Each day has its own color strip — hotels, cab & activities"
             icon={CalendarDays}
           >
+            {typeof onHotelSeasonChange === 'function' && (
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-200 bg-violet-50/80 px-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-violet-600">
+                    Hotel rate season
+                  </p>
+                  <p className="text-[11px] text-slate-600">
+                    Switch On / Off season prices for all hotel nights
+                  </p>
+                </div>
+                <div className="inline-flex rounded-xl border border-violet-200 bg-white p-0.5 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => onHotelSeasonChange('onSeason')}
+                    className={cn(
+                      'h-8 rounded-[10px] px-3 text-[11px] font-bold transition-colors',
+                      hotelSeason !== 'offSeason'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'text-slate-600 hover:bg-slate-50'
+                    )}
+                  >
+                    On Season
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onHotelSeasonChange('offSeason')}
+                    className={cn(
+                      'h-8 rounded-[10px] px-3 text-[11px] font-bold transition-colors',
+                      hotelSeason === 'offSeason'
+                        ? 'bg-amber-500 text-white shadow-sm'
+                        : 'text-slate-600 hover:bg-slate-50'
+                    )}
+                  >
+                    Off Season
+                  </button>
+                </div>
+              </div>
+            )}
             <PackageBuilderDayTimeline
               itinerary={itinerary}
               dayWiseHotels={dayWiseHotels}
