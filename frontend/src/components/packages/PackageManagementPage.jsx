@@ -129,9 +129,25 @@ export default function PackageManagementPage() {
     }
   };
 
-  const handleEditCopy = (pkg) => {
-    setEditPackage(pkg);
-    setModalOpen(true);
+  const handleEditCopy = async (pkg) => {
+    const id = pkg._id || pkg.id;
+    if (!id) {
+      setEditPackage(pkg);
+      setModalOpen(true);
+      return;
+    }
+    setCloningId(id);
+    try {
+      // List endpoint strips fullData (where packageCabs live) — load full doc for edit.
+      const res = await API.get(`/packages/${id}`, { skipErrorToast: true });
+      setEditPackage(res.data || pkg);
+      setModalOpen(true);
+    } catch {
+      setEditPackage(pkg);
+      setModalOpen(true);
+    } finally {
+      setCloningId(null);
+    }
   };
 
   const handleCreate = () => {
@@ -267,7 +283,7 @@ export default function PackageManagementPage() {
               setDetailLoading(false);
             }}
             onEdit={handleEditCopy}
-            editingId={null}
+            editingId={cloningId}
           />
         </div>
       )}

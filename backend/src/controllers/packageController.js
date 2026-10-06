@@ -63,15 +63,27 @@ function internalSourceType(value) {
   return value;
 }
 
+/** Cabs live on fullData / day-options raw — flatten for edit forms. */
+function extractPackageCabs(pkg = {}) {
+  const candidates = [
+    pkg.packageCabs,
+    pkg.package_cabs,
+    pkg.fullData?.packageCabs,
+    pkg.fullData?.package_cabs,
+    pkg.rawUno?.dayOptions?.cabs,
+    pkg.fullData?._apiRaw?.dayOptions?.cabs,
+    pkg._apiRaw?.dayOptions?.cabs,
+  ];
+  for (const list of candidates) {
+    if (Array.isArray(list) && list.length) return list;
+  }
+  return [];
+}
+
 function sanitizePackageForClient(pkg) {
   if (!pkg || typeof pkg !== 'object') return pkg;
   const { rawUno, ...rest } = pkg;
-  const packageCabs =
-    Array.isArray(rest.packageCabs) && rest.packageCabs.length
-      ? rest.packageCabs
-      : Array.isArray(rest.fullData?.packageCabs)
-        ? rest.fullData.packageCabs
-        : [];
+  const packageCabs = extractPackageCabs({ ...pkg, rawUno });
   return {
     ...rest,
     packageCabs,

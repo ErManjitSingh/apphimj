@@ -5,6 +5,7 @@ import AppModal from '../ui/AppModal';
 import { defaultItineraryDay } from '../quotations/quotationUtils';
 import ItineraryBuilder from './ItineraryBuilder';
 import InclusionExclusionEditor, { cleanInclusionExclusionLines } from '../quotations/InclusionExclusionEditor';
+import { resolvePackageCabs } from '../../lib/packageCabMapper';
 
 const emptyCab = () => ({
   id: `cab-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -78,8 +79,10 @@ export default function PackageFormModal({
 
   useEffect(() => {
     if (editPackage) {
-      const existingCabs =
-        editPackage.packageCabs?.length
+      const resolved = resolvePackageCabs(editPackage);
+      const existingCabs = resolved.length
+        ? resolved
+        : editPackage.packageCabs?.length
           ? editPackage.packageCabs
           : editPackage.fullData?.packageCabs?.length
             ? editPackage.fullData.packageCabs
@@ -95,9 +98,14 @@ export default function PackageFormModal({
         packageCabs: existingCabs.length
           ? existingCabs.map((c) => ({
               id: c.id || c.packageCabId || emptyCab().id,
-              name: c.name || '',
+              name: c.name || c.vehicleType || '',
               seatingCapacity: c.seatingCapacity || c.seats || 4,
-              absoluteFare: c.absoluteFare ?? c.totalAmount ?? c.cost ?? '',
+              absoluteFare:
+                c.absoluteFare ??
+                c.totalAmount ??
+                c.price_delta ??
+                c.cost ??
+                '',
               isDefault: Boolean(c.isDefault ?? c.is_default),
             }))
           : [emptyCab()],
