@@ -8,44 +8,70 @@ We are proud to offer packages that can't be more perfect and take you to such a
 
 So, let our executives assist you 24/7 and create magical moments just for you.`;
 
+/** Policies aligned to Him Journey Tours Policies & Terms PDF */
 export const QUOTE_POLICIES = {
   remarks: [
-    'Rates are subject to change without prior notice.',
-    'Accommodation will be provided in the mentioned or similar hotels based on availability.',
-    'Confirmation is subject to availability and receipt of advance payment.',
+    'Rates are subject to change without prior notice until the booking is confirmed.',
+    'Accommodation will be provided in the mentioned hotel or a similar hotel, subject to availability.',
+    'Hotel and other services are subject to availability until the required advance payment is received.',
+    'Taxes are included as applicable.',
     'Extra bed refers to an extra mattress.',
-    'Heater charges are payable extra at the hotel.',
-    'Token/advance amount is non-refundable.',
-    'No refund will be provided for unused services such as accommodation, meals, transport, sightseeing, etc., due to weather conditions, health issues, strikes, roadblocks, or any unforeseen circumstances.',
-    'Air conditioning (AC) will not operate in hill stations.',
-    'Rates may vary during festive periods (e.g., Independence Day, Holi, Diwali, New Year, etc.).',
-  ],
-  terms: [
-    'No refund for any unused accommodation, meals, transportation, sightseeing tours, or other services.',
-    'Room allocation is subject to hotel discretion at the time of check-in, within the booked room category.',
-    'No refunds shall be entertained if hotel services or amenities do not meet customer expectations; such cases will be considered individually.',
+    'Heater charges, where applicable, are payable directly at the hotel.',
+    'Air conditioning (AC) may not operate in certain hill stations due to local conditions.',
+    'Rates may vary during festive periods and special dates such as Independence Day, Holi, Diwali, Christmas and New Year.',
+    "No refund will be provided for unused services due to weather conditions, health issues, strikes, roadblocks, government restrictions or other unforeseen circumstances beyond the company's control.",
   ],
   confirmation: [
-    'A token amount of 25% of the total package cost is required for booking confirmation.',
-    '75% (25% + 50%) of the package cost must be paid within one month from the booking date.',
-    'The remaining 25% must be paid no later than 7 days prior to the arrival date.',
+    '40% advance is required to confirm the booking.',
+    'If you do not wish to pay 40% at once, you may lock the package by paying a 25% token amount. The token amount is non-refundable.',
+    'The remaining 15% must be paid at least 7 days before the travel date to complete the 40% advance.',
+    'If the total 40% advance is not cleared before the travel date, hotel and other services will be subject to availability and may be changed accordingly.',
+    'The remaining 60% payment must be cleared on arrival at the destination.',
   ],
   cancellation: [
-    'Cancellation more than 30 days before the start date: 20% of the total package cost will be charged.',
-    'Cancellation between 16 to 30 days before the start date: 35% of the total package cost will be charged.',
-    'Cancellation between 10 to 15 days before the start date: 50% of the total package cost will be charged.',
-    'Cancellation within 5 to 7 days of the check-in date: 100% of the booking amount will be charged.',
+    'More than 30 days before the travel date: 25% of the total package cost will be charged.',
+    '16 to 30 days before the travel date: 35% of the total package cost will be charged.',
+    '10 to 15 days before the travel date: 50% of the total package cost will be charged.',
+    'Within 7 days of the travel date or after the start of the trip: 100% of the total package cost will be charged.',
   ],
   amendment: [
-    'Clients wishing to prepone/postpone their travel must inform us via email at least 15 days before the scheduled journey.',
-    'One-time amendment is allowed without any additional charges if notified 15 days in advance. Subsequent changes will incur additional charges.',
-    'In some cases, service providers (hoteliers, transporters, etc.) may impose postponement/preponement fees, which will be deducted from the advance amount paid.',
-    'All amendments are subject to availability of services and applicable seasonal rates.',
-    'No changes are permitted within 15 days of the travel date, except in cases like natural calamities or strikes, where special consideration will be given.',
-    'Advance payments for postponed/preponed bookings are valid for 1 year from the date of payment.',
-    'Bookings are transferable to friends or relatives, subject to compliance with the above terms and conditions.',
+    'Requests to postpone or prepone the travel date must be communicated to Him Journey Tours in writing at least 15 days before the scheduled travel date.',
+    'One date change may be permitted without an amendment charge when requested at least 15 days before the travel date, subject to availability.',
+    'Any charges imposed by hotels, transporters or other service providers for the date change will be payable by the client or adjusted from the amount already paid.',
+    'All postponed/preponed bookings are subject to availability and applicable seasonal/festival rates. Any difference in package cost due to revised dates will be payable by the client.',
+    'No postponement or preponement request will normally be accepted within 15 days of the travel date, except where special consideration is possible due to circumstances such as natural calamities, strikes or other exceptional situations.',
+    'The amount paid for a postponed/preponed booking will remain valid for 2 years from the date of the original payment and may be adjusted against a future tour with Him Journey Tours, subject to the applicable terms and availability.',
+    'The booking may be transferred to a friend or relative upon request, subject to availability and compliance with the applicable terms and conditions.',
+    'Cancellation of a booking will be governed separately by the Cancellation Policy above. Postponement/preponement is not considered a cancellation when processed under this policy.',
+  ],
+  terms: [
+    "Room allocation is subject to the hotel's discretion at the time of check-in within the booked room category.",
+    'No refund will be provided for unused accommodation, meals, transportation, sightseeing or other services.',
+    "Hotel services and amenities are subject to the hotel's policies and operating conditions. Any service-related concern will be handled with the concerned service provider on a case-by-case basis.",
+    "In case of unforeseen circumstances beyond the company's control, the company will assist the client in making reasonable alternative arrangements, subject to availability and applicable additional costs.",
   ],
 };
+
+/** Fallback when package catalog has no inclusions/exclusions */
+export const QUOTE_DEFAULT_INCLUSIONS = [
+  'Accommodation as per the itinerary (or similar category hotel).',
+  'Meals as mentioned in the day-wise plan (MAP / as selected).',
+  'Exclusive cab transfers as per the itinerary.',
+  'Airport / railway station / hotel pick-up and drop as applicable.',
+  'Driver allowances, tolls, parking and applicable green/luxury taxes.',
+  'Assistance on arrival.',
+  'All applicable taxes as included in the package fare.',
+];
+
+export const QUOTE_DEFAULT_EXCLUSIONS = [
+  'Anything not mentioned under inclusions.',
+  'Air fare / train fare.',
+  'Monument entry fees, camera charges and guide fees.',
+  'Heater charges (payable directly at the hotel, where applicable).',
+  'Meals other than those specified in the itinerary.',
+  'Personal expenses such as laundry, tips, telephone and beverages.',
+  'Any expense arising due to natural calamities, landslides, strikes or roadblocks.',
+];
 
 export const QUOTE_BANK_ACCOUNTS = COMPANY_BANK_ACCOUNTS;
 

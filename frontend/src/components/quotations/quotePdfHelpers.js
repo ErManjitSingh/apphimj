@@ -1,6 +1,13 @@
 import { getPackageTypeConfig } from './quotationUtils';
-import { getPackageCategoryLabel, QUOTE_POLICIES, QUOTE_BANK_ACCOUNTS } from './quoteTemplateDefaults';
-import { resolveExtraBedNightRate } from '../../lib/mealPlanDefaults';
+import {
+  getPackageCategoryLabel,
+  QUOTE_POLICIES,
+  QUOTE_BANK_ACCOUNTS,
+  QUOTE_DEFAULT_INCLUSIONS,
+  QUOTE_DEFAULT_EXCLUSIONS,
+} from './quoteTemplateDefaults';
+import { resolveExtraBedNightRate, shortMealPlanLabel } from '../../lib/mealPlanDefaults';
+import { pickInclusionExclusionList } from '../../lib/inclusionExclusionLines';
 
 export function resolveQuotePackage(quote) {
   const snap = quote?.packageSnapshot && typeof quote.packageSnapshot === 'object' ? quote.packageSnapshot : {};
@@ -15,12 +22,37 @@ export function resolveQuotePackage(quote) {
     sightseeing: day.sightseeing || '',
     activityNotes: day.activityNotes || '',
   }));
+
+  // Prefer non-empty lists — empty [] on snapshot must not wipe package / catalog data
+  const inclusions = pickInclusionExclusionList(
+    snap.inclusions,
+    snap.includes,
+    pop.inclusions,
+    pop.includes,
+    raw.inclusions,
+    raw.includes,
+    snap._apiRaw?.package?.inclusions,
+    pop._apiRaw?.package?.inclusions,
+    QUOTE_DEFAULT_INCLUSIONS
+  );
+  const exclusions = pickInclusionExclusionList(
+    snap.exclusions,
+    snap.excludes,
+    pop.exclusions,
+    pop.excludes,
+    raw.exclusions,
+    raw.excludes,
+    snap._apiRaw?.package?.exclusions,
+    pop._apiRaw?.package?.exclusions,
+    QUOTE_DEFAULT_EXCLUSIONS
+  );
+
   return {
     ...raw,
     itinerary,
     highlights: raw.highlights || [],
-    inclusions: raw.inclusions || [],
-    exclusions: raw.exclusions || [],
+    inclusions,
+    exclusions,
     coverImage: raw.coverImage || '',
     hotels: raw.hotels || [],
     vehicles: raw.vehicles || [],
@@ -37,8 +69,50 @@ export function resolveQuotePackage(quote) {
   };
 }
 
+function firstNonEmpty(...values) {
+  for (const value of values) {
+    const text = String(value || '').trim();
+    if (text) return text;
+  }
+  return '';
+}
+
+/** Lead may be populated object, id string, or only guest fields on snapshot. */
 export function resolveQuoteLead(quote) {
-  return quote?.lead || {};
+  const raw = quote?.lead;
+  const lead = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const snap = quote?.packageSnapshot && typeof quote.packageSnapshot === 'object' ? quote.packageSnapshot : {};
+  const pkg = quote?.package && typeof quote.package === 'object' ? quote.package : {};
+
+  const name = firstNonEmpty(
+    lead.name,
+    lead.customerName,
+    lead.guestName,
+    lead.fullName,
+    lead.clientName,
+    lead.contactName,
+    quote?.leadName,
+    quote?.customerName,
+    quote?.guestName,
+    snap.guestName,
+    snap.preparedFor,
+    snap.customerName,
+    pkg.guestName,
+    pkg.preparedFor
+  );
+
+  return {
+    ...lead,
+    name,
+    phone: firstNonEmpty(lead.phone, lead.mobile, lead.whatsapp, quote?.leadPhone, snap.guestPhone),
+    email: firstNonEmpty(lead.email, quote?.leadEmail, snap.guestEmail),
+    destination: firstNonEmpty(lead.destination, quote?.destination, snap.destination, pkg.destination),
+    travelDate: lead.travelDate || quote?.travelDate || snap.travelDate || pkg.travelDate || '',
+    adults: lead.adults ?? quote?.adults ?? snap.adults,
+    children: lead.children ?? quote?.children ?? snap.children,
+    travelers: lead.travelers ?? quote?.travelers,
+    numberOfRooms: lead.numberOfRooms ?? lead.rooms ?? snap.rooms,
+  };
 }
 
 export function formatQuoteDate(value) {
@@ -131,13 +205,25 @@ export function buildSelectedHotelsSnapshot(dayWiseHotels, { rooms = 1, mattress
         rating: entry.hotel.rating,
         starCategory: entry.hotel.starCategory,
         reviewCount: entry.hotel.reviewCount,
-        thumbnailUrl: entry.hotel.thumbnailUrl,
-        images: entry.hotel.images,
+        thumbnailUrl:
+          entry.hotel.thumbnailUrl ||
+          entry.hotel.image ||
+          entry.hotel.images?.[0] ||
+          '',
+        image: entry.hotel.image || entry.hotel.thumbnailUrl || entry.hotel.images?.[0] || '',
+        images: entry.hotel.images?.length
+          ? entry.hotel.images
+          : [entry.hotel.thumbnailUrl || entry.hotel.image].filter(Boolean),
         room: entry.room
           ? { ...entry.room, extraBedRates, extraBedRate: extraBedPerNight }
           : entry.room,
         mealPlan: entry.mealPlan,
-        meals: entry.mealPlan?.label || entry.mealPlan?.key || '',
+        meals: (() => {
+          const longLabel = entry.mealPlan?.label || entry.mealPlan?.key || '';
+          const code = shortMealPlanLabel(entry.mealPlan, entry.mealPlanKey, longLabel);
+          return Number(entry.day) === 1 ? code : longLabel;
+        })(),
+        mealPlanKey: shortMealPlanLabel(entry.mealPlan, entry.mealPlanKey, entry.mealPlan?.label),
         nights,
         rooms: lineRooms,
         mattresses: extraMats,
@@ -161,6 +247,9 @@ export function collectHotelImageUrls(hotel = {}) {
     }
   };
   add(hotel.thumbnailUrl);
+  add(hotel.image);
+  add(hotel.coverImage);
+  add(hotel.photo);
   (hotel.images || []).forEach(add);
   (hotel.room?.images || []).forEach(add);
   return urls;
@@ -174,6 +263,9 @@ export function collectHotelOnlyImages(hotel = {}) {
     }
   };
   add(hotel.thumbnailUrl);
+  add(hotel.image);
+  add(hotel.coverImage);
+  add(hotel.photo);
   (hotel.images || []).forEach(add);
   return urls;
 }
@@ -185,17 +277,23 @@ export function collectRoomImages(hotel = {}) {
 function mapSelectedHotelRecord(h, lead, pkg) {
   const hotelImages = collectHotelOnlyImages(h);
   const roomImages = collectRoomImages(h);
+  const dayNum = Number(h.day) || 0;
+  const longMeals =
+    h.mealPlan?.label
+    || (typeof h.mealPlan === 'string' ? h.mealPlan : null)
+    || h.meals
+    || 'Breakfast & Dinner';
+  const mealCode = shortMealPlanLabel(h.mealPlan, h.mealPlanKey, h.meals, longMeals);
+  // Day 1: short MAP only — not "MAP — Breakfast + Dinner"
+  const meals = dayNum === 1 ? mealCode : longMeals;
   return {
     day: h.day,
     date: h.day ? getDayDate(lead.travelDate, h.day) : null,
-    city: h.city || h.location?.split(',')[0]?.trim() || h.location || pkg.destination?.split(/[,·]/)[0]?.trim() || '—',
+city: h.city || h.location?.split(',')[0]?.trim() || h.location || pkg.destination?.split(/[,·]/)[0]?.trim() || '—',
     name: h.name || 'Hotel',
     roomType: h.room?.name || h.roomType || 'Deluxe',
-    meals:
-      h.mealPlan?.label
-      || (typeof h.mealPlan === 'string' ? h.mealPlan : null)
-      || h.meals
-      || 'Breakfast & Dinner',
+    meals,
+    mealPlanKey: mealCode,
     similarHotel: h.similarHotel || '',
     rating: h.rating ?? h.starCategory,
     reviewCount: h.reviewCount,
@@ -285,7 +383,11 @@ export function resolveQuoteHotels(quote) {
         city: enrich?.city || pkg.destination?.split(/[,·]/)[0]?.trim() || '—',
         name: hotelName,
         roomType: enrich?.roomType || 'Deluxe',
-        meals: day.meals || enrich?.meals || 'Breakfast & Dinner',
+        meals:
+          dayNum === 1
+            ? shortMealPlanLabel(day.meals, enrich?.meals, enrich?.mealPlanKey, day.mealPlanKey)
+            : day.meals || enrich?.meals || 'Breakfast & Dinner',
+        mealPlanKey: shortMealPlanLabel(day.meals, enrich?.meals, enrich?.mealPlanKey, day.mealPlanKey),
         similarHotel: enrich?.similarHotel || '',
         thumbnailUrl: enrich?.thumbnailUrl || enrich?.hotelImages?.[0] || '',
         hotelImages: enrich?.hotelImages || [],
@@ -337,7 +439,11 @@ export function resolveQuoteHotels(quote) {
       city: pkg.destination?.split(/[,·]/)[0]?.trim() || '—',
       name: day.hotel,
       roomType: 'Deluxe',
-      meals: day.meals || 'Breakfast & Dinner',
+      meals:
+        Number(day.day) === 1
+          ? shortMealPlanLabel(day.meals, day.mealPlanKey)
+          : day.meals || 'Breakfast & Dinner',
+      mealPlanKey: shortMealPlanLabel(day.meals, day.mealPlanKey),
       similarHotel: '',
       thumbnailUrl: '',
       images: [],

@@ -48,28 +48,62 @@ export function isMapMealPlan(plan = {}) {
   return normalizeMealPlanKey(plan?.key || plan?.label) === 'map';
 }
 
-/** Nightly rate for a meal plan — website room.rates win (same as hotel picker). */
-export function mealPlanNightlyRate(plan = {}, room = {}) {
+/** Short display code: MAP / CP / EP / AP (for Day 1 UI & quotation PDF). */
+export function shortMealPlanLabel(...sources) {
+  for (const src of sources) {
+    if (src == null || src === '') continue;
+    if (typeof src === 'object') {
+      const key = normalizeMealPlanKey(
+        src.key || src.mealPlanKey || src.label || src.meals || src.mealPlan?.key || src.mealPlan?.label
+      );
+      if (key) return key.toUpperCase();
+      continue;
+    }
+    const key = normalizeMealPlanKey(src);
+    if (key) return key.toUpperCase();
+  }
+  return 'MAP';
+}
+
+/** Nightly rate for a meal plan — Hotel Control on/off season + flat rack. */
+export function mealPlanNightlyRate(plan = {}, room = {}, season = 'onSeason') {
   const key = normalizeMealPlanKey(plan?.key || plan?.label);
   const rates = room?.rates || {};
-  const fromRates = key ? Number(rates[key] || 0) : 0;
-  if (fromRates > 0) return fromRates;
+  const seasonKey = season === 'offSeason' ? 'offSeason' : 'onSeason';
+  const seasonal = rates[seasonKey];
+  if (key && seasonal && typeof seasonal === 'object') {
+    const fromSeason = Number(seasonal[key] || 0);
+    if (fromSeason > 0) return fromSeason;
+  }
+  // Flat rates.* are on-season; skip when season is off.
+  if (seasonKey === 'onSeason') {
+    const fromRates = key ? Number(rates[key] || 0) : 0;
+    if (fromRates > 0) return fromRates;
+  }
 
   const absolute = Number(plan?.absolutePrice || 0);
   const supplement = Number(plan?.price || 0);
   const roomBase =
+    Number(seasonal?.ep || 0) ||
     Number(room?.epPrice || 0) ||
     Number(room?.rates?.ep || 0) ||
+    Number(room?.rates?.onSeason?.ep || 0) ||
     Number(room?.pricePerNight || 0) ||
     0;
 
   // Stale plan row: absolute duplicated EP while supplement is the meal premium — use rates if present.
   if (absolute > 0 && supplement > 0 && roomBase > 0 && Math.abs(absolute - roomBase) < 1) {
-    const rebuilt = Number(rates[key || 'map'] || 0);
+    const rebuilt = Number(
+      seasonal?.[key || 'map'] || rates[key || 'map'] || rates?.onSeason?.[key || 'map'] || 0
+    );
     if (rebuilt > 0) return rebuilt;
     return Math.round((roomBase + supplement) * 100) / 100;
   }
-  if (absolute > 0) return absolute;
+  // absolutePrice on meal plans is usually on-season — skip when asking for off-season.
+  if (absolute > 0 && seasonKey === 'onSeason') return absolute;
+  if (absolute > 0 && seasonKey === 'offSeason' && !(seasonal && typeof seasonal === 'object')) {
+    return absolute;
+  }
   return Math.round((roomBase + supplement) * 100) / 100;
 }
 
@@ -81,7 +115,8 @@ function preferPricedPlan(matches = [], room = null) {
 }
 
 /**
- * Prefer API meal options; ensure common plans exist. Fills absolutes from room.rates.
+ * Prefer API meal options; ensure common plans exist. Fills absolutes from room.rates
+ * (on-season flat rack from Hotel Control).
  */
 export function ensureMealPlanOptions(room = {}) {
   const raw =
@@ -90,10 +125,15 @@ export function ensureMealPlanOptions(room = {}) {
       : FALLBACK_MEAL_PLANS.map((p) => ({ ...p }));
 
   const rates = room?.rates || {};
-  const ep = Number(rates.ep || room.epPrice || room.pricePerNight || 0);
+  const on = rates.onSeason || {};
+  const ep =
+    Number(rates.ep || on.ep || room.epPrice || room.pricePerNight || 0) || 0;
+  const rateFor = (key) =>
+    Number(rates[key] || on[key] || 0) || 0;
+
   const enrich = (plan) => {
     const key = normalizeMealPlanKey(plan?.key || plan?.label);
-    const fromRates = key ? Number(rates[key] || 0) : 0;
+    const fromRates = key ? rateFor(key) : 0;
     if (fromRates > 0 && !(Number(plan.absolutePrice) > 0)) {
       return {
         ...plan,
@@ -115,7 +155,7 @@ export function ensureMealPlanOptions(room = {}) {
   const plans = raw.map(enrich);
   const hasMap = plans.some(isMapMealPlan);
   if (!hasMap) {
-    const mapAbs = Number(rates.map || 0);
+    const mapAbs = rateFor('map');
     const mapPlan =
       mapAbs > 0
         ? {
@@ -222,7 +262,7 @@ export function defaultPackageRoomNightly(room = null, mealKey = DEFAULT_MEAL_PL
 }
 
 /** Same rate logic as PackageResourcePickerDrawer — for day cards & seed. */
-export function resolveHotelNightDisplayRate(hotelSel = null, meta = null, mealKey = 'map') {
+export function resolveHotelNightDisplayRate(hotelSel = null, meta = null, mealKey = 'map', season = 'onSeason') {
   const room = hotelSel?.room || meta?.room || {};
   const want =
     normalizeMealPlanKey(
@@ -233,18 +273,53 @@ export function resolveHotelNightDisplayRate(hotelSel = null, meta = null, mealK
         meta?.meals ||
         mealKey
     ) || 'map';
-  const fromRates = Number(room?.rates?.[want] || 0);
-  if (fromRates > 0) return fromRates;
+  const seasonKey = season === 'offSeason' ? 'offSeason' : 'onSeason';
+  const seasonal = room?.rates?.[seasonKey];
+  if (seasonal && Number(seasonal[want] || 0) > 0) {
+    return Number(seasonal[want]);
+  }
+  // Flat rates.* keys are on-season rack — skip when asking for off-season.
+  if (seasonKey === 'onSeason') {
+    const fromRates = Number(room?.rates?.[want] || 0);
+    if (fromRates > 0) return fromRates;
+  }
   const plans = ensureMealPlanOptions(room);
   const selected = hotelSel?.mealPlan || meta?.mealPlan || null;
   const plan =
     resolveSelectedMealPlan(selected, plans, room, want) ||
     pickPreferredMealPlan(plans, room, want);
-  const rate = mealPlanNightlyRate(plan, room);
+  const rate = mealPlanNightlyRate(plan, room, seasonKey);
   if (rate > 0) return rate;
-  return (
-    Number(hotelSel?.absolutePerNight ?? meta?.absolutePerNight ?? meta?.includedRate ?? 0) || 0
-  );
+  // Only fall back to stored absolute when asking for on-season (absolute is usually on-season rack).
+  if (seasonKey === 'onSeason') {
+    return (
+      Number(hotelSel?.absolutePerNight ?? meta?.absolutePerNight ?? meta?.includedRate ?? 0) || 0
+    );
+  }
+  return 0;
+}
+
+/** Remap day-wise hotel absolute rates when quotation season toggle changes. */
+export function applyHotelSeasonToSelections(selections = [], season = 'onSeason') {
+  const seasonKey = season === 'offSeason' ? 'offSeason' : 'onSeason';
+  const list = Array.isArray(selections) ? selections : [];
+  return list.map((entry) => {
+    if (!entry?.hotel && !entry?.room) return entry;
+    const mealKey =
+      entry?.mealPlan?.key || entry?.mealPlanKey || entry?.meals || 'map';
+    const rate = resolveHotelNightDisplayRate(entry, null, mealKey, seasonKey);
+    if (!(rate > 0)) return entry;
+    return {
+      ...entry,
+      absolutePerNight: rate,
+      mealPlan: entry.mealPlan
+        ? { ...entry.mealPlan, absolutePrice: rate }
+        : entry.mealPlan,
+      room: entry.room
+        ? { ...entry.room, pricePerNight: rate }
+        : entry.room,
+    };
+  });
 }
 
 function mealRateNumber(obj, key) {
@@ -316,8 +391,8 @@ export function extraBedRatesFrom(source = {}) {
 }
 
 /**
- * Extra mattress nightly rate from hotel API extra_bed, matched to the selected meal plan.
- * MAP/CP/EP never fall back to AP extra-bed (that is why every hotel showed ₹1,000).
+ * Extra mattress nightly rate from Hotel Control `extraBedRate` / website extra_bed,
+ * matched to the selected meal plan when meal-keyed rates exist.
  */
 export function resolveExtraBedNightRate(source = {}, mealKey = 'map') {
   const room = source?.room && typeof source.room === 'object' ? source.room : source;
@@ -326,9 +401,9 @@ export function resolveExtraBedNightRate(source = {}, mealKey = 'map') {
       mealKey || source?.mealPlan?.key || source?.mealPlanKey || room?.mealPlanKey
     ) || 'map';
 
-  // Manual / override rate on the quotation line wins (own hotels often have no API extra-bed).
+  // Manual / override rate on the quotation line wins.
   const explicit =
-    Number(source?.extraBedPerNight ?? room?.extraBedPerNight ?? room?.extraBedRate ?? 0) || 0;
+    Number(source?.extraBedPerNight ?? room?.extraBedPerNight ?? room?.extraBedRate ?? source?.extraBedRate ?? 0) || 0;
   if (explicit > 0 && (source?.extraBedRateManual || room?.extraBedRateManual)) {
     return explicit;
   }
@@ -349,5 +424,8 @@ export function resolveExtraBedNightRate(source = {}, mealKey = 'map') {
       if (Number(rates[key] || 0) > 0) return Number(rates[key]);
     }
   }
-  return explicit;
+
+  // Hotel Control scalar extraBedRate (same for all meal plans)
+  if (explicit > 0) return explicit;
+  return 0;
 }

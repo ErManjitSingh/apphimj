@@ -1,48 +1,50 @@
 /* HIM JOURNEY TOURS — Premium travel quotation PDF */
 
 .quote-pdf-preview-shell {
-  padding: 28px 16px 48px;
+  padding: 32px 16px 56px;
   display: flex;
   justify-content: center;
   align-items: flex-start;
   min-height: calc(100vh - 56px);
   background:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(93, 95, 239, 0.12), transparent 55%),
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(93, 95, 239, 0.1), transparent 55%),
     linear-gradient(180deg, #eef0f8 0%, #e4e7f2 100%);
 }
 
 .quote-pdf-preview-paper {
-  width: 100%;
-  max-width: 794px;
+  width: 210mm;
+  max-width: min(210mm, 100%);
   box-shadow:
     0 0 0 1px rgba(15, 23, 42, 0.06),
     0 32px 80px -24px rgba(15, 23, 42, 0.45);
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
+  background: #fff;
 }
 
 .quote-ht-pdf {
-  --quote-ink: #0b1220;
-  --quote-navy: #151c2e;
-  --quote-brand: #5d5fef;
-  --quote-brand-deep: #4547d4;
-  --quote-brand-soft: #eef0ff;
-  --quote-brand-mist: #f5f6ff;
-  --quote-gold: #c9a227;
-  --quote-border: #e4e7f0;
-  --quote-muted: #64748b;
-  --quote-text: #334155;
-  --quote-gray-bg: #f7f8fc;
-  --quote-section-gap: 22px;
-  --quote-radius: 12px;
-  width: 100%;
-  max-width: 794px;
+  --quote-ink: #0a0f1a;
+  --quote-navy: #12182a;
+  --quote-brand: #4f46e5;
+  --quote-brand-deep: #3730a3;
+  --quote-brand-soft: #eef2ff;
+  --quote-brand-mist: #f8f9ff;
+  --quote-gold: #b45309;
+  --quote-border: #d8dee9;
+  --quote-muted: #475569;
+  --quote-text: #1e293b;
+  --quote-gray-bg: #f1f5f9;
+  --quote-section-gap: 30px;
+  --quote-radius: 14px;
+  width: 210mm;
+  max-width: 100%;
   margin: 0 auto;
   background: #ffffff;
   color: var(--quote-text);
   font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-  font-size: 11px;
+  font-size: 15px;
   line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
 }
 
 .quote-ht-pdf * {
@@ -53,11 +55,11 @@
 .quote-ht-topbar {
   background: linear-gradient(180deg, #ffffff 0%, #fafbff 100%);
   color: var(--quote-ink);
-  padding: 14px 20px;
+  padding: 18px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 16px;
   border-bottom: 1px solid var(--quote-border);
   position: relative;
 }
@@ -75,13 +77,13 @@
 .quote-ht-brand-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   min-width: 0;
 }
 
 .quote-ht-logo-img {
-  height: 52px;
-  width: 52px;
+  height: 58px;
+  width: 58px;
   border-radius: 50%;
   object-fit: cover;
   background: #000;
@@ -92,59 +94,59 @@
 .quote-ht-brand-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
 }
 
 .quote-ht-brand-name {
-  font-size: 13px;
+  font-size: 19px;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.03em;
   color: var(--quote-ink);
   line-height: 1.2;
 }
 
 .quote-ht-brand-tagline {
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--quote-muted);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .quote-ht-quote-meta {
   text-align: right;
-  font-size: 9px;
-  line-height: 1.45;
+  font-size: 13px;
+  line-height: 1.5;
   color: var(--quote-muted);
   flex-shrink: 0;
 }
 
 .quote-ht-meta-pill {
   display: inline-block;
-  font-size: 7.5px;
+  font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--quote-brand-deep);
   background: var(--quote-brand-soft);
-  padding: 3px 8px;
+  padding: 5px 11px;
   border-radius: 999px;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .quote-ht-quote-meta .qnum {
   font-weight: 800;
-  font-size: 12px;
-  color: var(--quote-brand-deep);
+  font-size: 16px;
+  color: var(--quote-ink);
   letter-spacing: -0.01em;
 }
 
 /* ── Cinematic cover ── */
 .quote-ht-cover {
   position: relative;
-  min-height: 280px;
-  height: 280px;
+  min-height: 320px;
+  height: 320px;
   overflow: hidden;
   background: var(--quote-navy);
   page-break-inside: avoid;
@@ -179,10 +181,10 @@
 
 .quote-ht-cover-ornament {
   position: absolute;
-  left: 22px;
-  top: 22px;
-  width: 36px;
-  height: 2px;
+  left: 26px;
+  top: 26px;
+  width: 42px;
+  height: 3px;
   background: linear-gradient(90deg, var(--quote-gold), transparent);
   z-index: 2;
 }
@@ -190,7 +192,7 @@
 .quote-ht-cover-content {
   position: relative;
   z-index: 1;
-  padding: 36px 22px 24px;
+  padding: 42px 26px 28px;
   color: #fff;
   max-width: 68%;
 }
@@ -199,65 +201,74 @@
   display: inline-block;
   background: var(--quote-brand);
   color: #fff;
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  padding: 5px 11px;
-  border-radius: 6px;
-  margin-bottom: 10px;
+  padding: 6px 13px;
+  border-radius: 7px;
+  margin-bottom: 12px;
   box-shadow: 0 6px 16px rgba(93, 95, 239, 0.45);
 }
 
 .quote-ht-cover-kicker {
-  margin: 0 0 6px;
-  font-size: 10px;
+  margin: 0 0 8px;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  color: rgba(255, 255, 255, 0.72);
+  letter-spacing: 0.03em;
+  color: rgba(255, 255, 255, 0.78);
 }
 
 .quote-ht-cover-title {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   font-family: Georgia, 'Times New Roman', serif;
-  font-size: 28px;
+  font-size: 36px;
   font-weight: 700;
   line-height: 1.15;
   letter-spacing: -0.02em;
-  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
 }
 
 .quote-ht-cover-route {
-  margin: 0 0 14px;
-  font-size: 12px;
+  margin: 0 0 16px;
+  font-size: 15px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.88);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .quote-ht-cover-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 
 .quote-ht-cover-chips span {
-  font-size: 9px;
+  font-size: 13px;
   font-weight: 700;
-  padding: 5px 10px;
+  padding: 7px 13px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.quote-ht-cover-price .price-value {
+  display: block;
+  font-size: 30px;
+  font-weight: 900;
+  color: var(--quote-ink);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
 }
 
 .quote-ht-cover-price {
   position: absolute;
-  right: 18px;
-  bottom: 18px;
+  right: 22px;
+  bottom: 22px;
   z-index: 2;
   background: #fff;
-  border-radius: 14px;
-  padding: 14px 18px;
-  min-width: 148px;
+  border-radius: 16px;
+  padding: 16px 20px;
+  min-width: 168px;
   text-align: center;
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.32);
   border: 1px solid rgba(93, 95, 239, 0.15);
@@ -276,17 +287,17 @@
 
 .quote-ht-cover-price .price-label {
   display: block;
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   color: var(--quote-muted);
-  margin-bottom: 3px;
+  margin-bottom: 4px;
 }
 
 .quote-ht-cover-price .price-value {
   display: block;
-  font-size: 23px;
+  font-size: 28px;
   font-weight: 900;
   color: var(--quote-ink);
   line-height: 1.1;
@@ -295,10 +306,10 @@
 
 .quote-ht-cover-price .price-note {
   display: block;
-  font-size: 7.5px;
+  font-size: 11px;
   color: var(--quote-brand-deep);
   font-weight: 700;
-  margin-top: 4px;
+  margin-top: 5px;
 }
 
 /* ── Glance tiles ── */
@@ -316,8 +327,8 @@
 .quote-ht-glance-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 14px 14px;
+  gap: 12px;
+  padding: 18px 16px;
   border-right: 1px solid var(--quote-border);
   min-width: 0;
 }
@@ -327,12 +338,12 @@
 }
 
 .quote-ht-glance-icon {
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   background: var(--quote-brand-soft);
   color: var(--quote-brand-deep);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 900;
   display: inline-flex;
   align-items: center;
@@ -343,19 +354,20 @@
 
 .quote-ht-glance-item .lbl {
   display: block;
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   color: var(--quote-muted);
+  margin-bottom: 2px;
 }
 
 .quote-ht-glance-item .val {
   display: block;
-  font-size: 11px;
+  font-size: 15px;
   font-weight: 800;
   color: var(--quote-ink);
-  line-height: 1.25;
+  line-height: 1.3;
   word-break: break-word;
 }
 
@@ -363,62 +375,74 @@
 .quote-ht-highlights {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  padding: 14px 18px 2px;
+  gap: 12px;
+  padding: 0;
   page-break-inside: avoid;
   break-inside: avoid;
 }
 
+.quote-ht-highlights--1 {
+  grid-template-columns: 1fr;
+}
+
+.quote-ht-highlights--2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+.quote-ht-highlights--4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
 .quote-ht-highlight-card {
   margin: 0;
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
   border: 1px solid var(--quote-border);
   background: var(--quote-gray-bg);
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
 }
 
 .quote-ht-highlight-img {
   display: block;
   width: 100%;
-  height: 84px;
+  height: 128px;
   object-fit: cover;
 }
 
 .quote-ht-highlight-card figcaption {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  font-size: 8.5px;
+  gap: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
   font-weight: 700;
-  color: var(--quote-navy);
+  color: var(--quote-ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .quote-ht-highlight-num {
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 800;
-  color: var(--quote-brand);
+  color: var(--quote-brand-deep);
   letter-spacing: 0.04em;
 }
 
 /* ── Sections ── */
 .quote-ht-section {
-  margin: var(--quote-section-gap) 18px 0;
+  margin: var(--quote-section-gap) 22px 0;
 }
 
 .quote-ht-section-spaced {
-  margin-top: calc(var(--quote-section-gap) + 4px);
+  margin-top: calc(var(--quote-section-gap) + 6px);
 }
 
 .quote-ht-section-title {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  margin-bottom: 12px;
+  gap: 4px;
+  margin-bottom: 14px;
   padding-bottom: 0;
   border-bottom: none;
   page-break-after: avoid;
@@ -426,16 +450,16 @@
 }
 
 .quote-ht-section-eyebrow {
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--quote-brand-deep);
 }
 
 .quote-ht-section-heading {
   font-family: Georgia, 'Times New Roman', serif;
-  font-size: 17px;
+  font-size: 24px;
   font-weight: 700;
   color: var(--quote-ink);
   letter-spacing: -0.015em;
@@ -444,9 +468,9 @@
 
 .quote-ht-section-rule {
   display: block;
-  width: 42px;
+  width: 48px;
   height: 3px;
-  margin-top: 6px;
+  margin-top: 8px;
   border-radius: 999px;
   background: linear-gradient(90deg, var(--quote-brand), rgba(93, 95, 239, 0.15));
 }
@@ -460,35 +484,76 @@
 }
 
 .quote-ht-section--flush .quote-ht-section-title {
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
-/* Welcome */
+/* Welcome / bullet points */
 .quote-ht-welcome {
-  font-size: 11px;
-  color: #475569;
-  line-height: 1.7;
-  padding: 14px 16px;
+  font-size: 15.5px;
+  color: var(--quote-text);
+  line-height: 1.65;
+  padding: 18px 18px;
   background: var(--quote-brand-mist);
-  border: 1px solid rgba(93, 95, 239, 0.12);
+  border: 1px solid rgba(79, 70, 229, 0.16);
   border-radius: var(--quote-radius);
-  border-left: 3px solid var(--quote-brand);
+  border-left: 4px solid var(--quote-brand);
+}
+
+.quote-ht-welcome--points {
+  padding: 16px 18px 14px;
 }
 
 .quote-ht-welcome p {
-  margin: 0 0 8px;
+  margin: 0 0 12px;
+}
+
+.quote-ht-welcome-guest {
+  font-size: 17px !important;
+  font-weight: 700;
+  color: var(--quote-ink);
+  margin-bottom: 14px !important;
 }
 
 .quote-ht-welcome-contact {
-  margin-top: 4px !important;
-  padding-top: 10px;
-  border-top: 1px dashed rgba(93, 95, 239, 0.25);
-  font-size: 10px;
+  margin-top: 10px !important;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(79, 70, 229, 0.28);
+  font-size: 14px;
   color: var(--quote-muted);
 }
 
 .quote-ht-welcome-contact strong {
+  color: var(--quote-ink);
+}
+
+.quote-ht-bullets {
+  margin: 0;
+  padding: 0 0 0 18px;
+  list-style: disc;
+}
+
+.quote-ht-bullets li {
+  margin: 0 0 8px;
+  padding-left: 2px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--quote-ink);
+  line-height: 1.45;
+}
+
+.quote-ht-bullets li::marker {
   color: var(--quote-brand-deep);
+}
+
+.quote-ht-day-points {
+  margin: 4px 0 10px;
+}
+
+.quote-ht-day-points li {
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--quote-ink);
 }
 
 /* Snapshot grid */
@@ -505,7 +570,7 @@
 
 .quote-ht-snapshot-cell {
   background: #fff;
-  padding: 11px 13px;
+  padding: 14px 16px;
 }
 
 .quote-ht-snapshot-cell:nth-child(odd) {
@@ -514,46 +579,46 @@
 
 .quote-ht-snapshot-cell .lbl {
   display: block;
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--quote-muted);
-  margin-bottom: 3px;
+  margin-bottom: 4px;
 }
 
 .quote-ht-snapshot-cell .val {
   display: block;
-  font-size: 11px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--quote-ink);
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
 /* Transport cards */
 .quote-ht-transport-grid {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .quote-ht-transport-card {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 13px 14px;
+  gap: 14px;
+  padding: 16px 16px;
   border: 1px solid rgba(93, 95, 239, 0.18);
   border-radius: var(--quote-radius);
   background: linear-gradient(90deg, var(--quote-brand-soft) 0%, #fff 32%);
 }
 
 .quote-ht-transport-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 11px;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
   background: linear-gradient(145deg, var(--quote-brand) 0%, var(--quote-brand-deep) 100%);
   color: #fff;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 900;
   letter-spacing: 0.06em;
   display: inline-flex;
@@ -564,15 +629,15 @@
 }
 
 .quote-ht-transport-name {
-  font-size: 12.5px;
+  font-size: 16px;
   font-weight: 800;
   color: var(--quote-ink);
 }
 
 .quote-ht-transport-meta {
-  font-size: 9.5px;
+  font-size: 14px;
   color: var(--quote-muted);
-  margin-top: 2px;
+  margin-top: 3px;
   text-transform: capitalize;
 }
 
@@ -585,8 +650,8 @@
 
 .quote-ht-timeline-item {
   display: grid;
-  grid-template-columns: 38px 1fr;
-  gap: 10px;
+  grid-template-columns: 44px 1fr;
+  gap: 12px;
   page-break-inside: avoid;
   break-inside: avoid;
 }
@@ -599,12 +664,12 @@
 }
 
 .quote-ht-timeline-dot {
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: linear-gradient(145deg, var(--quote-brand) 0%, var(--quote-brand-deep) 100%);
   color: #fff;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 900;
   display: inline-flex;
   align-items: center;
@@ -617,7 +682,7 @@
 .quote-ht-timeline-line {
   flex: 1;
   width: 2px;
-  min-height: 24px;
+  min-height: 28px;
   background: linear-gradient(180deg, rgba(93, 95, 239, 0.55), #e2e8f0);
   margin: 4px 0 0;
 }
@@ -626,8 +691,8 @@
   border: 1px solid var(--quote-border);
   border-radius: var(--quote-radius);
   background: #fff;
-  padding: 13px 14px;
-  margin-bottom: 14px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
   box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
 }
 
@@ -639,52 +704,93 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 8px;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.quote-ht-day-head-main {
+  min-width: 0;
+  flex: 1;
 }
 
 .quote-ht-day-title {
   margin: 0;
-  font-size: 13.5px;
+  font-size: 20px;
   font-weight: 800;
   color: var(--quote-ink);
   line-height: 1.3;
 }
 
 .quote-ht-day-date {
-  margin-top: 3px;
-  font-size: 9px;
+  margin-top: 5px;
+  font-size: 14px;
   color: var(--quote-muted);
   font-weight: 600;
 }
 
+.quote-ht-day-thumb {
+  width: 92px;
+  height: 68px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 1px solid var(--quote-border);
+  background: var(--quote-gray-bg);
+}
+
+.quote-ht-day-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .quote-ht-meals-pill {
   flex-shrink: 0;
-  font-size: 8.5px;
+  font-size: 12px;
   font-weight: 800;
   color: var(--quote-brand-deep);
   background: var(--quote-brand-soft);
-  border: 1px solid rgba(93, 95, 239, 0.22);
-  padding: 5px 10px;
+  border: 1px solid rgba(79, 70, 229, 0.22);
+  padding: 6px 12px;
   border-radius: 999px;
   white-space: nowrap;
 }
 
 .quote-ht-day-body {
-  font-size: 10.5px;
-  color: #475569;
-  line-height: 1.65;
-  margin-bottom: 8px;
+  font-size: 14.5px;
+  color: var(--quote-text);
+  line-height: 1.55;
+  margin-bottom: 10px;
 }
 
 .quote-ht-day-extra {
-  font-size: 10px;
-  color: #64748b;
-  margin-bottom: 8px;
-  padding: 9px 11px;
+  font-size: 14px;
+  color: var(--quote-text);
+  margin-bottom: 10px;
+  padding: 12px 14px;
   background: var(--quote-gray-bg);
-  border-radius: 9px;
+  border-radius: 10px;
   border: 1px solid var(--quote-border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.quote-ht-day-extra-block strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--quote-ink);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.quote-ht-day-extra .quote-ht-bullets li {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 5px;
 }
 
 .quote-ht-day-extra strong {
@@ -699,13 +805,13 @@
 /* ── Hotel voucher card ── */
 .quote-ht-stay-card {
   display: grid;
-  grid-template-columns: 136px 1fr;
+  grid-template-columns: 168px 1fr;
   gap: 0;
   border: 1px solid var(--quote-border);
-  border-radius: 11px;
+  border-radius: 12px;
   overflow: hidden;
   background: #fff;
-  margin-top: 4px;
+  margin-top: 6px;
   page-break-inside: avoid;
   break-inside: avoid;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
@@ -713,7 +819,7 @@
 
 .quote-ht-stay-photo {
   position: relative;
-  min-height: 118px;
+  min-height: 148px;
   background: var(--quote-navy);
 }
 
@@ -734,7 +840,7 @@
   justify-content: center;
   color: rgba(255, 255, 255, 0.7);
   font-weight: 800;
-  font-size: 11px;
+  font-size: 13px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   background: linear-gradient(135deg, #2a2f55, #0b1220);
@@ -742,35 +848,35 @@
 
 .quote-ht-stay-photo-tag {
   position: absolute;
-  left: 8px;
-  bottom: 8px;
+  left: 10px;
+  bottom: 10px;
   background: rgba(93, 95, 239, 0.92);
   color: #fff;
-  font-size: 7.5px;
+  font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  padding: 3px 7px;
-  border-radius: 4px;
+  padding: 4px 9px;
+  border-radius: 5px;
 }
 
 .quote-ht-stay-body {
-  padding: 11px 13px;
+  padding: 14px 16px;
   min-width: 0;
 }
 
 .quote-ht-stay-label {
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   color: var(--quote-brand-deep);
-  margin-bottom: 2px;
+  margin-bottom: 4px;
 }
 
 .quote-ht-stay-name {
   margin: 0;
-  font-size: 13px;
+  font-size: 17px;
   font-weight: 800;
   color: var(--quote-ink);
   line-height: 1.3;
@@ -779,18 +885,18 @@
 .quote-ht-stay-rating {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-top: 3px;
+  gap: 5px;
+  margin-top: 4px;
 }
 
 .quote-ht-stay-stars {
   color: var(--quote-gold);
-  font-size: 9px;
+  font-size: 13px;
   letter-spacing: -1px;
 }
 
 .quote-ht-stay-rating-val {
-  font-size: 9px;
+  font-size: 13px;
   font-weight: 800;
   color: var(--quote-ink);
 }
@@ -798,28 +904,28 @@
 .quote-ht-stay-meta {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  margin-top: 9px;
-  padding-top: 9px;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid var(--quote-border);
 }
 
 .quote-ht-stay-meta-label {
   display: block;
-  font-size: 7.5px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--quote-muted);
-  margin-bottom: 1px;
+  margin-bottom: 3px;
 }
 
 .quote-ht-stay-meta-value {
   display: block;
-  font-size: 9.5px;
+  font-size: 14px;
   font-weight: 800;
   color: var(--quote-ink);
-  line-height: 1.3;
+  line-height: 1.35;
   word-break: break-word;
 }
 
@@ -827,11 +933,11 @@
 .quote-ht-inc-exc {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 12px;
 }
 
 .quote-ht-inc-exc > div {
-  padding: 13px 14px;
+  padding: 16px 16px;
   border-radius: var(--quote-radius);
   border: 1px solid var(--quote-border);
 }
@@ -847,8 +953,8 @@
 }
 
 .quote-ht-inc-exc h4 {
-  margin: 0 0 8px;
-  font-size: 11px;
+  margin: 0 0 10px;
+  font-size: 15px;
   font-weight: 800;
 }
 
@@ -867,11 +973,13 @@
 }
 
 .quote-ht-inc-exc li {
-  margin-bottom: 5px;
-  padding-left: 16px;
+  margin-bottom: 7px;
+  padding-left: 18px;
   position: relative;
-  font-size: 9.5px;
-  line-height: 1.45;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--quote-ink);
+  font-weight: 600;
 }
 
 .quote-ht-inc-exc .inc li::before {
@@ -892,13 +1000,13 @@
 
 /* Fare strip */
 .quote-ht-fare {
-  margin: 20px 18px;
+  margin: 24px 22px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 16px 20px;
-  border-radius: 14px;
+  gap: 18px;
+  padding: 20px 24px;
+  border-radius: 16px;
   background:
     radial-gradient(ellipse at 90% 20%, rgba(201, 162, 39, 0.28), transparent 45%),
     linear-gradient(110deg, #0b1220 0%, #1a1f3a 48%, #3d3fbf 120%);
@@ -910,16 +1018,16 @@
 
 .quote-ht-fare-label {
   display: block;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: rgba(255, 255, 255, 0.65);
-  margin-bottom: 3px;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 4px;
 }
 
 .quote-ht-fare-sub {
-  font-size: 11.5px;
+  font-size: 14px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.92);
 }
@@ -930,7 +1038,7 @@
 
 .quote-ht-fare-amount {
   display: block;
-  font-size: 26px;
+  font-size: 34px;
   font-weight: 900;
   color: #fff;
   line-height: 1.1;
@@ -939,9 +1047,9 @@
 
 .quote-ht-fare-note {
   display: block;
-  font-size: 8px;
-  color: #e8d48a;
-  margin-top: 4px;
+  font-size: 13px;
+  color: #fde68a;
+  margin-top: 5px;
   font-weight: 600;
 }
 
@@ -949,13 +1057,13 @@
 .quote-ht-policies-wrap {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .quote-ht-policy {
   border: 1px solid var(--quote-border);
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-radius: 12px;
+  padding: 14px 16px;
   background: #fff;
   page-break-inside: avoid;
   break-inside: avoid;
@@ -963,29 +1071,31 @@
 
 .quote-ht-policy-head {
   font-weight: 800;
-  font-size: 10.5px;
+  font-size: 15px;
   color: var(--quote-ink);
-  padding: 0 0 5px;
+  padding: 0 0 8px;
   border-bottom: 1px solid var(--quote-border);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .quote-ht-policy ul {
   margin: 0;
-  padding: 0 0 2px 16px;
-  font-size: 9.5px;
-  color: #64748b;
+  padding: 0 0 2px 18px;
+  font-size: 14px;
+  color: var(--quote-text);
+  line-height: 1.55;
 }
 
 .quote-ht-policy li {
-  margin-bottom: 2px;
+  margin-bottom: 5px;
+  font-weight: 600;
 }
 
 /* Bank */
 .quote-ht-bank-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 8.5px;
+  font-size: 13px;
   border: 1px solid var(--quote-border);
   border-radius: var(--quote-radius);
   overflow: hidden;
@@ -994,14 +1104,15 @@
 .quote-ht-bank-table th,
 .quote-ht-bank-table td {
   border-bottom: 1px solid var(--quote-border);
-  padding: 8px 8px;
+  padding: 11px 12px;
   text-align: left;
+  color: var(--quote-ink);
 }
 
 .quote-ht-bank-table th {
   background: linear-gradient(180deg, var(--quote-brand-soft) 0%, #f7f8fc 100%);
   font-weight: 800;
-  font-size: 7.5px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--quote-brand-deep);
@@ -1020,14 +1131,14 @@
 .quote-ht-planner {
   display: grid;
   grid-template-columns: 1fr 1.4fr;
-  gap: 10px;
+  gap: 12px;
 }
 
 .quote-ht-planner-box {
-  padding: 14px;
+  padding: 16px;
   border-radius: var(--quote-radius);
   border: 1px solid var(--quote-border);
-  font-size: 10px;
+  font-size: 13px;
   background: #fff;
 }
 
@@ -1038,25 +1149,26 @@
 }
 
 .quote-ht-planner-box h4 {
-  margin: 0 0 6px;
-  font-size: 8.5px;
+  margin: 0 0 8px;
+  font-size: 12px;
   color: var(--quote-brand-deep);
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
 }
 
 .quote-ht-planner-name {
-  font-size: 15px;
+  font-size: 19px;
   font-weight: 800;
   color: var(--quote-ink);
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .quote-ht-contact-line {
-  margin-top: 3px;
-  color: var(--quote-muted);
-  font-size: 9.5px;
+  margin-top: 4px;
+  color: var(--quote-text);
+  font-size: 14px;
+  font-weight: 600;
 }
 
 /* Footer */
@@ -1065,9 +1177,9 @@
   background:
     radial-gradient(ellipse at 50% 0%, rgba(93, 95, 239, 0.35), transparent 55%),
     var(--quote-ink);
-  color: rgba(255, 255, 255, 0.82);
-  padding: 22px 20px 20px;
-  font-size: 9.5px;
+  color: rgba(255, 255, 255, 0.85);
+  padding: 26px 24px 24px;
+  font-size: 13px;
   text-align: center;
   border-top: none;
   page-break-inside: avoid;
@@ -1086,77 +1198,71 @@
 }
 
 .quote-ht-footer-inner {
-  max-width: 420px;
+  max-width: 460px;
   margin: 0 auto;
 }
 
 .quote-ht-footer-logo {
-  height: 52px;
-  width: 52px;
+  height: 56px;
+  width: 56px;
   object-fit: cover;
   display: block;
-  margin: 0 auto 10px;
+  margin: 0 auto 12px;
   background: #000;
   border-radius: 50%;
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
 }
 
 .quote-ht-footer-price {
-  font-size: 11px;
-  margin: 0 0 8px !important;
+  font-size: 14px;
+  margin: 0 0 10px !important;
   color: #fff;
 }
 
 .quote-ht-footer-price strong {
   color: #f0d878;
-  font-size: 15px;
+  font-size: 18px;
 }
 
 .quote-ht-footer-brand {
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   color: #fff;
-  margin: 0 0 4px !important;
+  margin: 0 0 6px !important;
 }
 
 .quote-ht-footer p {
-  margin: 2px 0;
+  margin: 3px 0;
 }
 
 .quote-ht-footer-thanks {
-  margin-top: 10px !important;
-  opacity: 0.7;
+  margin-top: 12px !important;
+  opacity: 0.75;
   font-style: italic;
+  font-size: 13px;
 }
 
-/* Print — seamless page breaks */
+/* Print — keep the same visual design as on-screen preview (WYSIWYG) */
 @media print {
   .quote-pdf-preview-shell,
   .quote-pdf-preview-paper {
-    padding: 0;
-    margin: 0;
-    box-shadow: none;
-    max-width: none;
-    border-radius: 0;
-    background: #fff;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    max-width: none !important;
+    width: 100% !important;
   }
 
   .quote-ht-pdf {
-    max-width: none;
-    overflow: visible;
+    width: 100% !important;
+    max-width: none !important;
+    overflow: visible !important;
   }
 
-  .quote-ht-section {
-    margin-left: 0;
-    margin-right: 0;
-  }
-
-  .quote-ht-fare {
-    margin-left: 0;
-    margin-right: 0;
-  }
-
+  /* Keep cards / borders / spacing identical to preview — do not flatten */
   .quote-ht-topbar,
   .quote-ht-cover,
   .quote-ht-glance,
@@ -1178,7 +1284,8 @@
   .quote-ht-bank-table,
   .quote-ht-footer,
   .quote-ht-cover-price,
-  .quote-ht-timeline-dot {
+  .quote-ht-timeline-dot,
+  .quote-ht-timeline-card {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
@@ -1198,55 +1305,11 @@
     break-after: avoid !important;
   }
 
-  .quote-ht-stay-card,
-  .quote-ht-transport-card,
-  .quote-ht-inc-exc > div,
-  .quote-ht-planner-box,
-  .quote-ht-snapshot-cell,
-  .quote-ht-policy,
-  .quote-ht-day-extra {
-    -webkit-box-decoration-break: clone;
-    box-decoration-break: clone;
-  }
-
-  .quote-ht-timeline-line {
-    display: none !important;
-  }
-
-  .quote-ht-timeline-item {
-    margin-bottom: 12px;
-  }
-
-  .quote-ht-timeline-card {
-    margin-bottom: 0 !important;
-    box-shadow: none !important;
-    border: none !important;
-    border-radius: 0 !important;
-    padding-left: 4px !important;
-    padding-right: 4px !important;
-    background: transparent !important;
-  }
-
-  .quote-ht-cover-price,
-  .quote-ht-timeline-dot {
-    box-shadow: none !important;
-  }
-
-  .quote-ht-stay-card,
-  .quote-ht-transport-card,
-  .quote-ht-inc-exc > div,
-  .quote-ht-planner-box,
-  .quote-ht-fare,
-  .quote-ht-highlight-card,
-  .quote-ht-snapshot {
-    border-radius: 4px !important;
-  }
-
   .quote-ht-day-body,
   .quote-ht-welcome,
   .quote-ht-policy li {
-    orphans: 4;
-    widows: 4;
+    orphans: 3;
+    widows: 3;
   }
 
   .quote-ht-section-title,
@@ -1261,9 +1324,12 @@
   .quote-ht-inc-exc .inc,
   .quote-ht-inc-exc .exc,
   .quote-ht-topbar,
-  .quote-ht-welcome {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+  .quote-ht-welcome,
+  .quote-ht-stay-card,
+  .quote-ht-timeline-card,
+  .quote-ht-transport-card {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   thead {
@@ -1283,29 +1349,117 @@
 }
 
 @media (max-width: 640px) {
-  .quote-ht-glance,
-  .quote-ht-highlights {
-    grid-template-columns: 1fr 1fr;
+  .quote-pdf-preview-shell {
+    padding: 12px 8px 40px;
+  }
+
+  .quote-pdf-preview-paper {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 8px;
+  }
+
+  .quote-ht-pdf {
+    width: 100%;
+    font-size: 16px;
+  }
+
+  .quote-ht-topbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 14px 12px;
+  }
+
+  .quote-ht-quote-meta {
+    text-align: left;
   }
 
   .quote-ht-cover {
     height: auto;
-    min-height: 300px;
+    min-height: 260px;
   }
 
   .quote-ht-cover-content {
     max-width: 100%;
-    padding-bottom: 100px;
+    padding: 18px 14px 110px;
   }
 
   .quote-ht-cover-price {
-    left: 14px;
-    right: 14px;
+    left: 12px;
+    right: 12px;
     bottom: 12px;
   }
 
   .quote-ht-cover-title {
-    font-size: 22px;
+    font-size: 24px;
+  }
+
+  .quote-ht-cover-kicker {
+    font-size: 13px;
+  }
+
+  .quote-ht-section {
+    margin-left: 12px;
+    margin-right: 12px;
+  }
+
+  .quote-ht-section-heading {
+    font-size: 20px;
+  }
+
+  .quote-ht-welcome {
+    font-size: 15px;
+  }
+
+  .quote-ht-welcome-guest {
+    font-size: 16px !important;
+  }
+
+  .quote-ht-snapshot {
+    grid-template-columns: 1fr;
+  }
+
+  .quote-ht-timeline-item {
+    grid-template-columns: 34px 1fr;
+    gap: 8px;
+  }
+
+  .quote-ht-timeline-dot {
+    width: 34px;
+    height: 34px;
+    font-size: 12px;
+  }
+
+  .quote-ht-timeline-card {
+    padding: 12px;
+  }
+
+  .quote-ht-day-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .quote-ht-day-title {
+    font-size: 18px;
+  }
+
+  .quote-ht-day-date {
+    font-size: 13px;
+  }
+
+  .quote-ht-day-thumb {
+    width: 100%;
+    height: 140px;
+  }
+
+  .quote-ht-day-points li {
+    font-size: 15px;
+  }
+
+  .quote-ht-day-extra {
+    grid-template-columns: 1fr;
   }
 
   .quote-ht-stay-card {
@@ -1317,8 +1471,7 @@
   }
 
   .quote-ht-inc-exc,
-  .quote-ht-planner,
-  .quote-ht-snapshot {
+  .quote-ht-planner {
     grid-template-columns: 1fr;
   }
 
@@ -1329,5 +1482,13 @@
 
   .quote-ht-fare-right {
     text-align: left;
+  }
+
+  .quote-ht-transport-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .quote-ht-bank-table {
+    font-size: 13px;
   }
 }

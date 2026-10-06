@@ -21,14 +21,39 @@ export function waitForImages(root, timeoutMs = 8000) {
   );
 }
 
+/** Make relative /uploads paths absolute against the CRM origin. */
+export function absolutizeUrl(url, baseOrigin = typeof window !== 'undefined' ? window.location.origin : '') {
+  const raw = String(url || '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('data:') || raw.startsWith('blob:')) return raw;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (!baseOrigin) return raw;
+  if (raw.startsWith('//')) return `${window.location.protocol}${raw}`;
+  try {
+    return new URL(raw, baseOrigin.endsWith('/') ? baseOrigin : `${baseOrigin}/`).href;
+  } catch {
+    return raw;
+  }
+}
+
+function isSameOriginUrl(url) {
+  try {
+    if (!url || String(url).startsWith('data:')) return true;
+    const u = new URL(url, window.location.href);
+    return u.origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
 /** Print-safe max dimensions — keeps quotation PDF small. */
 function getPrintImageLimits(img) {
   const cls = String(img?.className || '');
-  if (cls.includes('quote-ht-cover-img')) return { maxW: 880, maxH: 520, quality: 0.7 };
-  if (cls.includes('quote-ht-highlight-img')) return { maxW: 340, maxH: 200, quality: 0.65 };
-  if (cls.includes('quote-ht-stay-photo-img')) return { maxW: 400, maxH: 320, quality: 0.68 };
+  if (cls.includes('quote-ht-cover-img')) return { maxW: 880, maxH: 520, quality: 0.72 };
+  if (cls.includes('quote-ht-highlight-img')) return { maxW: 340, maxH: 200, quality: 0.68 };
+  if (cls.includes('quote-ht-stay-photo-img')) return { maxW: 480, maxH: 360, quality: 0.72 };
   if (cls.includes('quote-ht-logo-img') || cls.includes('quote-ht-footer-logo')) {
-    return { maxW: 220, maxH: 90, quality: 0.8 };
+    return { maxW: 220, maxH: 90, quality: 0.82 };
   }
   return { maxW: 640, maxH: 480, quality: 0.7 };
 }
@@ -54,7 +79,6 @@ function canvasToJpeg(canvas, quality = 0.7) {
 
 /**
  * Resize + compress an HTMLImageElement for print/PDF embedding.
- * Full-resolution embeds were making quotation PDFs very heavy.
  */
 export function imgElementToDataUrl(img, limits) {
   if (!img?.naturalWidth) return null;
@@ -76,40 +100,57 @@ export function imgElementToDataUrl(img, limits) {
   }
 }
 
-/** Load remote image into an Image element (CORS when possible). */
-function loadImageElement(url) {
+/** Load remote image into an Image element. Same-origin skips CORS to avoid tainted canvas. */
+function loadImageElement(url, { forceCors = false } = {}) {
   return new Promise((resolve) => {
     const el = new Image();
     el.decoding = 'async';
-    if (!String(url).startsWith('data:')) {
+    const absolute = absolutizeUrl(url);
+    const sameOrigin = isSameOriginUrl(absolute);
+    if (!String(absolute).startsWith('data:') && (forceCors || !sameOrigin)) {
       el.crossOrigin = 'anonymous';
       el.referrerPolicy = 'no-referrer';
     }
     el.onload = () => resolve(el);
     el.onerror = () => resolve(null);
-    el.src = url;
+    el.src = absolute;
   });
 }
 
 /** Fetch/load image then compress through canvas for a light data URL. */
 async function urlToCompressedDataUrl(url, limits) {
   if (!url) return null;
+  const absolute = absolutizeUrl(url);
 
-  if (String(url).startsWith('data:image/')) {
-    const el = await loadImageElement(url);
-    if (!el) return url.length < 120_000 ? url : null;
-    return imgElementToDataUrl(el, limits) || (url.length < 120_000 ? url : null);
+  if (String(absolute).startsWith('data:image/')) {
+    const el = await loadImageElement(absolute);
+    if (!el) return absolute.length < 120_000 ? absolute : null;
+    return imgElementToDataUrl(el, limits) || (absolute.length < 120_000 ? absolute : null);
   }
 
-  const el = await loadImageElement(url);
+  // Prefer same-origin load without CORS (uploads/hotels work this way).
+  let el = await loadImageElement(absolute, { forceCors: false });
   if (el?.naturalWidth) {
     const compressed = imgElementToDataUrl(el, limits);
     if (compressed) return compressed;
   }
 
-  // Last resort: raw fetch — still attempt canvas compress after blob load
+  // Cross-origin retry with anonymous CORS
+  if (!isSameOriginUrl(absolute)) {
+    el = await loadImageElement(absolute, { forceCors: true });
+    if (el?.naturalWidth) {
+      const compressed = imgElementToDataUrl(el, limits);
+      if (compressed) return compressed;
+    }
+  }
+
+  // Fetch blob (same-origin always works; cross-origin needs CORS)
   try {
-    const res = await fetch(url, { mode: 'cors', cache: 'force-cache' });
+    const res = await fetch(absolute, {
+      mode: isSameOriginUrl(absolute) ? 'same-origin' : 'cors',
+      credentials: isSameOriginUrl(absolute) ? 'same-origin' : 'omit',
+      cache: 'force-cache',
+    });
     if (!res.ok) return null;
     const blob = await res.blob();
     const objectUrl = URL.createObjectURL(blob);
@@ -132,7 +173,18 @@ async function urlToCompressedDataUrl(url, limits) {
 export async function cloneWithEmbeddedImages(contentEl) {
   if (!contentEl) return null;
 
-  await waitForImages(contentEl, 10000);
+  // Absolutize live img srcs first so relative /uploads paths resolve for print clones
+  contentEl.querySelectorAll('img').forEach((img) => {
+    const raw = img.getAttribute('src') || img.src || '';
+    if (!raw || raw.startsWith('data:')) return;
+    const abs = absolutizeUrl(raw);
+    if (abs && abs !== raw) {
+      img.setAttribute('src', abs);
+      img.src = abs;
+    }
+  });
+
+  await waitForImages(contentEl, 12000);
 
   const clone = contentEl.cloneNode(true);
   const srcImgs = contentEl.querySelectorAll('img');
@@ -144,12 +196,22 @@ export async function cloneWithEmbeddedImages(contentEl) {
     if (!srcImg || !cloneImg) continue;
 
     const limits = getPrintImageLimits(srcImg);
+    const rawSrc = srcImg.currentSrc || srcImg.src || srcImg.getAttribute('src') || '';
+    const absolute = absolutizeUrl(rawSrc);
+
     let dataUrl = imgElementToDataUrl(srcImg, limits);
-    if (!dataUrl && srcImg.src) {
-      dataUrl = await urlToCompressedDataUrl(srcImg.src, limits);
+    if (!dataUrl && absolute) {
+      dataUrl = await urlToCompressedDataUrl(absolute, limits);
     }
+
     if (dataUrl) {
       cloneImg.src = dataUrl;
+      cloneImg.removeAttribute('srcset');
+      cloneImg.removeAttribute('sizes');
+      cloneImg.removeAttribute('crossorigin');
+    } else if (absolute) {
+      // Keep absolute URL so print iframe (with <base>) can still load it
+      cloneImg.src = absolute;
       cloneImg.removeAttribute('srcset');
       cloneImg.removeAttribute('sizes');
     }
