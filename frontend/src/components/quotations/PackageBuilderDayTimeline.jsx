@@ -19,7 +19,6 @@ import {
   Copy,
   Car,
   Hotel,
-  UtensilsCrossed,
   Sparkles,
   Star,
   RefreshCw,
@@ -31,7 +30,7 @@ import { useState } from 'react';
 import { cn } from '../../lib/utils';
 import { defaultItineraryDay, formatINR } from './quotationUtils';
 import { resolvePartyOccupancy, resolveCabCount, clampExtraMattresses, MAX_EXTRA_MATTRESSES_PER_ROOM } from './partyCosting';
-import { resolveHotelNightDisplayRate, resolveExtraBedNightRate } from '../../lib/mealPlanDefaults';
+import { resolveHotelNightDisplayRate, resolveExtraBedNightRate, shortMealPlanLabel } from '../../lib/mealPlanDefaults';
 import {
   getCabCapacityHint,
   getHotelRoomHint,
@@ -39,6 +38,18 @@ import {
   extraMattressesOnLine,
   extraMattressesForDay,
 } from './partyCapacityHints';
+
+/** @deprecated use shortMealPlanLabel — kept for Day 1 hotel card */
+function shortMealPlanCode(meta, hotelSel) {
+  return shortMealPlanLabel(
+    hotelSel?.mealPlan,
+    meta?.mealPlan,
+    meta?.mealPlanKey,
+    hotelSel?.meals,
+    meta?.meals,
+    meta?.mealPlan?.label
+  );
+}
 
 const DAY_ACCENTS = [
   { card: 'border-teal-200 bg-gradient-to-br from-teal-50 to-white', badge: 'bg-teal-600 shadow-teal-600/30', strip: 'from-teal-500 to-cyan-400' },
@@ -155,6 +166,7 @@ function HotelCard({
   onAddRoom,
   onChangeExtraRoom,
   onChangeRoomMattresses,
+  onRemoveHotel,
   emptyLabel,
   rooms = 1,
   showTotal = true,
@@ -162,6 +174,8 @@ function HotelCard({
   extraRoomLines = [],
   primaryExtraMattresses = 0,
   onChangeMattressRate,
+  dayNumber = null,
+  hotelSeason = 'onSeason',
 }) {
   const image = meta?.image || meta?.images?.[0];
   const stars = Math.min(5, Math.round(Number(meta?.starRating || 0)));
@@ -171,11 +185,26 @@ function HotelCard({
     hotelSel?.perNight ?? hotelSel?.totalCost ?? meta?.priceDelta ?? 0
   );
   const isIncluded = upgradePerNight <= 0;
-  const rateNight = resolveHotelNightDisplayRate(hotelSel, meta, 'map');
+  const isDayOne = Number(dayNumber) === 1;
+  const seasonKey = hotelSeason === 'offSeason' ? 'offSeason' : 'onSeason';
+  const mealKey =
+    hotelSel?.mealPlan?.key ||
+    hotelSel?.mealPlanKey ||
+    meta?.mealPlanKey ||
+    meta?.mealPlan?.key ||
+    'map';
+  const rateNight = resolveHotelNightDisplayRate(hotelSel, meta, mealKey, seasonKey);
+  const mattressRate = resolveExtraBedNightRate(hotelSel || meta, mealKey);
   const rawTotal = isIncluded
     ? rateNight * nights
     : rateNight * nights * Math.max(1, Number(rooms) || 1);
   const displayTotal = Math.round(rawTotal * 100) / 100;
+  const hasStay = Boolean(meta?.name || hotelSel?.hotel?.name);
+  const seasonChipLabel = seasonKey === 'offSeason' ? 'Off Season Price' : 'On Season Price';
+  const seasonChipClass =
+    seasonKey === 'offSeason'
+      ? 'rounded-md bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-800'
+      : 'rounded-md bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800';
 
   return (
     <div className="rounded-xl border border-violet-200 bg-violet-50/70 overflow-hidden shadow-sm shadow-violet-100/50">
@@ -212,18 +241,25 @@ function HotelCard({
                     {stars}★
                   </span>
                 )}
-                {meta?.tierName && <span>{meta.tierName}</span>}
-                {meta?.room?.name && meta.room.name !== meta.tierName && (
-                  <span>· {meta.room.name}</span>
+                {/* Day 1 only: show short meal code (MAP) — hide Deluxe / full meal label / Included */}
+                {isDayOne && hasStay ? (
+                  <span className="font-semibold text-violet-800">{shortMealPlanCode(meta, hotelSel)}</span>
+                ) : (
+                  <>
+                    {meta?.tierName && <span>{meta.tierName}</span>}
+                    {meta?.room?.name && meta.room.name !== meta.tierName && (
+                      <span>· {meta.room.name}</span>
+                    )}
+                    {(meta?.mealPlan?.label || meta?.meals) && (
+                      <span>· {meta.mealPlan?.label || meta.meals}</span>
+                    )}
+                    {isIncluded && hasStay ? (
+                      <span className="font-medium text-emerald-700">· Included in package</span>
+                    ) : displayTotal <= 0 ? (
+                      <span className="font-medium text-slate-400">· Not included</span>
+                    ) : null}
+                  </>
                 )}
-                {(meta?.mealPlan?.label || meta?.meals) && (
-                  <span>· {meta.mealPlan?.label || meta.meals}</span>
-                )}
-                {isIncluded && (meta?.name || hotelSel?.hotel?.name) ? (
-                  <span className="font-medium text-emerald-700">· Included in package</span>
-                ) : displayTotal <= 0 ? (
-                  <span className="font-medium text-slate-400">· Not included</span>
-                ) : null}
               </div>
             </div>
             <div className="flex flex-col items-end gap-1.5 shrink-0">
@@ -231,6 +267,18 @@ function HotelCard({
                 <p className="text-base font-bold text-violet-800 metric-tabular leading-none">
                   {formatINR(displayTotal)}
                 </p>
+              )}
+              {rateNight > 0 && (
+                <div className="flex flex-wrap justify-end gap-1">
+                  <span className={seasonChipClass}>
+                    {seasonChipLabel} {formatINR(rateNight)}/n
+                  </span>
+                  {mattressRate > 0 && (
+                    <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-[9px] font-bold text-teal-800">
+                      Extra Mattress {formatINR(mattressRate)}/n
+                    </span>
+                  )}
+                </div>
               )}
               {showTotal && isIncluded && displayTotal > 0 && (
                 <p className="text-[10px] font-semibold text-emerald-700 leading-none">
@@ -241,14 +289,7 @@ function HotelCard({
                 {onChangeRoomMattresses && (meta?.name || hotelSel?.hotel?.name) && (
                   <MattressStepper
                     count={primaryExtraMattresses}
-                    nightRate={resolveExtraBedNightRate(
-                      hotelSel || meta,
-                      hotelSel?.mealPlan?.key ||
-                        hotelSel?.mealPlanKey ||
-                        meta?.mealPlanKey ||
-                        meta?.mealPlan?.key ||
-                        'map'
-                    )}
+                    nightRate={mattressRate}
                     onChange={(n) =>
                       onChangeRoomMattresses(Number(hotelSel?.roomSlot || 1), n)
                     }
@@ -310,7 +351,7 @@ function HotelCard({
           ))}
         </div>
       )}
-      {(roomHint?.needsAction || onAddRoom || roomHint?.stayWithMattress) && (
+      {(roomHint?.needsAction || onAddRoom || roomHint?.stayWithMattress || (hasStay && onRemoveHotel) || (!hasStay && onOpenPicker)) && (
         <div className="flex flex-wrap gap-2 px-3 pb-3 pt-0">
           {onOpenPicker && (
             <button
@@ -319,10 +360,10 @@ function HotelCard({
               className="inline-flex items-center gap-1 h-8 px-3 rounded-lg border border-violet-300 bg-white text-[11px] font-bold text-violet-700 hover:bg-violet-50"
             >
               <RefreshCw className="w-3 h-3" />
-              Change hotel / room
+              {hasStay ? 'Change hotel / room' : 'Select hotel'}
             </button>
           )}
-          {onAddRoom && (
+          {onAddRoom && hasStay && (
             <button
               type="button"
               onClick={onAddRoom}
@@ -330,6 +371,16 @@ function HotelCard({
             >
               <Plus className="w-3 h-3" />
               Add room
+            </button>
+          )}
+          {hasStay && onRemoveHotel && (
+            <button
+              type="button"
+              onClick={onRemoveHotel}
+              className="inline-flex items-center gap-1 h-8 px-3 rounded-lg border border-rose-200 bg-white text-[11px] font-bold text-rose-600 hover:bg-rose-50"
+            >
+              <Trash2 className="w-3 h-3" />
+              Remove hotel
             </button>
           )}
         </div>
@@ -551,6 +602,7 @@ function SortableDayCard({
   onChangeExtraRoom,
   onChangeRoomMattresses,
   onChangeMattressRate,
+  onRemoveHotel,
   onChangeCab,
   onAddCab,
   onCabFareChange,
@@ -566,6 +618,7 @@ function SortableDayCard({
   party = null,
   lead = null,
   dayWiseHotels = [],
+  hotelSeason = 'onSeason',
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: day.id });
   const style = {
@@ -609,20 +662,25 @@ function SortableDayCard({
   const roomLines = getRoomLinesForDay(dayWiseHotels, dayNum);
   const primaryLine = roomLines[0] || hotelSel;
   const extraRoomLines = roomLines.slice(1);
-  const roomHint = getHotelRoomHint(
-    lead,
-    party,
-    Math.max(1, roomLines.length || 1),
-    extraMattressesForDay(dayWiseHotels, dayNum)
+  const hasHotelStay = Boolean(
+    hotelMeta?.name || hotelSel?.hotel?.name || primaryLine?.hotel?.name || day.hotel
   );
+  const roomHint =
+    !isLastDay && hasHotelStay
+      ? getHotelRoomHint(
+          lead,
+          party,
+          Math.max(1, roomLines.length || 1),
+          extraMattressesForDay(dayWiseHotels, dayNum)
+        )
+      : null;
   const cabHint =
     day.day === 1 ? getCabCapacityHint(lead, packageCab, party, extraCabs) : null;
 
   const facts = [
     { icon: Car, label: 'Travel & Transfer', value: packageCab?.name || day.transport || 'Private Transfer', tone: 'border-sky-200 bg-sky-50 text-sky-700' },
-    { icon: Hotel, label: 'Hotel & Stay', value: hotelMeta?.name || day.hotel || (isLastDay ? 'Departure' : '—'), tone: 'border-violet-200 bg-violet-50 text-violet-700' },
+    { icon: Hotel, label: 'Hotel & Stay', value: hotelMeta?.name || day.hotel || (isLastDay ? 'Departure' : 'No hotel'), tone: 'border-violet-200 bg-violet-50 text-violet-700' },
     { icon: Sparkles, label: 'Activities', value: day.activities || day.sightseeing || 'Sightseeing', tone: 'border-amber-200 bg-amber-50 text-amber-700' },
-    { icon: UtensilsCrossed, label: 'Meals', value: hotelMeta?.meals || day.meals || 'As per plan', tone: 'border-rose-200 bg-rose-50 text-rose-700' },
   ];
 
   const joinNames = (items = []) => (Array.isArray(items) ? items.map((x) => x?.name).filter(Boolean) : []).join(' · ');
@@ -720,13 +778,12 @@ function SortableDayCard({
             <div className="flex flex-wrap gap-1.5">
               <Chip tone="bg-sky-100 text-sky-800">Transport</Chip>
               <Chip tone="bg-violet-100 text-violet-800">Stay</Chip>
-              <Chip tone="bg-rose-100 text-rose-800">Meals</Chip>
               {day.sightseeing && <Chip tone="bg-amber-100 text-amber-800">Sightseeing</Chip>}
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 mb-3">
           {facts.map(({ icon: Icon, label, value, tone }) => (
             <div key={label} className={cn('rounded-xl border px-2.5 py-2', tone)}>
               <p className="text-[10px] font-bold inline-flex items-center gap-1 mb-1 opacity-80">
@@ -760,6 +817,11 @@ function SortableDayCard({
                 ? (slot, rate) => onChangeMattressRate?.(day, slot, rate)
                 : undefined
             }
+            onRemoveHotel={
+              !isLastDay && (hotelMeta?.name || hotelSel?.hotel?.name || primaryLine?.hotel?.name)
+                ? () => onRemoveHotel?.(day)
+                : undefined
+            }
             emptyLabel={isLastDay ? 'Departure day · no overnight stay' : 'Select hotel for this night'}
             rooms={extraRoomLines.length > 0 ? 1 : rooms}
             roomHint={!isLastDay ? roomHint : null}
@@ -768,6 +830,8 @@ function SortableDayCard({
             showTotal={Boolean(
               !isLastDay && (primaryLine?.hotel || hotelSel?.hotel || hotelMeta?.name || day.hotel)
             )}
+            dayNumber={day.day || 1}
+            hotelSeason={hotelSeason}
           />
           {renderHotelActions?.(day)}
           {day.day === 1 && (
@@ -955,6 +1019,7 @@ export default function PackageBuilderDayTimeline({
   onChangeExtraRoom,
   onChangeRoomMattresses,
   onChangeMattressRate,
+  onRemoveHotel,
   onChangeCab,
   onAddCab,
   onCabFareChange,
@@ -966,6 +1031,7 @@ export default function PackageBuilderDayTimeline({
   embedded = false,
   lead = null,
   party = null,
+  hotelSeason = 'onSeason',
 }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const occ = party || resolvePartyOccupancy(lead || {});
@@ -1053,6 +1119,7 @@ export default function PackageBuilderDayTimeline({
                   onChangeExtraRoom={onChangeExtraRoom}
                   onChangeRoomMattresses={onChangeRoomMattresses}
                   onChangeMattressRate={onChangeMattressRate}
+                  onRemoveHotel={onRemoveHotel}
                   onChangeCab={onChangeCab}
                   onAddCab={onAddCab}
                   onCabFareChange={onCabFareChange}
@@ -1068,6 +1135,7 @@ export default function PackageBuilderDayTimeline({
                   party={party}
                   lead={lead}
                   dayWiseHotels={dayWiseHotels}
+                  hotelSeason={hotelSeason}
                 />
               );
             })}

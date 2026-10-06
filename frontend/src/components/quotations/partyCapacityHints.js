@@ -146,20 +146,31 @@ export function getPartyCapacityReadiness({
 
   const overnightDays = (() => {
     const days = Array.isArray(itinerary) ? itinerary : [];
+    let candidates = [];
     if (days.length > 1) {
       // Last itinerary day is usually departure (no overnight).
-      return days.slice(0, -1).map((d, i) => Number(d.day) || i + 1);
+      candidates = days.slice(0, -1).map((d, i) => Number(d.day) || i + 1);
+    } else if (days.length === 1) {
+      candidates = [Number(days[0].day) || 1];
+    } else {
+      candidates = [
+        ...new Set(
+          (Array.isArray(dayWiseHotels) ? dayWiseHotels : [])
+            .map((h) => Number(h.day) || 0)
+            .filter((d) => d > 0)
+        ),
+      ].sort((a, b) => a - b);
     }
-    if (days.length === 1) return [Number(days[0].day) || 1];
 
-    const fromHotels = [
-      ...new Set(
-        (Array.isArray(dayWiseHotels) ? dayWiseHotels : [])
-          .map((h) => Number(h.day) || 0)
-          .filter((d) => d > 0)
-      ),
-    ];
-    return fromHotels.sort((a, b) => a - b);
+    // Skip nights where sales intentionally removed / never set a hotel.
+    return candidates.filter((dayNum) => {
+      const hasLine = (Array.isArray(dayWiseHotels) ? dayWiseHotels : []).some(
+        (h) => Number(h.day) === Number(dayNum)
+      );
+      if (hasLine) return true;
+      const day = days.find((d) => Number(d.day) === Number(dayNum));
+      return Boolean(day?.hotelMeta?.name || day?.hotel);
+    });
   })();
 
   const roomGaps = overnightDays.map((dayNum) => {
@@ -187,8 +198,9 @@ export function getPartyCapacityReadiness({
   }
 
   const roomsReady =
-    (roomGaps.length > 0 && roomGaps.every((g) => g.capacity >= adults)) ||
-    (roomGaps.length === 0 && adults <= BASE_ADULTS_PER_ROOM);
+    roomGaps.length === 0
+      ? true
+      : roomGaps.every((g) => g.capacity >= adults);
 
   const missingParts = [];
   if (!roomsReady) {

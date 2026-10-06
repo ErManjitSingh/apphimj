@@ -184,10 +184,10 @@ export function stripHtml(input = '') {
 
 const SECTION_TONES = {
   package: {
-    wrap: 'border-indigo-200/90 bg-gradient-to-br from-indigo-50 via-white to-sky-50 shadow-indigo-100/60',
-    bar: 'from-indigo-500 to-sky-500',
-    badge: 'bg-indigo-600 text-white',
-    iconWrap: 'bg-indigo-100 text-indigo-600',
+    wrap: 'border-slate-200/90 bg-gradient-to-br from-slate-50 via-white to-teal-50/50 shadow-slate-200/50',
+    bar: 'from-slate-800 to-teal-600',
+    badge: 'bg-slate-900 text-white',
+    iconWrap: 'bg-slate-900 text-teal-200',
   },
   route: {
     wrap: 'border-amber-200/90 bg-gradient-to-br from-amber-50 via-white to-orange-50 shadow-amber-100/60',
@@ -202,10 +202,10 @@ const SECTION_TONES = {
     iconWrap: 'bg-sky-100 text-sky-700',
   },
   stay: {
-    wrap: 'border-violet-200/90 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50 shadow-violet-100/60',
-    bar: 'from-violet-500 to-fuchsia-500',
-    badge: 'bg-violet-600 text-white',
-    iconWrap: 'bg-violet-100 text-violet-700',
+    wrap: 'border-teal-200/90 bg-gradient-to-br from-teal-50 via-white to-emerald-50 shadow-teal-100/60',
+    bar: 'from-teal-500 to-emerald-500',
+    badge: 'bg-teal-600 text-white',
+    iconWrap: 'bg-teal-100 text-teal-700',
   },
   itinerary: {
     wrap: 'border-teal-200/90 bg-gradient-to-br from-teal-50 via-cyan-50/40 to-white shadow-teal-100/60',
@@ -214,14 +214,14 @@ const SECTION_TONES = {
     iconWrap: 'bg-teal-100 text-teal-700',
   },
   policy: {
-    wrap: 'border-emerald-200/90 bg-gradient-to-br from-emerald-50 via-white to-rose-50 shadow-emerald-100/50',
-    bar: 'from-emerald-500 to-rose-400',
+    wrap: 'border-emerald-200/90 bg-gradient-to-br from-emerald-50 via-white to-orange-50 shadow-emerald-100/50',
+    bar: 'from-emerald-500 to-orange-400',
     badge: 'bg-emerald-600 text-white',
     iconWrap: 'bg-emerald-100 text-emerald-700',
   },
   preview: {
-    wrap: 'border-slate-300 bg-gradient-to-br from-slate-100 via-white to-violet-50 shadow-slate-200/50',
-    bar: 'from-slate-600 to-violet-500',
+    wrap: 'border-slate-300 bg-gradient-to-br from-slate-100 via-white to-teal-50 shadow-slate-200/50',
+    bar: 'from-slate-700 to-teal-500',
     badge: 'bg-slate-800 text-white',
     iconWrap: 'bg-slate-200 text-slate-700',
   },
@@ -282,7 +282,7 @@ function PackageDescription({ text, fallback }) {
   const needsMore = plain.length > 160 || plain.split(/\n/).length > 2;
 
   return (
-    <div className="space-y-1 rounded-xl bg-white/70 border border-indigo-100/80 px-3.5 py-3">
+    <div className="space-y-1 rounded-xl bg-white/70 border border-teal-100/80 px-3.5 py-3">
       <p className={cn('text-sm text-slate-700 leading-relaxed whitespace-pre-line', !expanded && 'line-clamp-2')}>
         {plain}
       </p>
@@ -290,7 +290,7 @@ function PackageDescription({ text, fallback }) {
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="text-sm font-semibold text-indigo-600 hover:text-indigo-700"
+          className="text-sm font-semibold text-teal-700 hover:text-teal-800"
         >
           {expanded ? 'Show less' : 'Read more >'}
         </button>
@@ -329,6 +329,8 @@ export default function PackageBuilderWorkspace({
   onExtraCabsChange,
   stayWithMattress = false,
   onStayWithMattressChange,
+  hotelSeason = 'onSeason',
+  onHotelSeasonChange,
   packageCabs = [],
   pricing,
   onPricingChange,
@@ -366,8 +368,30 @@ export default function PackageBuilderWorkspace({
       grandTotal: draftQuote.pricing?.total,
       destination: draftQuote.package?.destination || pkg?.destination || lead?.destination,
       travelDate: lead?.travelDate,
+      lead: draftQuote.lead?.name ? draftQuote.lead : (lead || draftQuote.lead),
+      leadName: draftQuote.leadName || lead?.name || lead?.customerName || '',
     };
-  }, [draftQuote, pkg?.destination, lead?.destination, lead?.travelDate]);
+  }, [draftQuote, pkg?.destination, lead, lead?.destination, lead?.travelDate]);
+
+  const previewQuote = useMemo(() => {
+    if (!draftQuote) return null;
+    const guestName = lead?.name || lead?.customerName || lead?.fullName || draftQuote.lead?.name || '';
+    return {
+      ...draftQuote,
+      lead: {
+        ...(typeof draftQuote.lead === 'object' && draftQuote.lead ? draftQuote.lead : {}),
+        ...(lead && typeof lead === 'object' ? lead : {}),
+        name: guestName,
+        phone: lead?.phone || draftQuote.lead?.phone || '',
+      },
+      leadName: guestName,
+      packageSnapshot: {
+        ...(draftQuote.packageSnapshot || draftQuote.package || {}),
+        guestName,
+        preparedFor: guestName,
+      },
+    };
+  }, [draftQuote, lead]);
 
   const shareText = useMemo(
     () =>
@@ -516,7 +540,7 @@ export default function PackageBuilderWorkspace({
       value: destinations[0]?.name && destinations[destinations.length - 1]?.name
         ? `${destinations[0].name} → ${destinations[destinations.length - 1].name}`
         : pkg?.destination || 'Delhi',
-      tone: 'bg-violet-50 border-violet-200 text-violet-700',
+      tone: 'bg-teal-50 border-teal-200 text-teal-700',
     },
   ];
 
@@ -574,8 +598,11 @@ export default function PackageBuilderWorkspace({
         hotel: {
           id: option.id || option.hotelId,
           name: option.name,
-          image: option.image || '',
-          images: option.images || [],
+          image: option.image || option.thumbnailUrl || option.images?.[0] || '',
+          thumbnailUrl: option.thumbnailUrl || option.image || option.images?.[0] || '',
+          images: option.images?.length
+            ? option.images
+            : [option.image || option.thumbnailUrl].filter(Boolean),
           starCategory: option.starRating || 0,
           starRating: option.starRating || 0,
           location: option.location || '',
@@ -675,6 +702,23 @@ export default function PackageBuilderWorkspace({
     setPicker(null);
   };
 
+  const handleRemoveHotel = (day) => {
+    if (!day) return;
+    const nextItinerary = itinerary.map((d) => {
+      if (d.id !== day.id && d.day !== day.day) return d;
+      return {
+        ...d,
+        hotel: '',
+        accommodation: '',
+        hotelMeta: null,
+      };
+    });
+    onItineraryChange?.(nextItinerary);
+    onDayWiseHotelsChange?.(
+      (dayWiseHotels || []).filter((h) => Number(h.day) !== Number(day.day))
+    );
+  };
+
   const handleSetRoomMattresses = (day, roomSlot, count) => {
     if (!day) return;
     const slot = Math.max(1, Number(roomSlot) || 1);
@@ -746,6 +790,7 @@ export default function PackageBuilderWorkspace({
       lines.sort((a, b) => a.day - b.day || (a.roomSlot || 1) - (b.roomSlot || 1))
     );
   };
+
 
   const openCabPicker = (mode = 'change') => setPicker({ type: 'cab', cabMode: mode });
   const openStayPicker = () => setPicker({ type: 'hotel' });
@@ -851,26 +896,26 @@ export default function PackageBuilderWorkspace({
     selectedPackageCab?.id || selectedPackageCab?.packageCabId || selectedPackageCab?.name || null;
 
   return (
-    <div className="relative space-y-4 rounded-none bg-[#f4f5f9] p-0 pb-36 sm:space-y-5 sm:rounded-3xl sm:bg-gradient-to-b sm:from-slate-100 sm:via-indigo-50/40 sm:to-amber-50/30 sm:p-3 sm:pb-4 xl:pb-4 -mx-0 sm:-mx-1">
+    <div className="relative space-y-4 rounded-none bg-[#f1f5f9] p-0 pb-36 sm:space-y-5 sm:rounded-[28px] sm:bg-gradient-to-b sm:from-slate-100 sm:via-teal-50/30 sm:to-orange-50/20 sm:p-3 sm:pb-4 xl:pb-4 -mx-0 sm:-mx-1">
       {/* Mobile sticky top bar */}
-      <div className="sticky top-0 z-30 -mx-0 border-b border-slate-200/80 bg-white/95 px-3 py-2.5 backdrop-blur-md xl:hidden">
+      <div className="sticky top-0 z-30 -mx-0 border-b border-slate-200/80 bg-slate-950/95 px-3 py-2.5 backdrop-blur-md xl:hidden">
         <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={onBack}
             aria-label="Back to packages"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-violet-600">Create Quotation</p>
-            <p className="truncate text-sm font-bold text-slate-900">{lead?.name || 'Customer'}</p>
+            <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-teal-300">Create Quotation</p>
+            <p className="truncate text-sm font-bold text-white">{lead?.name || 'Customer'}</p>
           </div>
           <button
             type="button"
             onClick={() => setShowPreview(true)}
-            className="inline-flex h-9 shrink-0 items-center gap-1 rounded-xl bg-violet-600 px-3 text-xs font-semibold text-white shadow-sm"
+            className="inline-flex h-9 shrink-0 items-center gap-1 rounded-xl bg-teal-400 px-3 text-xs font-bold text-slate-950 shadow-sm"
           >
             <FileText className="h-3.5 w-3.5" />
             PDF
@@ -879,37 +924,38 @@ export default function PackageBuilderWorkspace({
       </div>
 
       {/* Desktop header */}
-      <div className="hidden flex-wrap items-start justify-between gap-3 rounded-2xl border border-indigo-200/70 bg-white/90 px-4 py-4 shadow-sm shadow-indigo-100/50 xl:flex">
-        <div>
+      <div className="hidden items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-950 px-4 py-2.5 shadow-sm xl:flex">
+        <div className="flex min-w-0 items-center gap-3">
           <button
             type="button"
             onClick={onBack}
-            className="mb-2 inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700"
+            className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-white/15 bg-white/10 px-2.5 text-xs font-semibold text-white hover:bg-white/20"
           >
-            <ArrowLeft className="w-4 h-4" /> Back to Packages
+            <ArrowLeft className="w-3.5 h-3.5" /> Back
           </button>
-          <h1 className="text-2xl sm:text-[28px] font-bold tracking-tight text-slate-900">Create Quotation</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Build and customize the perfect package for{' '}
-            <span className="font-semibold text-indigo-700">{lead?.name || 'your customer'}</span>.
-          </p>
+          <div className="min-w-0">
+            <h1 className="truncate text-[15px] font-bold text-white">Create Quotation</h1>
+            <p className="truncate text-[11px] text-slate-400">
+              For <span className="text-teal-300">{lead?.name || 'your customer'}</span>
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             disabled={saving}
             onClick={onSaveDraft}
-            className="h-10 rounded-xl border border-indigo-200 bg-indigo-50 px-4 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-60"
+            className="h-8 rounded-xl border border-white/15 bg-white/10 px-3 text-xs font-semibold text-white hover:bg-white/20 disabled:opacity-60"
           >
             {draftLabel || 'Save as Draft'}
           </button>
           <button
             type="button"
             onClick={() => setShowPreview(true)}
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-violet-600 px-4 text-sm font-semibold text-white shadow-md shadow-violet-600/25 hover:bg-violet-500"
+            className="inline-flex h-8 items-center gap-1.5 rounded-xl bg-teal-400 px-3 text-xs font-bold text-slate-950 hover:bg-teal-300"
           >
-            <FileText className="w-4 h-4" />
-            Generate PDF
+            <FileText className="w-3.5 h-3.5" />
+            PDF
           </button>
         </div>
       </div>
@@ -923,16 +969,16 @@ export default function PackageBuilderWorkspace({
             subtitle="Cover, highlights and trip meta"
             icon={Sparkles}
           >
-            <div className="overflow-hidden rounded-xl border border-indigo-100 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
               <div className="relative h-40 overflow-hidden bg-slate-200 sm:h-56">
                 {pkg?.coverImage ? (
                   <img src={pkg.coverImage} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  <div className="h-full w-full bg-gradient-to-br from-sky-400 via-indigo-400 to-violet-500" />
+                  <div className="h-full w-full bg-gradient-to-br from-teal-500 via-slate-700 to-orange-500" />
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/25 to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 space-y-2 p-3.5 sm:space-y-2.5 sm:p-5">
-                  <span className="inline-flex rounded-md bg-indigo-500 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm">
+                  <span className="inline-flex rounded-md bg-teal-500 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-950 shadow-sm">
                     Package Preview
                   </span>
                   <h2 className="text-lg font-bold leading-snug text-white drop-shadow-sm sm:text-2xl">
@@ -953,7 +999,7 @@ export default function PackageBuilderWorkspace({
                 </div>
               </div>
 
-              <div className="space-y-3 bg-gradient-to-b from-indigo-50/50 to-white px-3.5 py-3.5 sm:space-y-4 sm:px-5 sm:py-4">
+              <div className="space-y-3 bg-gradient-to-b from-teal-50/40 to-white px-3.5 py-3.5 sm:space-y-4 sm:px-5 sm:py-4">
                 <PackageDescription
                   text={pkg?.description || pkg?.shortDescription}
                   fallback={`Experience ${pkg?.destination || 'the hills'} with curated stays, private transfers and handpicked sightseeing — fully customisable for your guest.`}
@@ -989,12 +1035,14 @@ export default function PackageBuilderWorkspace({
               itinerary={itinerary}
               dayWiseHotels={dayWiseHotels}
               packageCab={selectedPackageCab}
+              hotelSeason={hotelSeason}
               onChange={onItineraryChange}
               onOpenHotelPicker={openDayHotelPicker}
               onAddHotelRoom={openAddRoomPicker}
               onChangeExtraRoom={openChangeExtraRoomPicker}
               onChangeRoomMattresses={handleSetRoomMattresses}
               onChangeMattressRate={handleSetMattressRate}
+              onRemoveHotel={handleRemoveHotel}
               onChangeCab={() => openCabPicker('change')}
               onAddCab={() => openCabPicker('add')}
               onCabFareChange={(value) => {
@@ -1137,7 +1185,7 @@ export default function PackageBuilderWorkspace({
               <button
                 type="button"
                 onClick={() => setMobilePricingOpen(false)}
-                className="w-full h-11 rounded-xl bg-violet-600 text-sm font-semibold text-white shadow-md"
+                className="w-full h-11 rounded-xl bg-teal-600 text-sm font-bold text-white shadow-md"
               >
                 Done · {formatINR(mobileTotal)}
               </button>
@@ -1147,8 +1195,8 @@ export default function PackageBuilderWorkspace({
       ) : null}
 
       <QuotationPdfOverlay
-        quote={draftQuote}
-        open={showPreview && !!draftQuote}
+        quote={previewQuote}
+        open={showPreview && !!previewQuote}
         autoPrint={autoPrint}
         onAutoPrintDone={() => setAutoPrint(false)}
         onClose={() => {
@@ -1215,6 +1263,8 @@ export default function PackageBuilderWorkspace({
         nights={picker?.day?.stayNights || nights || 1}
         destination={hotelDestination || pkg?.destination || ''}
         basePrice={hotelBasePrice}
+        hotelSeason={hotelSeason}
+        onHotelSeasonChange={onHotelSeasonChange}
         initialHotel={
           picker?.addRoom || picker?.replaceRoomSlot ? picker.initialHotel || null : null
         }
