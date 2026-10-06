@@ -2,8 +2,8 @@ import { forwardRef } from 'react';
 import './quotePdfTemplate.css';
 import { COMPANY_INFO } from './constants';
 import { formatINR } from './quotationUtils';
-import { QUOTE_WELCOME_TEXT } from './quoteTemplateDefaults';
 import { resolveDestinationImages } from './destinationGalleryUtils';
+import { QUOTE_WELCOME_TEXT } from './quoteTemplateDefaults';
 import {
   resolveQuotePackage,
   resolveQuoteLead,
@@ -17,6 +17,32 @@ import {
   resolveBankAccounts,
   resolveTravelerCounts,
 } from './quotePdfHelpers';
+import { shortMealPlanLabel } from '../../lib/mealPlanDefaults';
+import { absolutizeUrl } from './embedPrintImages';
+
+/** Split long text into short bullet lines — no dense paragraphs. */
+function toBulletLines(text, { max = 6, maxLen = 110 } = {}) {
+  const raw = String(text || '').trim();
+  if (!raw) return [];
+
+  const chunks = raw
+    .split(/\n+|•|\u2022|(?<=[.!?])\s+|(?<=;)\s+/)
+    .map((s) => s.replace(/^[-–—\d.)\s]+/, '').trim())
+    .filter((s) => s.length > 2);
+
+  const lines = [];
+  for (const chunk of chunks) {
+    if (lines.length >= max) break;
+    if (chunk.length <= maxLen) {
+      lines.push(chunk);
+      continue;
+    }
+    // Prefer natural break near maxLen
+    const cut = chunk.lastIndexOf(' ', maxLen);
+    lines.push((cut > 40 ? chunk.slice(0, cut) : chunk.slice(0, maxLen)).trim());
+  }
+  return lines.length ? lines : [raw.slice(0, maxLen)];
+}
 
 function PdfSection({ title, eyebrow, children, flush, spaced, className = '' }) {
   const sectionClass = [
@@ -62,27 +88,55 @@ function PolicyBlock({ title, items }) {
 
 function PdfImage({ src, alt, className }) {
   if (!src) return null;
+  const absolute = absolutizeUrl(src);
+  const isData = absolute.startsWith('data:');
+  let sameOrigin = true;
+  try {
+    if (!isData && typeof window !== 'undefined') {
+      sameOrigin = new URL(absolute, window.location.href).origin === window.location.origin;
+    }
+  } catch {
+    sameOrigin = true;
+  }
   return (
     <img
-      src={src}
+      src={absolute}
       alt={alt}
       className={className}
-      crossOrigin={src.startsWith('data:') ? undefined : 'anonymous'}
+      crossOrigin={isData || sameOrigin ? undefined : 'anonymous'}
+      referrerPolicy={isData || sameOrigin ? undefined : 'no-referrer'}
     />
   );
 }
 
-function HotelStayCard({ dayHotel, dayMeals }) {
+function BulletList({ items, className = '' }) {
+  const list = (items || []).filter(Boolean);
+  if (!list.length) return null;
+  return (
+    <ul className={`quote-ht-bullets ${className}`.trim()}>
+      {list.map((item) => (
+        <li key={item}>{item}</li>
+      ))}
+    </ul>
+  );
+}
+
+function HotelStayCard({ dayHotel, dayMeals, dayNumber }) {
   if (!dayHotel?.name) return null;
 
-  const hotelPhoto =
+  const hotelPhoto = absolutizeUrl(
     dayHotel.hotelImages?.[0] ||
-    dayHotel.thumbnailUrl ||
-    dayHotel.images?.[0] ||
-    dayHotel.roomImage ||
-    dayHotel.roomImages?.[0];
-  const mealPlan = dayHotel.meals || dayMeals || '—';
-  const location = dayHotel.city || dayHotel.location || '—';
+      dayHotel.thumbnailUrl ||
+      dayHotel.image ||
+      dayHotel.images?.[0] ||
+      dayHotel.roomImage ||
+      dayHotel.roomImages?.[0] ||
+      ''
+  );
+  const isDayOne = Number(dayNumber) === 1;
+  const mealPlan = isDayOne
+    ? shortMealPlanLabel(dayHotel.mealPlanKey, dayHotel.meals, dayMeals, dayHotel.mealPlan)
+    : dayHotel.meals || dayMeals || '—';
   const roomType = dayHotel.roomType || 'Deluxe';
   const rating = Number(dayHotel.rating || dayHotel.starCategory || 0);
 
@@ -106,17 +160,15 @@ function HotelStayCard({ dayHotel, dayMeals }) {
           </div>
         )}
         <div className="quote-ht-stay-meta">
-          <div className="quote-ht-stay-meta-item">
-            <span className="quote-ht-stay-meta-label">Room</span>
-            <span className="quote-ht-stay-meta-value">{roomType}</span>
-          </div>
+          {!isDayOne && (
+            <div className="quote-ht-stay-meta-item">
+              <span className="quote-ht-stay-meta-label">Room</span>
+              <span className="quote-ht-stay-meta-value">{roomType}</span>
+            </div>
+          )}
           <div className="quote-ht-stay-meta-item">
             <span className="quote-ht-stay-meta-label">Meal Plan</span>
             <span className="quote-ht-stay-meta-value">{mealPlan}</span>
-          </div>
-          <div className="quote-ht-stay-meta-item">
-            <span className="quote-ht-stay-meta-label">Location</span>
-            <span className="quote-ht-stay-meta-value">{location}</span>
           </div>
         </div>
       </div>
@@ -137,26 +189,27 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
   const pax = resolveTravelerCounts(quote);
   const nights = Math.max(1, (pkg.duration || 1) - 1);
   const shortName = pkg.shortName || pkg.name?.split(' ').slice(0, 2).join(' ') || 'Package';
-  const guestFirst = lead.name ? lead.name.split(' ')[0] : 'Guest';
+  const guestName = lead.name || 'Guest';
+  const guestFirst = guestName.split(/\s+/).filter(Boolean)[0] || 'Guest';
   const destImages = resolveDestinationImages(quote);
   const coverSrc = pkg.coverImage || destImages[0]?.url || '';
   const destLabel =
-    (pkg.routing || pkg.destination || '').split(/[,·]/)[0]?.trim() ||
+    (pkg.routing || pkg.destination || '').split(/[,·|/]/)[0]?.trim() ||
     destImages[0]?.label ||
     'Your Trip';
-  const highlightThumbs = destImages.slice(0, 3);
-  const welcomePara = QUOTE_WELCOME_TEXT.split('\n\n')[0];
+  const welcomeParagraphs = String(QUOTE_WELCOME_TEXT || '')
+    .split(/\n\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
 
   return (
     <div ref={ref} className="quote-ht-pdf">
-      {/* Brand masthead */}
       <header className="quote-ht-topbar">
         <div className="quote-ht-brand-row">
           <img
-            src={COMPANY_INFO.logoUrl}
+            src={absolutizeUrl(COMPANY_INFO.logoUrl)}
             alt={COMPANY_INFO.name}
             className="quote-ht-logo-img"
-            crossOrigin="anonymous"
           />
           <div className="quote-ht-brand-text">
             <span className="quote-ht-brand-name">{COMPANY_INFO.brand}</span>
@@ -170,7 +223,6 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
         </div>
       </header>
 
-      {/* Cinematic cover */}
       <div className="quote-ht-cover">
         {coverSrc ? (
           <PdfImage src={coverSrc} alt={destLabel} className="quote-ht-cover-img" />
@@ -181,11 +233,15 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
         <div className="quote-ht-cover-ornament" aria-hidden="true" />
         <div className="quote-ht-cover-content">
           <span className="quote-ht-cover-badge">{shortName}</span>
-          <p className="quote-ht-cover-kicker">Crafted for {guestFirst}</p>
+          {guestName && guestName !== 'Guest' && (
+            <p className="quote-ht-cover-kicker">Prepared for {guestName}</p>
+          )}
           <h1 className="quote-ht-cover-title">{pkg.name}</h1>
           <p className="quote-ht-cover-route">{pkg.routing || pkg.destination}</p>
           <div className="quote-ht-cover-chips">
-            <span>{nights}N / {pkg.duration}D</span>
+            <span>
+              {nights}N / {pkg.duration}D
+            </span>
             <span>{pkg.packageCategory}</span>
             {lead.travelDate && <span>{formatQuoteDate(lead.travelDate)}</span>}
           </div>
@@ -197,69 +253,14 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
         </div>
       </div>
 
-      {/* Trip at a glance */}
-      <div className="quote-ht-glance">
-        <div className="quote-ht-glance-item">
-          <span className="quote-ht-glance-icon" aria-hidden="true">
-            ✦
-          </span>
-          <div>
-            <span className="lbl">Guest</span>
-            <span className="val">{lead.name || 'Guest'}</span>
-          </div>
-        </div>
-        <div className="quote-ht-glance-item">
-          <span className="quote-ht-glance-icon" aria-hidden="true">
-            ◎
-          </span>
-          <div>
-            <span className="lbl">Travellers</span>
-            <span className="val">
-              {pax.adults}A{pax.kids ? ` · ${pax.kids}C` : ''}
-            </span>
-          </div>
-        </div>
-        <div className="quote-ht-glance-item">
-          <span className="quote-ht-glance-icon" aria-hidden="true">
-            ▢
-          </span>
-          <div>
-            <span className="lbl">Rooms</span>
-            <span className="val">
-              {pax.rooms}
-              {pax.extraBeds ? ` +${pax.extraBeds} EB` : ''}
-            </span>
-          </div>
-        </div>
-        <div className="quote-ht-glance-item">
-          <span className="quote-ht-glance-icon" aria-hidden="true">
-            ▷
-          </span>
-          <div>
-            <span className="lbl">Cab</span>
-            <span className="val">{pkg.cabCategory || vehicles[0]?.name || '—'}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Destination gallery strip */}
-      {highlightThumbs.length > 1 && (
-        <div className="quote-ht-highlights">
-          {highlightThumbs.map((img, i) => (
-            <figure key={img.url} className="quote-ht-highlight-card">
-              <PdfImage src={img.url} alt={img.label} className="quote-ht-highlight-img" />
-              <figcaption>
-                <span className="quote-ht-highlight-num">{String(i + 1).padStart(2, '0')}</span>
-                {img.label}
-              </figcaption>
-            </figure>
-          ))}
-        </div>
-      )}
-
-      <PdfSection title={`Hello ${guestFirst},`} eyebrow="A note from us" spaced>
+      <PdfSection title={`Hello ${guestFirst}`} eyebrow="Greeting" spaced>
         <div className="quote-ht-welcome">
-          <p>{welcomePara}</p>
+          <p className="quote-ht-welcome-guest">
+            Dear <strong>{guestName}</strong>,
+          </p>
+          {welcomeParagraphs.map((para) => (
+            <p key={para.slice(0, 40)}>{para}</p>
+          ))}
           <p className="quote-ht-welcome-contact">
             Need help anytime? <strong>{COMPANY_INFO.phone}</strong> · {COMPANY_INFO.email}
           </p>
@@ -269,11 +270,20 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
       <PdfSection title="Trip Snapshot" eyebrow="Overview" spaced>
         <div className="quote-ht-snapshot">
           {[
+            ['Guest', guestName],
             ['Package', pkg.name],
             ['Quotation', quote.quoteNumber],
-            ['Route', pkg.routing || pkg.destination],
+            ['Route', pkg.routing || pkg.destination || destLabel],
             ['Duration', `${pkg.duration} Days / ${nights} Nights`],
-            ['Prepared for', lead.name || 'Guest'],
+            [
+              'Travellers',
+              `${pax.adults} Adult${pax.adults !== 1 ? 's' : ''}${pax.kids ? ` · ${pax.kids} Child` : ''}`,
+            ],
+            [
+              'Rooms',
+              `${pax.rooms}${pax.extraBeds ? ` + ${pax.extraBeds} extra bed` : ''}`,
+            ],
+            ['Cab', pkg.cabCategory || vehicles[0]?.name || '—'],
             ...(lead.phone ? [['Contact', lead.phone]] : []),
             ...(lead.travelDate ? [['Travel date', formatQuoteDate(lead.travelDate)]] : []),
             ['Category', pkg.packageCategory],
@@ -314,6 +324,12 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
               const dayHotel = resolveDayHotelForItinerary(quote, day.day);
               const hasHotel = dayHotel?.name || day.hotel;
               const isLast = index === pkg.itinerary.length - 1;
+              const dayPhoto = destImages[index % Math.max(1, destImages.length)];
+              const dayPoints = toBulletLines(day.description, { max: 5 });
+              const sightPoints = toBulletLines(day.sightseeing, { max: 4 });
+              const activityPoints = toBulletLines(day.activities || day.activityNotes, {
+                max: 4,
+              });
 
               return (
                 <div
@@ -328,7 +344,7 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
                   </div>
                   <div className="quote-ht-timeline-card">
                     <div className="quote-ht-day-head">
-                      <div>
+                      <div className="quote-ht-day-head-main">
                         <h3 className="quote-ht-day-title">{day.title}</h3>
                         <div className="quote-ht-day-date">
                           {dayDate ? formatQuoteDate(dayDate) : `Day ${day.day}`}
@@ -337,44 +353,46 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
                           )}
                         </div>
                       </div>
-                      {(dayHotel?.meals || day.meals) && (
-                        <span className="quote-ht-meals-pill">
-                          {dayHotel?.meals || day.meals}
-                        </span>
+                      {dayPhoto?.url && (
+                        <div className="quote-ht-day-thumb">
+                          <PdfImage
+                            src={dayPhoto.url}
+                            alt={dayPhoto.label || `Day ${day.day}`}
+                            className="quote-ht-day-thumb-img"
+                          />
+                        </div>
                       )}
                     </div>
 
-                    {day.description && (
-                      <div className="quote-ht-day-body">{day.description}</div>
-                    )}
+                    {dayPoints.length > 0 && <BulletList items={dayPoints} className="quote-ht-day-points" />}
 
-                    {(day.sightseeing || day.activities || day.activityNotes) && (
+                    {(sightPoints.length > 0 || activityPoints.length > 0) && (
                       <div className="quote-ht-day-extra">
-                        {day.sightseeing && (
-                          <div>
-                            <strong>Sightseeing:</strong> {day.sightseeing}
+                        {sightPoints.length > 0 && (
+                          <div className="quote-ht-day-extra-block">
+                            <strong>Sightseeing</strong>
+                            <BulletList items={sightPoints} />
                           </div>
                         )}
-                        {day.activities && (
-                          <div>
-                            <strong>Activities:</strong> {day.activities}
+                        {activityPoints.length > 0 && (
+                          <div className="quote-ht-day-extra-block">
+                            <strong>Activities</strong>
+                            <BulletList items={activityPoints} />
                           </div>
-                        )}
-                        {day.activityNotes && (
-                          <div className="quote-ht-day-note">{day.activityNotes}</div>
                         )}
                       </div>
                     )}
 
                     {hasHotel && (
                       <HotelStayCard
+                        dayNumber={day.day}
                         dayMeals={day.meals}
                         dayHotel={
                           dayHotel || {
                             name: day.hotel,
                             roomType: '',
                             meals: day.meals,
-                            city: pkg.destination?.split(/[,·]/)[0]?.trim(),
+                            city: pkg.destination?.split(/[,·|/]/)[0]?.trim(),
                           }
                         }
                       />
@@ -387,28 +405,26 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
         </PdfSection>
       )}
 
-      {(pkg.inclusions?.length || pkg.exclusions?.length) && (
-        <PdfSection title="What's Included" eyebrow="Package cover" spaced>
-          <div className="quote-ht-inc-exc">
-            <div className="inc">
-              <h4>Inclusions</h4>
-              <ul>
-                {(pkg.inclusions || []).map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-            <div className="exc">
-              <h4>Exclusions</h4>
-              <ul>
-                {(pkg.exclusions || []).map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
+      <PdfSection title="What's Included" eyebrow="Package cover" spaced>
+        <div className="quote-ht-inc-exc">
+          <div className="inc">
+            <h4>Inclusions</h4>
+            <ul>
+              {(pkg.inclusions || []).map((item, index) => (
+                <li key={`inc-${index}`}>{item}</li>
+              ))}
+            </ul>
           </div>
-        </PdfSection>
-      )}
+          <div className="exc">
+            <h4>Exclusions</h4>
+            <ul>
+              {(pkg.exclusions || []).map((item, index) => (
+                <li key={`exc-${index}`}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </PdfSection>
 
       <div className="quote-ht-fare">
         <div className="quote-ht-fare-left">
@@ -427,10 +443,13 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
       <PdfSection title="Policies & Terms" eyebrow="Please read" spaced>
         <div className="quote-ht-policies-wrap">
           <PolicyBlock title="Remarks" items={policies.remarks} />
-          <PolicyBlock title="Terms & Conditions" items={policies.terms} />
-          <PolicyBlock title="Confirmation Policy" items={policies.confirmation} />
+          <PolicyBlock title="Booking & Payment Policy" items={policies.confirmation} />
           <PolicyBlock title="Cancellation Policy" items={policies.cancellation} />
-          <PolicyBlock title="Amendment (Postpone & Prepone) Policy" items={policies.amendment} />
+          <PolicyBlock
+            title="Postponement / Preponement Policy"
+            items={policies.amendment}
+          />
+          <PolicyBlock title="General Terms & Conditions" items={policies.terms} />
         </div>
       </PdfSection>
 
@@ -491,10 +510,9 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
       <footer className="quote-ht-footer">
         <div className="quote-ht-footer-inner">
           <img
-            src={COMPANY_INFO.logoUrl}
+            src={absolutizeUrl(COMPANY_INFO.logoUrl)}
             alt={COMPANY_INFO.name}
             className="quote-ht-footer-logo"
-            crossOrigin="anonymous"
           />
           <p className="quote-ht-footer-price">
             Total Package Price: <strong>{formatINR(p.total)}</strong>
