@@ -75,10 +75,12 @@ export function mealPlanNightlyRate(plan = {}, room = {}, season = 'onSeason') {
     const fromSeason = Number(seasonal[key] || 0);
     if (fromSeason > 0) return fromSeason;
   }
-  // Flat rates.* are on-season; never use them (or meal absolutePrice) for off-season.
+
+  // Off-season rack missing/empty → keep showing on-season (never blank the quote).
   if (seasonKey === 'offSeason') {
-    return 0;
+    return mealPlanNightlyRate(plan, room, 'onSeason');
   }
+
   const fromRates = key ? Number(rates[key] || 0) : 0;
   if (fromRates > 0) return fromRates;
 
@@ -275,7 +277,6 @@ export function resolveHotelNightDisplayRate(hotelSel = null, meta = null, mealK
   if (seasonal && Number(seasonal[want] || 0) > 0) {
     return Number(seasonal[want]);
   }
-  // Flat rates.* keys are on-season rack — skip when asking for off-season.
   if (seasonKey === 'onSeason') {
     const fromRates = Number(room?.rates?.[want] || 0);
     if (fromRates > 0) return fromRates;
@@ -287,13 +288,22 @@ export function resolveHotelNightDisplayRate(hotelSel = null, meta = null, mealK
     pickPreferredMealPlan(plans, room, want);
   const rate = mealPlanNightlyRate(plan, room, seasonKey);
   if (rate > 0) return rate;
-  // Only fall back to stored absolute when asking for on-season (absolute is usually on-season rack).
-  if (seasonKey === 'onSeason') {
-    return (
-      Number(hotelSel?.absolutePerNight ?? meta?.absolutePerNight ?? meta?.includedRate ?? 0) || 0
-    );
+
+  // Off-season rack missing → use on-season path (includes stored absolutes).
+  if (seasonKey === 'offSeason') {
+    return resolveHotelNightDisplayRate(hotelSel, meta, mealKey, 'onSeason');
   }
-  return 0;
+
+  return (
+    Number(
+      hotelSel?.absolutePerNight ||
+        hotelSel?.onSeasonAbsolutePerNight ||
+        hotelSel?.includedRate ||
+        meta?.absolutePerNight ||
+        meta?.includedRate ||
+        0
+    ) || 0
+  );
 }
 
 /** Remap day-wise hotel absolute rates when quotation season toggle changes. */
@@ -304,17 +314,30 @@ export function applyHotelSeasonToSelections(selections = [], season = 'onSeason
     if (!entry?.hotel && !entry?.room) return entry;
     const mealKey =
       entry?.mealPlan?.key || entry?.mealPlanKey || entry?.meals || 'map';
-    const rate = resolveHotelNightDisplayRate(entry, null, mealKey, seasonKey);
-    // Always rewrite absolute so UI/pricing never keep a stale opposite-season rack.
+    const onSeasonRate = resolveHotelNightDisplayRate(entry, null, mealKey, 'onSeason');
+    const seasonRate = resolveHotelNightDisplayRate(entry, null, mealKey, seasonKey);
+    const baseline = Math.max(
+      0,
+      Number(entry.onSeasonAbsolutePerNight || 0) ||
+        Number(entry.includedRate || 0) ||
+        onSeasonRate ||
+        Number(entry.absolutePerNight || 0) ||
+        0
+    );
+    const nextRate = seasonRate > 0 ? seasonRate : baseline;
     return {
       ...entry,
-      absolutePerNight: rate > 0 ? rate : 0,
+      onSeasonAbsolutePerNight: baseline,
+      absolutePerNight: nextRate,
       hotelSeason: seasonKey,
       mealPlan: entry.mealPlan
-        ? { ...entry.mealPlan, absolutePrice: rate > 0 ? rate : 0 }
+        ? { ...entry.mealPlan, absolutePrice: nextRate }
         : entry.mealPlan,
       room: entry.room
-        ? { ...entry.room, pricePerNight: rate > 0 ? rate : Number(entry.room.pricePerNight || 0) }
+        ? {
+            ...entry.room,
+            pricePerNight: nextRate > 0 ? nextRate : Number(entry.room.pricePerNight || 0),
+          }
         : entry.room,
     };
   });

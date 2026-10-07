@@ -30,7 +30,7 @@ import { useState } from 'react';
 import { cn } from '../../lib/utils';
 import { defaultItineraryDay, formatINR } from './quotationUtils';
 import { resolvePartyOccupancy, resolveCabCount, clampExtraMattresses, MAX_EXTRA_MATTRESSES_PER_ROOM } from './partyCosting';
-import { resolveHotelNightDisplayRate, resolveExtraBedNightRate, shortMealPlanLabel } from '../../lib/mealPlanDefaults';
+import { resolveHotelNightDisplayRate, resolveExtraBedNightRate, shortMealPlanLabel, normalizeMealPlanKey } from '../../lib/mealPlanDefaults';
 import {
   getCabCapacityHint,
   getHotelRoomHint,
@@ -200,9 +200,23 @@ function HotelCard({
     : rateNight * nights * Math.max(1, Number(rooms) || 1);
   const displayTotal = Math.round(rawTotal * 100) / 100;
   const hasStay = Boolean(meta?.name || hotelSel?.hotel?.name);
-  const seasonChipLabel = seasonKey === 'offSeason' ? 'Off Season Price' : 'On Season Price';
-  const seasonChipClass =
+  const hasDedicatedOff =
+    seasonKey === 'offSeason' &&
+    Number(
+      hotelSel?.room?.rates?.offSeason?.[
+        normalizeMealPlanKey(mealKey) || 'map'
+      ] ||
+        meta?.room?.rates?.offSeason?.[normalizeMealPlanKey(mealKey) || 'map'] ||
+        0
+    ) > 0;
+  const seasonChipLabel =
     seasonKey === 'offSeason'
+      ? hasDedicatedOff
+        ? 'Off Season Price'
+        : 'On Season Price (off not set)'
+      : 'On Season Price';
+  const seasonChipClass =
+    seasonKey === 'offSeason' && hasDedicatedOff
       ? 'rounded-md bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-800'
       : 'rounded-md bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800';
 

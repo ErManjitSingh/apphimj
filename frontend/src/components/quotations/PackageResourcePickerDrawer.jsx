@@ -494,19 +494,24 @@ function RoomListRow({ room, hotel, selected, onSelect, basePrice = 0, defaultMe
   const preferred = pickPreferredMealPlan(ensureMealPlanOptions(room), room, defaultMealPlanKey);
   const seasonKey = hotelSeason === 'offSeason' ? 'offSeason' : 'onSeason';
   const seasonalPrice = mealPlanNightlyRate(preferred, room, seasonKey);
-  // Never fall back to on-season pricePerNight while Off Season is selected.
   const price =
     seasonalPrice > 0
       ? seasonalPrice
-      : seasonKey === 'onSeason'
-        ? Number(room.pricePerNight || room.epPrice || 0)
-        : 0;
+      : Number(room.pricePerNight || room.epPrice || 0) || 0;
   const rel = formatRelativePrice(price, basePrice, { isCurrent: false });
   const mealKey = normalizeMealPlanKey(preferred?.key || defaultMealPlanKey) || 'map';
   const extraBed = resolveExtraBedNightRate(room, mealKey);
-  const seasonLabel = seasonKey === 'offSeason' ? 'Off Season Price' : 'On Season Price';
-  const seasonClass =
+  const hasDedicatedOff =
+    seasonKey === 'offSeason' &&
+    Number(room?.rates?.offSeason?.[mealKey] || 0) > 0;
+  const seasonLabel =
     seasonKey === 'offSeason'
+      ? hasDedicatedOff
+        ? 'Off Season Price'
+        : 'On Season Price (off not set)'
+      : 'On Season Price';
+  const seasonClass =
+    seasonKey === 'offSeason' && hasDedicatedOff
       ? 'rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800'
       : 'rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800';
 
