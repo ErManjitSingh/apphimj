@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import { Area, AreaChart, ResponsiveContainer } from 'recharts';
@@ -15,10 +16,13 @@ export default function KpiCard({
   sparkData = [],
   index = 0,
   compact = false,
+  to,
 }) {
   const chartData = sparkData.map((v, i) => ({ i, v }));
   const isUp = changeType === 'up';
   const isNeutral = changeType === 'neutral';
+  const Shell = to ? Link : 'div';
+  const shellProps = to ? { to } : {};
 
   if (compact) {
     return (
@@ -26,9 +30,13 @@ export default function KpiCard({
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25, delay: index * 0.04 }}
+      >
+      <Shell
+        {...shellProps}
         className={cn(
           'group relative flex items-center gap-2.5 rounded-xl border border-subtle bg-white px-3 py-2.5 shadow-sm',
-          'hover:shadow-md hover:border-sky-200/80 transition-all duration-200'
+          'hover:shadow-md hover:border-sky-200/80 transition-all duration-200',
+          to && 'cursor-pointer'
         )}
       >
         <div
@@ -66,6 +74,7 @@ export default function KpiCard({
             )}
           </div>
         </div>
+      </Shell>
       </motion.div>
     );
   }
@@ -75,7 +84,13 @@ export default function KpiCard({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.05 }}
-      className="group relative flex min-h-[148px] flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition-all duration-300 hover:shadow-md"
+    >
+    <Shell
+      {...shellProps}
+      className={cn(
+        'group relative flex min-h-[148px] flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-0.5',
+        to && 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/40'
+      )}
     >
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className={cn('rounded-full flex items-center justify-center shrink-0 shadow-sm w-10 h-10', iconColor)}>
@@ -117,6 +132,7 @@ export default function KpiCard({
           </ResponsiveContainer>
         </div>
       )}
+    </Shell>
     </motion.div>
   );
 }

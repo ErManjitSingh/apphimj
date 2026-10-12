@@ -66,7 +66,13 @@ const receiveWebhook = asyncHandler(async (req, res) => {
 
 /** Status for ops (no secrets) */
 const webhookStatus = asyncHandler(async (_req, res) => {
-  res.json(getDiagnostics());
+  const pageToken = await probePageTokenHealth();
+  res.json(
+    getDiagnostics({
+      pageToken,
+      poller: getPollerStatus(),
+    })
+  );
 });
 
 /**
@@ -82,10 +88,11 @@ const webhookDebug = asyncHandler(async (req, res) => {
   }
   const pageToken = await probePageTokenHealth();
   res.json({
-    ...getDiagnostics(),
-    pageToken,
-    poller: getPollerStatus(),
-    note: 'If recentEvents has no Meta POSTs, the Callback URL is not subscribed/verified in Meta App → Webhooks (subscribed_apps alone does not deliver). Poller backfills missing leads every ~2 min when token is valid.',
+    ...getDiagnostics({
+      pageToken,
+      poller: getPollerStatus(),
+    }),
+    note: 'If pageToken.ok is false, Meta queries cannot ingest — regenerate FACEBOOK_PAGE_ACCESS_TOKEN. If recentEvents has no Meta POSTs, Callback URL is not subscribed/verified in Meta App → Webhooks.',
   });
 });
 

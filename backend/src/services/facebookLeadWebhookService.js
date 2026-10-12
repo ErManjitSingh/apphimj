@@ -739,18 +739,38 @@ async function probePageTokenHealth() {
   }
 }
 
-function getDiagnostics() {
+function resolvePublicApiBase() {
+  const raw =
+    process.env.PUBLIC_API_URL ||
+    process.env.API_PUBLIC_URL ||
+    process.env.CRM_API_URL ||
+    process.env.APP_URL ||
+    '';
+  const cleaned = String(raw || '')
+    .trim()
+    .replace(/\/$/, '');
+  if (cleaned && !/localhost|127\.0\.0\.1/i.test(cleaned)) {
+    return cleaned.endsWith('/api') ? cleaned : `${cleaned}/api`;
+  }
+  return 'https://crm.himjourneytours.in/api';
+}
+
+function getDiagnostics(extra = {}) {
   const cfg = getConfig();
   const db = getDbStatus();
-  const primaryCallback = 'http://localhost:5000/api/facebook/webhook';
-  const altCallback = 'http://localhost:5000/api/webhooks/facebook';
+  const apiBase = resolvePublicApiBase();
+  const primaryCallback = `${apiBase}/facebook/webhook`;
+  const altCallback = `${apiBase}/webhooks/facebook`;
   const envIssues = [];
   if (!cfg.verifyToken) envIssues.push('FACEBOOK_VERIFY_TOKEN missing');
   if (!cfg.pageAccessToken) envIssues.push('FACEBOOK_PAGE_ACCESS_TOKEN missing');
   if (!cfg.appSecret) envIssues.push('FACEBOOK_APP_SECRET missing');
 
+  const tokenError = extra.pageToken?.ok === false ? extra.pageToken.error : extra.poller?.lastSummary?.error;
+  const tokenUnhealthy = Boolean(tokenError) || extra.pageToken?.ok === false;
+
   return {
-    ok: true,
+    ok: !tokenUnhealthy,
     configured: isConfigured(),
     debug: cfg.debug,
     hasVerifyToken: Boolean(cfg.verifyToken),
@@ -760,10 +780,15 @@ function getDiagnostics() {
     defaultDestination: cfg.defaultDestination,
     database: db,
     envIssues,
+    pageToken: extra.pageToken || null,
+    poller: extra.poller || null,
     callbackUrl: primaryCallback,
     alternateCallbackUrl: altCallback,
     recentEvents: recentEvents.slice(0, 25),
     likelyFailureReasons: [
+      tokenUnhealthy
+        ? `Page Access Token invalid/expired: ${tokenError || 'token unhealthy'} — regenerate long-lived Page token and update FACEBOOK_PAGE_ACCESS_TOKEN on VPS`
+        : null,
       !cfg.verifyToken || !cfg.pageAccessToken
         ? 'Backend env incomplete — Meta POSTs may be rejected or Graph fetch fails'
         : null,
@@ -782,7 +807,8 @@ function getDiagnostics() {
       '4. Subscribe field: leadgen',
       '5. POST /{page-id}/subscribed_apps?subscribed_fields=leadgen',
       '6. Set FACEBOOK_PAGE_ACCESS_TOKEN (long-lived) + FACEBOOK_APP_SECRET',
-      '7. Check GET /api/facebook/webhook/debug?token=VERIFY_TOKEN after a test lead',
+      '7. If token invalidated (password/security change): Graph API Explorer → Page token → paste into VPS .env → pm2 restart',
+      '8. Check GET /api/facebook/webhook/debug?token=VERIFY_TOKEN after a test lead',
     ],
   };
 }

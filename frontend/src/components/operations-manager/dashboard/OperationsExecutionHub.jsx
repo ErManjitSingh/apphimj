@@ -5,9 +5,14 @@ import { ArrowRight, Car, MapPin, Plane } from 'lucide-react';
 const HUB_BG =
   'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1600&q=70';
 
-function HubStat({ icon: Icon, iconWrap, value, label, subtitle }) {
+function HubStat({ icon: Icon, iconWrap, value, label, subtitle, to }) {
+  const Shell = to ? Link : 'div';
+  const shellProps = to ? { to } : {};
   return (
-    <div className="min-w-[120px] text-center">
+    <Shell
+      {...shellProps}
+      className={`min-w-[120px] text-center ${to ? 'rounded-xl p-2 transition hover:bg-slate-50' : ''}`}
+    >
       <div
         className={`mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full ${iconWrap}`}
       >
@@ -16,7 +21,7 @@ function HubStat({ icon: Icon, iconWrap, value, label, subtitle }) {
       <p className="text-3xl font-bold tabular-nums leading-none text-slate-900">{value}</p>
       <p className="mt-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
       <p className="mt-0.5 text-[11px] text-slate-400">{subtitle}</p>
-    </div>
+    </Shell>
   );
 }
 
@@ -69,6 +74,7 @@ export default function OperationsExecutionHub({ kpis, hubStats }) {
             value={onTrip}
             label="On Trip"
             subtitle={onTrip ? 'Bookings in progress' : 'Bookings in progress'}
+            to="/operations-manager/bookings/active"
           />
           <HubStat
             icon={Plane}
@@ -76,6 +82,7 @@ export default function OperationsExecutionHub({ kpis, hubStats }) {
             value={departures}
             label="Departures Today"
             subtitle={departures ? 'Departing today' : 'No departures'}
+            to="/operations-manager/calendar"
           />
           <HubStat
             icon={MapPin}
@@ -83,6 +90,7 @@ export default function OperationsExecutionHub({ kpis, hubStats }) {
             value={arrivals}
             label="Arrivals Today"
             subtitle={arrivals ? 'Arriving today' : 'No arrivals'}
+            to="/operations-manager/calendar"
           />
         </div>
       </div>
