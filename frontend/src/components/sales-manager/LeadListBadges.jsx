@@ -78,6 +78,38 @@ export function leadArrivedFullTitle(date) {
   return formatLeadArrivedAt(date) || undefined;
 }
 
+/** IST calendar day key YYYY-MM-DD */
+function istDayKey(value) {
+  if (!value) return '';
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+}
+
+/**
+ * "New" badge — only for fresh same-day leads OR leads the assignee has not opened yet.
+ * Never on closed/booked (repeated badge is handled separately by caller).
+ */
+export function shouldShowNewLeadBadge(lead) {
+  if (!lead) return false;
+  const status = String(lead.status || '');
+  if (['lost', 'booked_from_another_company', 'booked', 'converted'].includes(status)) {
+    return false;
+  }
+
+  const dayRef = lead.assignedAt || lead.createdAt;
+  const sameDay = Boolean(dayRef) && istDayKey(dayRef) === istDayKey(new Date());
+
+  let unopened = false;
+  if (typeof lead.isUnopened === 'boolean') {
+    unopened = lead.isUnopened;
+  } else if (Object.prototype.hasOwnProperty.call(lead, 'firstOpenedAt')) {
+    unopened = !lead.firstOpenedAt;
+  }
+
+  return unopened || sameDay;
+}
+
 /** Compact date+time lines under lead name (created / assigned / creator). */
 export function LeadTimingLines({ lead, className }) {
   const created = formatLeadArrivedAt(lead?.createdAt);
@@ -374,7 +406,8 @@ export function CustomerCell({ name, lead, showPhone = false }) {
   const isRepeated = lead?.isRepeatCustomer || lead?.isVip;
   const isLost =
     lead?.status === 'lost' || lead?.status === 'booked_from_another_company';
-  const isConverted = lead?.status === 'converted';
+  const isConverted = lead?.status === 'converted' || lead?.status === 'booked';
+  const showNewBadge = !isRepeated && shouldShowNewLeadBadge(lead);
   return (
     <div className="flex min-w-0 items-start gap-2.5">
       <Avatar
@@ -395,11 +428,11 @@ export function CustomerCell({ name, lead, showPhone = false }) {
           </p>
           {isRepeated ? (
             <RepeatedLeadBadge size="sm" />
-          ) : (
+          ) : showNewBadge ? (
             <span className="shrink-0 rounded-full bg-orange-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-orange-600 ring-1 ring-orange-100">
               New
             </span>
-          )}
+          ) : null}
         </div>
         <div className="mt-0.5 flex flex-wrap items-center gap-1">
           <NextFollowUpLine lead={lead} className="mt-0" />

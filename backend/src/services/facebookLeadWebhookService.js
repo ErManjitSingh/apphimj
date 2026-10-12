@@ -244,6 +244,52 @@ function cleanPersonName(...candidates) {
   return '';
 }
 
+function humanizeFormFieldKey(key = '') {
+  return String(key)
+    .replace(/_/g, ' ')
+    .replace(/\?/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function parseTravelersCount(raw = '') {
+  const text = String(raw || '').trim();
+  if (!text) return 0;
+  const match = text.match(/\d+/);
+  return match ? Math.max(0, Number(match[0])) : 0;
+}
+
+function buildExternalFormCapture(graphLead = {}, meta = {}, fields = {}) {
+  const answers = Object.entries(fields)
+    .filter(([, v]) => !isDummyMetaValue(v))
+    .map(([key, value]) => ({
+      key: String(key),
+      label: humanizeFormFieldKey(key),
+      value: String(value).trim(),
+    }));
+
+  let capturedAt;
+  const rawTime = graphLead.created_time || meta.createdTime;
+  if (rawTime) {
+    const d = new Date(rawTime);
+    if (!Number.isNaN(d.getTime())) capturedAt = d;
+  }
+
+  return {
+    provider: 'facebook_leadgen',
+    capturedAt: capturedAt || new Date(),
+    leadgenId: String(graphLead.id || meta.leadgenId || ''),
+    campaignName: String(meta.campaignName || meta.campaignLabel || '').trim(),
+    adsetName: String(meta.adsetName || '').trim(),
+    adName: String(meta.adName || '').trim(),
+    formName: String(meta.formName || '').trim(),
+    formId: String(meta.formId || graphLead.form_id || ''),
+    adId: String(meta.adId || graphLead.ad_id || ''),
+    pageId: String(meta.pageId || ''),
+    answers,
+  };
+}
+
 async function fetchGraphJson(pathWithQuery) {
   const { pageAccessToken } = getConfig();
   const url = pathWithQuery.includes('access_token=')
@@ -356,8 +402,17 @@ function mapLeadFields(graphLead = {}, meta = {}) {
     'travellers',
     'number_of_travelers',
     'no_of_travellers',
+    "no._of_travelers_(don't_count_kids_under_5yrs)",
     'guests',
   ]);
+  const pickupRaw = pickFirst(fields, [
+    'your_pick_up_point_?',
+    'pick_up_point',
+    'pickup_point',
+    'pickup_location',
+    'your_pick_up_point',
+  ]);
+  const travelersCount = parseTravelersCount(travelersRaw);
   const messageRaw = pickFirst(fields, [
     'message',
     'comments',
@@ -415,8 +470,10 @@ function mapLeadFields(graphLead = {}, meta = {}) {
     destination,
     city: isDummyMetaValue(cityRaw) ? undefined : cityRaw || undefined,
     travelDate: isDummyMetaValue(travelDateRaw) ? undefined : travelDateRaw || undefined,
-    travelers: isDummyMetaValue(travelersRaw) ? undefined : travelersRaw || undefined,
+    travelers: travelersCount > 0 ? travelersCount : undefined,
+    pickupPoint: isDummyMetaValue(pickupRaw) ? undefined : pickupRaw || undefined,
     message: isDummyMetaValue(messageRaw) ? undefined : messageRaw || undefined,
+    externalFormCapture: buildExternalFormCapture(graphLead, meta, fields),
     notes: noteLines.join('\n'),
     landingPage: campaignLabel || formName || undefined,
     channel: 'facebook',

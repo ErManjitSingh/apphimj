@@ -3,8 +3,9 @@ import { Target } from 'lucide-react';
 import { formatCurrency } from '../executiveUtils';
 
 /**
- * Compact monthly target strip for the top of the SE dashboard.
- * Shows target, achieved, remaining, and progress in one glance.
+ * Compact monthly target strip for the SE dashboard.
+ * Achieved = converted package cost (subtracts from admin-set target).
+ * Remaining = target − achieved.
  */
 export default function ExecutiveTargetStrip({ target, now = new Date() }) {
   if (!target) return null;
@@ -12,10 +13,24 @@ export default function ExecutiveTargetStrip({ target, now = new Date() }) {
   const monthlyTarget = Number(
     target.monthlyTarget || target.totalSalesTarget || target.revenueTarget || 0
   );
-  const achieved = Number(target.revenueAchieved || 0);
-  const remaining = Math.max(0, monthlyTarget - achieved);
-  const progress = Math.min(100, Math.max(0, Number(target.progress || 0)));
+  const achieved = Number(
+    target.packageTurnoverAchieved ?? target.revenueAchieved ?? 0
+  );
+  const remaining = Math.max(
+    0,
+    Number(target.remaining != null ? target.remaining : monthlyTarget - achieved)
+  );
+  const collection = Number(target.collectionAchieved || 0);
+  const progress = Math.min(
+    100,
+    Math.max(
+      0,
+      Number(target.progress) ||
+        (monthlyTarget > 0 ? Math.round((achieved / monthlyTarget) * 100) : 0)
+    )
+  );
   const month = now.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  const setBy = target.setByName ? ` · Set by ${target.setByName}` : '';
 
   return (
     <motion.section
@@ -31,10 +46,14 @@ export default function ExecutiveTargetStrip({ target, now = new Date() }) {
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
               Your target · {month}
+              {setBy}
             </p>
             <p className="mt-0.5 text-sm font-bold text-slate-900">
               {formatCurrency(achieved)}
               <span className="font-medium text-slate-400"> / {formatCurrency(monthlyTarget)}</span>
+            </p>
+            <p className="mt-0.5 text-[10px] font-medium text-slate-400">
+              Converted package cost vs admin target · Collection {formatCurrency(collection)}
             </p>
           </div>
         </div>

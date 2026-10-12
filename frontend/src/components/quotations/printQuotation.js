@@ -1,62 +1,48 @@
 /**
  * Builds a self-contained HTML document for quotation print / PDF.
- * Uses inline template CSS so output always matches on-screen preview.
+ * Uses the same template CSS as on-screen preview so Save-as-PDF matches WYSIWYG.
  */
 import quotePdfCss from './quotePdfTemplate.css?inline';
 import { cloneWithEmbeddedImages, waitForImages } from './embedPrintImages';
 
 export function buildQuotationPrintDocument(contentHtml, title = 'Quotation') {
   const safeTitle = String(title || 'Quotation').replace(/[<>&"]/g, '');
+  const baseHref =
+    typeof window !== 'undefined' && window.location?.origin
+      ? `${window.location.origin}/`
+      : '/';
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <base href="${baseHref}" />
   <title>${safeTitle}</title>
   <style>
 ${quotePdfCss}
-    @page { margin: 10mm 11mm; size: A4 portrait; }
+    /* Exact A4 page — zero browser margins so layout matches preview paper */
+    @page {
+      size: A4 portrait;
+      margin: 0;
+    }
     html, body {
       margin: 0 !important;
       padding: 0 !important;
+      width: 210mm !important;
       background: #ffffff !important;
       overflow: visible !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
-    /* Prefer whole blocks on one page so page joins stay invisible */
-    .quote-ht-section {
-      orphans: 4;
-      widows: 4;
-      page-break-inside: auto;
-      break-inside: auto;
+    .quote-ht-pdf {
+      width: 210mm !important;
+      max-width: none !important;
+      margin: 0 !important;
     }
-    .quote-ht-section-title {
-      page-break-after: avoid !important;
-      break-after: avoid !important;
-    }
-    .quote-ht-section-title + .quote-ht-section-content {
-      page-break-before: avoid !important;
-      break-before: avoid !important;
-    }
-    .quote-ht-stay-card,
-    .quote-ht-fare,
-    .quote-ht-cover,
-    .quote-ht-glance,
-    .quote-ht-highlights,
-    .quote-ht-day-head,
-    .quote-ht-transport-card,
-    .quote-ht-policy,
-    .quote-ht-footer {
-      page-break-inside: avoid !important;
-      break-inside: avoid !important;
-    }
-    .quote-ht-timeline-line { display: none !important; }
-    .quote-ht-timeline-card {
-      border: none !important;
-      box-shadow: none !important;
-      background: transparent !important;
+    img {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
     }
   </style>
 </head>

@@ -15,15 +15,15 @@ const { syncMissedFollowUpsThrottled } = require('../utils/followUpHelpers');
 
 const listFollowUps = asyncHandler(async (req, res) => {
   await syncMissedFollowUpsThrottled();
-  const result = await findFollowUpsPaginated(req.query);
+  const result = await findFollowUpsPaginated(req.query, { branchId: req.branchId });
   res.json(result);
 });
 
 const getFollowUpSummary = asyncHandler(async (req, res) => {
   await syncMissedFollowUpsThrottled();
   const [summary, missedPreview, teamReport] = await Promise.all([
-    getAdminFollowUpSummary(),
-    getMissedFollowUpsPreview({}, 8),
+    getAdminFollowUpSummary({ branchId: req.branchId }),
+    getMissedFollowUpsPreview({ branchId: req.branchId }, 8),
     getTeamFollowUpReport(req.branchId),
   ]);
   res.json({ ...summary, missedPreview, teamReport });

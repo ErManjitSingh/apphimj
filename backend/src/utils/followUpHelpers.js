@@ -216,6 +216,8 @@ async function applyCategoryToLead(lead, category, status, body = {}) {
       lead.coldCallPending = false;
       lead.coldCallReminderAt = undefined;
       lead.coldCallFollowUpId = undefined;
+      lead.temperature = 'na';
+      lead.isHot = false;
     }
   } else if (category === 'expected_conv') {
     if (['new_lead', 'new', 'not_reachable', 'qualified', 'follow_up', 'contacted'].includes(lead.status)) {
@@ -264,7 +266,8 @@ async function applyCategoryToLead(lead, category, status, body = {}) {
       }
       // else: keep pipeline; only mark cold temperature
     }
-    lead.temperature = 'cold';
+    // Terminal cold outcomes that close the lead must leave Cold bucket (N/A).
+    lead.temperature = lead.status === 'lost' ? 'na' : 'cold';
     lead.isHot = false;
     if (body.statusReason) lead.statusReason = String(body.statusReason).trim();
     else if (outcomeKey) lead.statusReason = String(outcomeKey);
@@ -272,7 +275,7 @@ async function applyCategoryToLead(lead, category, status, body = {}) {
   } else if (category === 'dead_lead' || category === 'lost') {
     lead.status = 'lost';
     lead.lostReason = outcomeKey === 'booked_elsewhere' ? 'booked_elsewhere' : outcomeKey || body.lostReason || 'other';
-    lead.temperature = 'cold';
+    lead.temperature = 'na';
     lead.isHot = false;
     if (body.lostReason || body.outcome || body.statusReason) {
       lead.statusReason = body.statusReason || body.lostReason || body.outcome;

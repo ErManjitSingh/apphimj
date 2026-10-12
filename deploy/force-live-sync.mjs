@@ -125,6 +125,10 @@ stat -c '%y %n' "\$APP/frontend/dist/index.html" "\$APP/backend/src/services/nav
 grep -n 'newLead:' "\$APP/backend/src/services/navCountsService.js" | head -3
 
 cd "\$APP/backend" && npm ci --omit=dev
+cd "\$APP/backend" && node src/scripts/backfillClosedLeadTempNa.js
+cd "\$APP/backend" && node src/scripts/backfillBookedLeadPayments.js
+cd "\$APP/backend" && node src/scripts/backfillRevertExecutiveLeadSources.js
+cd "\$APP/backend" && node src/scripts/backfillConfirmOpsBookings.js
 pm2 restart himjourney-crm-api --update-env
 nginx -s reload || true
 rm -rf /tmp/hj-extract /tmp/himjourney-fix.tgz

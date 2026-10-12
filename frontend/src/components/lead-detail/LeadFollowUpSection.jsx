@@ -57,9 +57,11 @@ export default function LeadFollowUpSection({
     const { statusUpdate, skipFollowUp, ...followUpData } = form;
     const isLostClose =
       skipFollowUp || ['lost', 'booked_from_another_company'].includes(statusUpdate?.status);
+    const alreadyBooked =
+      lead?.status === 'booked' || lead?.status === 'converted';
 
     let created = null;
-    if (!isLostClose) {
+    if (!isLostClose && !alreadyBooked) {
       created = await createExecutiveFollowUp(
         buildFollowUpPayload({ ...followUpData, lead: lead._id })
       );
@@ -76,7 +78,8 @@ export default function LeadFollowUpSection({
       onFollowUpAdded?.(created);
     }
 
-    if (statusUpdate) {
+    // Never re-PUT status on already-booked leads (causes lock error).
+    if (statusUpdate && !alreadyBooked) {
       try {
         const base = String(window.location.pathname || '');
         const endpoint = base.includes('/sales-executive/')
@@ -87,6 +90,8 @@ export default function LeadFollowUpSection({
         const msg = err.response?.data?.message || err.message || 'Status could not be updated';
         toast.error(isLostClose ? msg : `Follow-up saved. ${msg}`);
       }
+    } else if (alreadyBooked && statusUpdate) {
+      toast.success('Lead is already booked — use Edit Advance to update voucher');
     }
 
     await onRefresh?.({ silent: true });

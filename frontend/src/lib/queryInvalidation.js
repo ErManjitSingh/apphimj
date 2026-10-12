@@ -2,7 +2,14 @@
 
 export function invalidateLeadLists(queryClient) {
   return queryClient.invalidateQueries({
-    predicate: (q) => q.queryKey[0] === 'leads',
+    // Only active list/detail-family queries — skip inactive cached pages & KPIs stampede
+    type: 'active',
+    predicate: (q) => {
+      if (q.queryKey[0] !== 'leads') return false;
+      // list-kpis is expensive; refresh via nav-counts / dedicated TTL instead
+      if (q.queryKey[1] === 'list-kpis') return false;
+      return true;
+    },
   });
 }
 

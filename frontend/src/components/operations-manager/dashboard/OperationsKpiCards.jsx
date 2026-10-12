@@ -27,9 +27,9 @@ const KPI_CONFIG = [
 export default function OperationsKpiCards({ kpis, kpiTrends, sparklines, loading }) {
   if (loading && !kpis) {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5 md:gap-4">
         {[...Array(10)].map((_, i) => (
-          <div key={i} className="rounded-2xl bg-white border border-subtle animate-pulse h-[148px]" />
+          <div key={i} className="h-[148px] animate-pulse rounded-2xl border border-slate-200 bg-white" />
         ))}
       </div>
     );
@@ -38,7 +38,7 @@ export default function OperationsKpiCards({ kpis, kpiTrends, sparklines, loadin
   if (!kpis) return null;
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5 md:gap-4">
       {KPI_CONFIG.map((item, i) => {
         const trend = kpiTrends?.[item.key] || { change: 'No change', changeType: 'neutral' };
         const sparkData = sparklines?.[item.key]?.length
@@ -52,7 +52,7 @@ export default function OperationsKpiCards({ kpis, kpiTrends, sparklines, loadin
             value={(kpis[item.key] ?? 0).toLocaleString('en-IN')}
             change={trend.change}
             changeType={trend.changeType || 'neutral'}
-            changeLabel={trend.changeType === 'neutral' ? '' : 'vs last 7 days'}
+            changeLabel=""
             icon={item.icon}
             iconColor={item.iconColor}
             sparkColor={item.sparkColor}

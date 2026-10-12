@@ -2,16 +2,20 @@ import { getLeadListStatusDisplay } from '../../lib/executiveStatusDisplay';
 import { PIPELINE_STAGES } from './leadDetailData';
 import { DETAIL_CARD } from './leadDetailUtils';
 import { cn } from '../../lib/utils';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Wallet, RotateCcw } from 'lucide-react';
 import {
   normalizeLeadStatus,
   LEAD_TEMPERATURE_OPTIONS,
   pipelineStatusLabel,
+  isBookedStatus,
+  isLostStatus,
 } from '../../lib/leadPipeline';
 
 export default function LeadStatusPipeline({ status, lead, onUpdateStatus }) {
   const resolved = lead || { status };
   const current = normalizeLeadStatus(resolved.status);
+  const booked = isBookedStatus(resolved.status);
+  const lost = isLostStatus(resolved.status);
   const temp = String(resolved.temperature || '').toLowerCase();
   const tempLabel =
     LEAD_TEMPERATURE_OPTIONS.find((t) => t.value === temp)?.label ||
@@ -30,6 +34,13 @@ export default function LeadStatusPipeline({ status, lead, onUpdateStatus }) {
   const [dateLine, timeLine] = stageDate ? stageDate.split(',').map((part) => part.trim()) : [];
   const display = getLeadListStatusDisplay(resolved);
 
+  const statusBtnLabel = booked
+    ? 'Edit Advance / Voucher'
+    : lost
+      ? 'Reopen / Change Status'
+      : 'Change Status';
+  const StatusIcon = booked ? Wallet : lost ? RotateCcw : RefreshCw;
+
   return (
     <div className={cn(DETAIL_CARD, 'px-5 py-4')}>
       <div className="mb-5 flex items-center justify-between gap-3">
@@ -40,15 +51,25 @@ export default function LeadStatusPipeline({ status, lead, onUpdateStatus }) {
             {tempLabel ? ` · ${tempLabel}` : ''}
             {display.reasonLabel ? ` · ${display.reasonLabel}` : ''}
           </p>
+          {lost ? (
+            <p className="mt-1 text-[11px] font-medium text-amber-700">
+              Customer came back? You can change the status again.
+            </p>
+          ) : null}
         </div>
         {onUpdateStatus ? (
           <button
             type="button"
             onClick={onUpdateStatus}
-            className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-[12px] font-semibold text-slate-600 hover:bg-slate-50"
+            className={cn(
+              'inline-flex h-8 items-center gap-1.5 rounded-xl border px-2.5 text-[12px] font-semibold shadow-sm',
+              lost
+                ? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+            )}
           >
-            <RefreshCw className="h-3.5 w-3.5" />
-            Change Status
+            <StatusIcon className="h-3.5 w-3.5" />
+            {statusBtnLabel}
           </button>
         ) : null}
       </div>

@@ -114,6 +114,8 @@ function enrichLead(lead) {
     isUrgent,
     isHighBudget,
     isUnassigned: !obj.assignedTo,
+    /** True until assigned executive opens the lead detail / call access once. */
+    isUnopened: !obj.firstOpenedAt,
     sourceShort,
     sourceLabel: sourceShort,
     temperatureLabel: obj.temperature ? `${temperatureEmoji[obj.temperature] || ''} ${obj.temperature}`.trim() : null,
@@ -217,13 +219,21 @@ function generateQuoteNumber() {
 function isConvertedListQuery(query = {}) {
   const filterKey = query.filter || query.listFilter || query.paramsFilter;
   if (filterKey === 'arrivals') return false;
-  return (
-    query.status === 'converted' ||
-    query.status === 'booked' ||
+  if (
     filterKey === 'converted' ||
     filterKey === 'booked' ||
     filterKey === 'bookings'
-  );
+  ) {
+    return true;
+  }
+  const status = query.status;
+  if (status === 'converted' || status === 'booked') return true;
+  // After alias expand, status becomes { $in: ['booked', 'converted'] }
+  if (status && typeof status === 'object') {
+    const values = Array.isArray(status.$in) ? status.$in : [];
+    if (values.includes('booked') || values.includes('converted')) return true;
+  }
+  return false;
 }
 
 function convertedPeriodClause(range) {

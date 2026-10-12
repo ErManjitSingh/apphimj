@@ -35,6 +35,51 @@ function parseDurationNights(pkg = {}) {
   return Math.max(0, parseDurationDays(pkg) - 1);
 }
 
+/** Normalize UNO inclusions/exclusions (array, HTML string, or bullet blob). */
+function normalizeInclusionList(value) {
+  if (value == null || value === '') return [];
+  if (Array.isArray(value)) {
+    return value
+      .flatMap((item) => {
+        if (item == null) return [];
+        if (typeof item === 'string' || typeof item === 'number') {
+          return normalizeInclusionList(String(item));
+        }
+        if (typeof item === 'object') {
+          const text = item.text || item.label || item.title || item.name || item.value || '';
+          return text ? normalizeInclusionList(text) : [];
+        }
+        return [];
+      })
+      .map((line) => String(line || '').trim())
+      .filter(Boolean);
+  }
+  if (typeof value !== 'string' && typeof value !== 'number') return [];
+  const text = String(value)
+    .replace(/<\s*br\s*\/?\s*>/gi, '\n')
+    .replace(/<\/\s*li\s*>/gi, '\n')
+    .replace(/<\/\s*p\s*>/gi, '\n')
+    .replace(/<\/\s*div\s*>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/\r/g, '')
+    .trim();
+  if (!text) return [];
+  return text
+    .split(/\n+|•|\u2022|(?:^|\s)[-–—*]\s+/)
+    .map((line) => line.replace(/^\d+[.)]\s+/, '').trim())
+    .filter((line) => line.length > 1);
+}
+
+function pickInclusionList(...candidates) {
+  for (const candidate of candidates) {
+    const lines = normalizeInclusionList(candidate);
+    if (lines.length) return lines;
+  }
+  return [];
+}
+
 function mapItineraryDays(days = []) {
   return days.map((day) => {
     const activityParts = [day.arrival, day.transport, day.cab_name, day.transport_mode].filter(Boolean);
@@ -1115,8 +1160,8 @@ function mapUnoPackage(pkg, { includeItinerary = false, includeDetail = false } 
     coverImage: sanitizeImageUrl(pkg.featured_image),
     shortDescription: pkg.short_description || '',
     description: pkg.description || '',
-    inclusions: pkg.inclusions || [],
-    exclusions: pkg.exclusions || [],
+    inclusions: pickInclusionList(pkg.inclusions, pkg.includes),
+    exclusions: pickInclusionList(pkg.exclusions, pkg.excludes),
     highlights: pkg.highlight_icons || [],
     externalSource: 'catalog',
     status: pkg.status,

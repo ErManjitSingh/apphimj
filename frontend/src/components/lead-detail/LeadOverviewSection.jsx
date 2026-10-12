@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Briefcase,
@@ -16,10 +16,6 @@ import {
   MoreHorizontal,
   Copy,
   Clock,
-  Eye,
-  Wallet,
-  ArrowDownCircle,
-  CreditCard,
   StickyNote,
   Plus,
   CalendarDays,
@@ -30,9 +26,12 @@ import { toast } from '../../context/ToastContext';
 import { beginLeadCall } from '../../lib/callSession';
 import { openCrmWhatsApp } from '../../lib/openCrmWhatsApp';
 import LeadStatusPipeline from './LeadStatusPipeline';
+import LeadPaymentSummaryCard from './LeadPaymentSummaryCard';
+import MetaFormAnswersCard from './MetaFormAnswersCard';
 import API from '../../api/axios';
 import { CHANNELS } from '../../config/channels';
 import { usePermissions } from '../../hooks/usePermissions';
+import { isBookedStatus } from '../../lib/leadPipeline';
 import {
   formatSource,
   DETAIL_CARD,
@@ -80,28 +79,6 @@ function Field({ icon: Icon, label, value, sub }) {
   );
 }
 
-function PayTile({ icon: Icon, label, value, tone }) {
-  const tones = {
-    violet: 'bg-violet-50 text-violet-900',
-    emerald: 'bg-emerald-50 text-emerald-900',
-    amber: 'bg-orange-50 text-orange-900',
-  };
-  const iconTone = {
-    violet: 'text-violet-500',
-    emerald: 'text-emerald-500',
-    amber: 'text-orange-500',
-  };
-  return (
-    <div className={cn('rounded-2xl px-4 py-3.5', tones[tone])}>
-      <p className={cn('mb-2 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide', iconTone[tone])}>
-        <Icon className="h-3.5 w-3.5" />
-        {label}
-      </p>
-      <p className="text-[22px] font-black tabular-nums leading-none">{formatDetailMoney(value)}</p>
-    </div>
-  );
-}
-
 function ActionTile({ icon: Icon, label, tone, onClick, disabled }) {
   const tones = {
     sky: 'bg-sky-50 text-sky-700 hover:bg-sky-100',
@@ -143,6 +120,7 @@ export default function LeadOverviewSection({
   onAssign,
   onAddNote,
   onUpdateStatus,
+  onEditCommercial,
   sidebarExtra,
 }) {
   const navigate = useNavigate();
@@ -155,6 +133,7 @@ export default function LeadOverviewSection({
   const [voucherHtml, setVoucherHtml] = useState('');
   const [voucherData, setVoucherData] = useState(null);
   const [voucherLoading, setVoucherLoading] = useState(false);
+  const [sendingVoucher, setSendingVoucher] = useState(false);
   const [noteDraft, setNoteDraft] = useState('');
   const [addingNote, setAddingNote] = useState(false);
   const [showNoteBox, setShowNoteBox] = useState(false);
@@ -165,6 +144,9 @@ export default function LeadOverviewSection({
   const packageCost = summary?.totalAmount ?? lead?.budget ?? 0;
   const advance = summary?.advanceReceived ?? 0;
   const balance = summary?.balanceDue ?? (packageCost - advance);
+  const booked = isBookedStatus(lead?.status);
+  const canManageVoucher = Boolean(booked || summary);
+  const editAdvanceHandler = onEditCommercial || (canManageVoucher ? onUpdateStatus : null);
   const upcoming = getUpcomingFollowUp(followups) || (lead?.nextFollowUp ? { scheduledAt: lead.nextFollowUp } : null);
   const noteItems = notes.length
     ? notes
@@ -173,20 +155,73 @@ export default function LeadOverviewSection({
       : [];
   const latestNote = noteItems[0];
   const endpoint = receiptEndpoint || (lead?._id ? `/leads/${lead._id}/payment-receipt` : null);
+  const sendEndpoint = endpoint ? `${endpoint}/send` : null;
   const phone = lead?.whatsapp || lead?.phone;
+
+  useEffect(() => {
+    const onOpen = (event) => {
+      const detail = event?.detail || {};
+      if (!detail.html) return;
+      setVoucherHtml(detail.html);
+      setVoucherData(detail.voucher || null);
+      setVoucherOpen(true);
+    };
+    window.addEventListener('hj:open-voucher', onOpen);
+    return () => window.removeEventListener('hj:open-voucher', onOpen);
+  }, []);
 
   const openVoucher = async () => {
     if (!endpoint) return;
     setVoucherLoading(true);
     try {
-      const { data } = await API.get(endpoint, { skipSuccessToast: true });
+      const { data } = await API.get(endpoint, {
+        params: { refresh: 1 },
+        skipSuccessToast: true,
+        skipErrorToast: true,
+      });
+      if (!data?.html) {
+        toast.error('Voucher HTML missing — save commercial / advance details first');
+        return;
+      }
       setVoucherHtml(data.html || '');
       setVoucherData(data.voucher || null);
       setVoucherOpen(true);
-    } catch {
-      toast.error('Unable to load payment voucher');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Unable to load payment voucher');
     } finally {
       setVoucherLoading(false);
+    }
+  };
+
+  const sendVoucherNow = async () => {
+    if (!sendEndpoint) {
+      toast.error('Send is not available for this lead');
+      return;
+    }
+    setSendingVoucher(true);
+    try {
+      // Ensure receipt HTML exists before send
+      await API.get(endpoint, {
+        params: { refresh: 1 },
+        skipSuccessToast: true,
+        skipErrorToast: true,
+      });
+      const { data } = await API.post(sendEndpoint, {}, { skipSuccessToast: true, skipErrorToast: true });
+      if (data?.sent === false) {
+        const reasons = {
+          no_email: 'Customer email is missing',
+          email_not_configured: 'Email is not configured on server',
+          no_receipt: 'Receipt not found — edit advance / commercial form first',
+        };
+        toast.error(reasons[data.reason] || 'Could not send voucher');
+        return;
+      }
+      toast.success(`Voucher sent${data?.to?.length ? ` to ${data.to.join(', ')}` : ''}`);
+      onEmailSent?.();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to send voucher');
+    } finally {
+      setSendingVoucher(false);
     }
   };
 
@@ -267,28 +302,37 @@ export default function LeadOverviewSection({
           </div>
         </section>
 
-        <section id="payment-advance" className={cn(DETAIL_CARD, 'scroll-mt-24 p-5')}>
-          <CardTitle
-            icon={Wallet}
-            title="Payment Information"
-            action={
-              <button
-                type="button"
-                onClick={openVoucher}
-                disabled={voucherLoading}
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-orange-200 bg-white px-2.5 text-[12px] font-semibold text-orange-500 hover:bg-orange-50"
-              >
-                <Eye className="h-3.5 w-3.5" />
-                {voucherLoading ? 'Loading…' : 'View Voucher'}
-              </button>
-            }
-          />
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <PayTile icon={Wallet} label="Package Cost" value={packageCost} tone="violet" />
-            <PayTile icon={ArrowDownCircle} label="Advance Received" value={advance} tone="emerald" />
-            <PayTile icon={CreditCard} label="Balance" value={balance} tone="amber" />
-          </div>
-        </section>
+        <MetaFormAnswersCard lead={lead} />
+
+        <LeadPaymentSummaryCard
+          packageCost={packageCost}
+          advance={advance}
+          balance={balance}
+          voucherLabel={
+            summary?.receiptNumber
+              ? `Voucher ${summary.receiptNumber}`
+              : summary?.invoiceNumber
+                ? `Invoice ${summary.invoiceNumber}`
+                : canManageVoucher
+                  ? 'Advance receipt ready'
+                  : null
+          }
+          receiptSentAt={summary?.receiptSentAt}
+          receiptSentTo={summary?.receiptSentTo}
+          paymentScreenshots={
+            summary?.paymentScreenshots?.length
+              ? summary.paymentScreenshots
+              : summary?.paymentScreenshotUrl
+                ? [{ url: summary.paymentScreenshotUrl, name: summary.paymentScreenshotName }]
+                : []
+          }
+          canManage={canManageVoucher}
+          onEditAdvance={editAdvanceHandler}
+          onSendVoucher={sendEndpoint ? sendVoucherNow : undefined}
+          onViewVoucher={openVoucher}
+          sendingVoucher={sendingVoucher}
+          voucherLoading={voucherLoading}
+        />
 
         <LeadStatusPipeline status={lead.status} lead={lead} onUpdateStatus={onUpdateStatus} />
       </div>

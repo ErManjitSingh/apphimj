@@ -310,15 +310,20 @@ export default function SetMonthlyTargetModal({ open, onClose, user, onSaved }) 
               />
             </label>
             <label className="text-sm">
-              <span className="text-xs font-semibold uppercase tracking-wide text-content-muted">Total sales {unitLabel}</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-content-muted">
+                Total turnover {unitLabel}
+              </span>
               <input
                 type="number"
                 min={0}
                 value={totalSales}
                 onChange={(e) => setTotalSales(e.target.value)}
-                placeholder={periodType === 'daily' ? 'e.g. 50000' : 'e.g. 1500000'}
+                placeholder={periodType === 'daily' ? 'e.g. 50000' : 'e.g. 360000'}
                 className="mt-1 w-full rounded-xl border border-subtle bg-surface px-3 py-2.5 text-sm"
               />
+              <span className="mt-1 block text-[10px] text-content-muted">
+                Package quote totals on converted/booked leads (not collection)
+              </span>
             </label>
             <label className="text-sm">
               <span className="text-xs font-semibold uppercase tracking-wide text-content-muted">Profit {unitLabel}</span>

@@ -21,6 +21,9 @@ const { getClientIp } = require('../services/activityService');
 const userCache = new Map();
 const USER_CACHE_MS = 45_000;
 const USER_CACHE_MAX = 1000;
+const sessionHeartbeat = new Map();
+const SESSION_HEARTBEAT_MS = 60_000;
+const SESSION_HEARTBEAT_MAX = 5000;
 
 function trimUserCache() {
   const now = Date.now();
@@ -93,15 +96,28 @@ const protect = asyncHandler(async (req, res, next) => {
   const decoded = jwt.verify(token, process.env.JWT_SECRET);
   const now = new Date();
 
-  const session = await UserSession.findOneAndUpdate(
-    { sessionId: decoded.sessionId, status: 'active' },
-    // A real request proves the session is still alive — clear any pending
-    // beacon disconnect suspicion so a refresh/bfcache round trip never gets
-    // mistaken for a closed tab.
-    { $set: { lastActivityAt: now, disconnectSignalAt: null } },
-    { new: true }
-  ).lean();
+  const session = await UserSession.findOne({
+    sessionId: decoded.sessionId,
+    status: 'active',
+  }).lean();
   if (!session) throw new ApiError(401, 'Session expired or logged out. Please sign in again.');
+
+  // Throttle lastActivityAt writes — every request used to hit Mongo for heartbeat.
+  const sid = String(decoded.sessionId);
+  const lastTouch = sessionHeartbeat.get(sid) || 0;
+  const needsHeartbeat =
+    Boolean(session.disconnectSignalAt) || Date.now() - lastTouch >= SESSION_HEARTBEAT_MS;
+  if (needsHeartbeat) {
+    if (sessionHeartbeat.size >= SESSION_HEARTBEAT_MAX) {
+      const oldest = sessionHeartbeat.keys().next().value;
+      if (oldest !== undefined) sessionHeartbeat.delete(oldest);
+    }
+    sessionHeartbeat.set(sid, Date.now());
+    UserSession.updateOne(
+      { sessionId: decoded.sessionId, status: 'active' },
+      { $set: { lastActivityAt: now, disconnectSignalAt: null } }
+    ).catch(() => {});
+  }
 
   const user = await loadAuthUser(decoded.id);
   if (!user || user.status === 'disabled') {

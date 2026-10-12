@@ -84,8 +84,13 @@ export default function LeadWizard() {
         const { status, ...updatePayload } = payload;
         if (user?.role === 'sales_executive') {
           delete updatePayload.name;
-          delete updatePayload.phone;
           delete updatePayload.email;
+        }
+        if (user?.role !== 'admin') {
+          delete updatePayload.phone;
+          delete updatePayload.source;
+          delete updatePayload.leadSource;
+          delete updatePayload.sourceLabel;
         }
         const res = await API.put(`${apiBase}/${id}`, updatePayload);
         saved = res.data;

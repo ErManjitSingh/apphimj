@@ -1,4 +1,5 @@
 import { resolveQuotePackage } from './quotePdfHelpers';
+import { pickInclusionExclusionList } from '../../lib/inclusionExclusionLines';
 import { resolvePackageCabs } from '../../lib/packageCabMapper';
 import { seedDayWiseHotelsFromItinerary } from '../../lib/packageItineraryMapper';
 import { applyAskDiscount, bakeCompanyMarginIntoLineCosts, calculatePricing } from './quotationUtils';
@@ -193,8 +194,14 @@ export function hydrateWizardFromQuote(quote) {
       id: d.id || d._id || `day-${i + 1}`,
       day: d.day || i + 1,
     })),
-    customInclusions: Array.isArray(pkg.inclusions) && pkg.inclusions.length ? [...pkg.inclusions] : [''],
-    customExclusions: Array.isArray(pkg.exclusions) && pkg.exclusions.length ? [...pkg.exclusions] : [''],
+    customInclusions: (() => {
+      const lines = pickInclusionExclusionList(pkg.inclusions, pkg.includes);
+      return lines.length ? [...lines] : [''];
+    })(),
+    customExclusions: (() => {
+      const lines = pickInclusionExclusionList(pkg.exclusions, pkg.excludes);
+      return lines.length ? [...lines] : [''];
+    })(),
     dayWiseHotels,
     selectedPackageCab,
     extraCabs,

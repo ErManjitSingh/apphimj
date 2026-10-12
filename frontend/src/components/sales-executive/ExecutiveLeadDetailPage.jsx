@@ -9,6 +9,7 @@ import { LeadDetailLayout } from '../lead-detail';
 import AddFollowUpModal from '../followups/AddFollowUpModal';
 import { createExecutiveFollowUp, buildFollowUpPayload } from '../followups/followupApi';
 import PostConvertCommercialModal from '../leads/PostConvertCommercialModal';
+import { isBookedStatus, isLostStatus } from '../../lib/leadPipeline';
 
 export default function ExecutiveLeadDetailPage() {
   const { id } = useParams();
@@ -59,6 +60,16 @@ export default function ExecutiveLeadDetailPage() {
 
   useDataRefresh(['leads'], loadLead);
 
+  const openBookedCommercialOrOutcome = () => {
+    // Booked / converted — only advance / voucher edit (no status change).
+    if (isBookedStatus(lead?.status)) {
+      setCommercialOpen(true);
+      return;
+    }
+    // Lost or active — open status / follow-up modal (lost can be reopened).
+    setOutcomeModalOpen(true);
+  };
+
   if (loading) {
     return (
       <div className="space-y-6 animate-pulse">
@@ -94,9 +105,19 @@ export default function ExecutiveLeadDetailPage() {
   const saveFollowUp = async (data) => {
     const { statusUpdate, leadOutcome, skipFollowUp, ...followUpData } = data;
     void leadOutcome;
-    const becameConverted = statusUpdate?.status === 'converted';
+    const becameConverted =
+      statusUpdate?.status === 'converted' || statusUpdate?.status === 'booked';
+    const alreadyBooked = isBookedStatus(lead?.status);
     const isLostClose = skipFollowUp || ['lost', 'booked_from_another_company'].includes(statusUpdate?.status);
 
+    // Already booked — never push status again; open commercial form for advance / voucher.
+    if (alreadyBooked) {
+      setOutcomeModalOpen(false);
+      setCommercialOpen(true);
+      return;
+    }
+
+    // Don't create another follow-up for lost closes.
     if (!isLostClose) {
       await createExecutiveFollowUp(
         buildFollowUpPayload({
@@ -125,6 +146,7 @@ export default function ExecutiveLeadDetailPage() {
       } catch (err) {
         const msg = err.response?.data?.message || err.message || 'Lead status could not be updated';
         toast.error(isLostClose ? msg : `Follow-up saved. ${msg}`);
+        throw err;
       }
     }
 
@@ -179,13 +201,33 @@ export default function ExecutiveLeadDetailPage() {
         flashMessage={flashMessage}
         highlightQuotationId={highlightQuotationId}
         onCreateQuote={() => navigate(`/sales-executive/quotations/new?leadId=${id}`)}
-        onScheduleFollowUp={() => setOutcomeModalOpen(true)}
-        onChangeStatus={() => setOutcomeModalOpen(true)}
+        onScheduleFollowUp={openBookedCommercialOrOutcome}
+        onChangeStatus={openBookedCommercialOrOutcome}
+        onEditCommercial={() => setCommercialOpen(true)}
         onContactLogged={loadLead}
         onEmailSent={loadLead}
-        canCreateFollowUp
+        canCreateFollowUp={!isBookedStatus(lead?.status)}
         canEditLead
         editHref={`/sales-executive/leads/${id}/edit`}
+        headerExtra={
+          isLostStatus(lead?.status) ? (
+            <div className="mb-4 flex flex-col gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-bold text-amber-900">Lead is Lost</p>
+                <p className="text-xs text-amber-800/90">
+                  Customer came back? Change the status to bring this lead back into the pipeline.
+                </p>
+              </div>
+              <Button
+                type="button"
+                onClick={() => setOutcomeModalOpen(true)}
+                className="shrink-0 rounded-xl h-9 bg-amber-600 hover:bg-amber-500 text-white border-0 font-semibold"
+              >
+                Reopen / Change Status
+              </Button>
+            </div>
+          ) : null
+        }
       />
 
       {outcomeModalOpen ? (
@@ -205,6 +247,7 @@ export default function ExecutiveLeadDetailPage() {
           open={commercialOpen}
           leadId={id}
           onClose={() => setCommercialOpen(false)}
+          onSaved={() => loadLead({ silent: true })}
         />
       ) : null}
     </motion.div>

@@ -115,7 +115,12 @@ export default function LeadDetailHeader({
   const neighbors = useLeadNeighbors(leadId || lead?._id, relatedBasePath);
   const location = [lead.city, lead.state].filter(Boolean).join(', ') || lead.destination || '—';
   const isLost = ['lost', 'booked_from_another_company'].includes(lead?.status);
-  const badgeLabel = listDisplay.bucket === 'new' ? 'No Status' : listDisplay.label || 'No Status';
+  const badgeLabel =
+    listDisplay.label && listDisplay.label !== 'No status'
+      ? listDisplay.label
+      : listDisplay.bucket === 'new'
+        ? 'No Status'
+        : listDisplay.pipelineLabel || listDisplay.label || 'No Status';
 
   const goNeighbor = (id) => {
     if (!id) return;

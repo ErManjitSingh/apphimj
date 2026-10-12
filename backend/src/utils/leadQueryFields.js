@@ -54,10 +54,12 @@ const LEAD_LIST_SELECT = [
   'reactivation.isReactivated',
   'reactivation.stage',
   'reactivation.reactivatedAt',
+  // Needed for list "New" badge (unopened vs already viewed). Schema is select:false → prefix +.
+  '+firstOpenedAt',
 ].join(' ');
 
 /** Detail view — excludes notes string and reactivation stageHistory */
-const LEAD_DETAIL_SELECT = `${LEAD_LIST_SELECT} city state travelDate returnDate tourDays pickupPoint dropPoint numberOfRooms roomsWithMattress cabType budgetRange leadType companyName hotelCategory mealPlan mealPreference transportRequirement specialRequirements statusReason priority channel assigneeRole assignedManager teamId lastContactedAt lastContactMethod executiveLastViewedAt smartScore referral occupationCategory occupation`;
+const LEAD_DETAIL_SELECT = `${LEAD_LIST_SELECT} city state travelDate returnDate tourDays pickupPoint dropPoint numberOfRooms roomsWithMattress cabType budgetRange leadType companyName hotelCategory mealPlan mealPreference transportRequirement specialRequirements statusReason priority channel assigneeRole assignedManager teamId lastContactedAt lastContactMethod executiveLastViewedAt smartScore referral occupationCategory occupation notes externalLeadId externalLeadSource externalFormCapture`;
 
 /**
  * "Opened" timeline info — management-only (see MANAGEMENT_VIEWER_ROLES). Kept out of

@@ -8,14 +8,18 @@ const {
   buildLeadSearchFilter,
 } = require('../utils/queryHelpers');
 const { parsePagination, parseSort, paginatedResponse } = require('../utils/pagination');
+const { withBranch } = require('../utils/branchScope');
 
-function buildFollowUpListFilter(query = {}) {
+function buildFollowUpListFilter(query = {}, branchId = null) {
   const { status, tab, kpiTab, leadId, category, search, priority } = query;
 
-  const filter = {
-    ...buildFollowUpTabFilter(tab || kpiTab),
-    ...buildFollowUpCategoryFilter(category),
-  };
+  const filter = withBranch(
+    {
+      ...buildFollowUpTabFilter(tab || kpiTab),
+      ...buildFollowUpCategoryFilter(category),
+    },
+    branchId
+  );
 
   if (status) filter.status = status;
   if (leadId) filter.lead = leadId;
@@ -28,15 +32,18 @@ function buildFollowUpListFilter(query = {}) {
   return filter;
 }
 
-async function findFollowUpsPaginated(query = {}) {
+async function findFollowUpsPaginated(query = {}, { branchId = null } = {}) {
   const { page, limit, skip } = parsePagination(query, { defaultLimit: 20, maxLimit: 200 });
   const sort = parseSort(query, { scheduledAt: 1 });
-  const filter = buildFollowUpListFilter(query);
+  const filter = buildFollowUpListFilter(query, branchId);
 
   if (filter._leadSearch) {
     const q = filter._leadSearch;
     delete filter._leadSearch;
-    const leads = await Lead.find(buildLeadSearchFilter(q)).select('_id').limit(200).lean();
+    const leads = await Lead.find(withBranch(buildLeadSearchFilter(q), branchId))
+      .select('_id')
+      .limit(200)
+      .lean();
     filter.lead = { $in: leads.map((l) => l._id) };
   }
 

@@ -3,7 +3,8 @@ const FollowUp = require('../models/FollowUp');
 const { withBranch } = require('../utils/branchScope');
 const { getOrSet, cacheKey } = require('./dashboardCacheService');
 
-const LIST_KPI_TTL_MS = 60 * 1000;
+const LIST_KPI_TTL_MS = 3 * 60 * 1000;
+const DUPLICATE_KPI_TTL_MS = 10 * 60 * 1000;
 
 function todayRange() {
   const start = new Date();
@@ -67,19 +68,22 @@ function phoneKeyExpr(field = '$phone') {
 }
 
 async function countDuplicateLeads(branchId) {
-  const match = withBranch(
-    { isDeleted: { $ne: true }, phone: { $exists: true, $nin: [null, ''] } },
-    branchId
-  );
-  const [row] = await Lead.aggregate([
-    { $match: match },
-    { $addFields: { phoneKey: phoneKeyExpr('$phone') } },
-    { $match: { phoneKey: { $regex: '^[0-9]{10}$' } } },
-    { $group: { _id: '$phoneKey', n: { $sum: 1 } } },
-    { $match: { n: { $gt: 1 } } },
-    { $group: { _id: null, duplicateLeads: { $sum: '$n' } } },
-  ]);
-  return row?.duplicateLeads || 0;
+  const key = cacheKey('lead-dup-count-v1', branchId || 'global');
+  return getOrSet(key, async () => {
+    const match = withBranch(
+      { isDeleted: { $ne: true }, phone: { $exists: true, $nin: [null, ''] } },
+      branchId
+    );
+    const [row] = await Lead.aggregate([
+      { $match: match },
+      { $addFields: { phoneKey: phoneKeyExpr('$phone') } },
+      { $match: { phoneKey: { $regex: '^[0-9]{10}$' } } },
+      { $group: { _id: '$phoneKey', n: { $sum: 1 } } },
+      { $match: { n: { $gt: 1 } } },
+      { $group: { _id: null, duplicateLeads: { $sum: '$n' } } },
+    ]);
+    return row?.duplicateLeads || 0;
+  }, DUPLICATE_KPI_TTL_MS);
 }
 
 /** Lead IDs that share a 10-digit phone with at least one other lead */

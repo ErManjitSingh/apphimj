@@ -194,6 +194,7 @@ export function buildWebsiteAlignedQuoteCosts({
   requiredRooms = null,
   requiredCabs = null,
   occupancyOverride = null,
+  hotelSeason = 'onSeason',
 } = {}) {
   void packageAnchor;
   const occ = occupancyOverride?.rooms
@@ -216,8 +217,9 @@ export function buildWebsiteAlignedQuoteCosts({
   // Hold party multipliers until SE configures rooms / cab for this party size.
   const effectiveRooms = roomsOk ? occ.rooms : 1;
   const effectiveMattresses = roomsOk ? occ.mattresses : 0;
+  const seasonKey = hotelSeason === 'offSeason' ? 'offSeason' : 'onSeason';
 
-  const hotelRackSum = sumDayWiseHotelRackTotal(dayWiseHotels, effectiveRooms);
+  const hotelRackSum = sumDayWiseHotelRackTotal(dayWiseHotels, effectiveRooms, seasonKey);
   const mattressCost = estimateMattressCost(dayWiseHotels, effectiveMattresses);
   const hotelLineCost = round2(hotelRackSum + mattressCost);
 

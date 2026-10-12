@@ -10,7 +10,7 @@ const { invalidateMailboxCache } = require('./emailMailboxCache');
 const company = require('../config/company');
 
 /** Bump when HTML layout changes so stored receipts regenerate. */
-const RECEIPT_TEMPLATE_VERSION = 8;
+const RECEIPT_TEMPLATE_VERSION = 11;
 
 const COMPANY = {
   ...company,
@@ -160,72 +160,63 @@ function buildPaymentReceiptHtml({
 <meta name="receipt-template" content="v${RECEIPT_TEMPLATE_VERSION}"/>
 <style>
   *{box-sizing:border-box}
-  body{margin:0;padding:28px 16px;background:#e8eef3;font-family:Inter,Segoe UI,Arial,Helvetica,sans-serif;color:#0f172a;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .sheet{max-width:720px;margin:0 auto;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 20px 50px rgba(15,23,42,.14)}
-  .hero{position:relative;background:linear-gradient(135deg,#059669 0%,#047857 55%,#0f766e 100%);color:#fff;padding:28px 28px 26px;overflow:hidden}
-  .hero:before,.hero:after{content:"";position:absolute;border-radius:50%;pointer-events:none}
-  .hero:before{width:280px;height:280px;right:-60px;top:-120px;background:rgba(255,255,255,.08)}
-  .hero:after{width:220px;height:220px;left:-80px;bottom:-100px;background:rgba(0,0,0,.08)}
-  .hero-inner{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
-  .brand{font-size:11px;letter-spacing:.16em;text-transform:uppercase;opacity:.88;font-weight:700;margin:0}
-  .title{margin:8px 0 0;font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1.15}
-  .sub{margin:8px 0 0;font-size:13px;opacity:.92}
-  .status{background:#fff;border-radius:16px;padding:14px 16px;min-width:168px;box-shadow:0 8px 24px rgba(0,0,0,.12)}
-  .status-row{display:flex;align-items:center;gap:10px}
-  .check{width:28px;height:28px;border-radius:50%;background:#10b981;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-  .check svg{display:block}
-  .status strong{display:block;color:#059669;font-size:14px;font-weight:800}
-  .status span{display:block;color:#64748b;font-size:11px;margin-top:2px}
-  .body{padding:8px 28px 28px}
-  .grid{display:grid;grid-template-columns:1fr 1fr 1fr;border:1px solid #e8eef3;border-radius:16px;overflow:hidden;margin-top:20px}
-  .cell{padding:16px 14px;border-right:1px solid #eef2f6;border-bottom:1px solid #eef2f6;min-height:92px}
+  body{margin:0;padding:12px;background:#e8eef3;font-family:Inter,Segoe UI,Arial,Helvetica,sans-serif;color:#0f172a;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .sheet{max-width:720px;margin:0 auto;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 12px 32px rgba(15,23,42,.12)}
+  .hero{position:relative;background:linear-gradient(135deg,#059669 0%,#047857 55%,#0f766e 100%);color:#fff;padding:18px 22px;overflow:hidden}
+  .hero:before{content:"";position:absolute;width:200px;height:200px;right:-50px;top:-90px;border-radius:50%;background:rgba(255,255,255,.08);pointer-events:none}
+  .hero-inner{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:14px}
+  .brand{margin:0;font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.9;font-weight:700}
+  .title{margin:5px 0 0;font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1.15}
+  .sub{margin:5px 0 0;font-size:12px;opacity:.92}
+  .status{background:#fff;border-radius:12px;padding:10px 12px;min-width:150px;box-shadow:0 6px 16px rgba(0,0,0,.12)}
+  .status-row{display:flex;align-items:center;gap:8px}
+  .check{width:24px;height:24px;border-radius:50%;background:#10b981;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0}
+  .status strong{display:block;color:#059669;font-size:13px;font-weight:800}
+  .status span{display:block;color:#64748b;font-size:10px;margin-top:1px}
+  .body{padding:14px 20px 16px}
+  .company{display:grid;grid-template-columns:1.3fr .7fr;gap:10px}
+  .panel{border:1px solid #e8eef3;border-radius:12px;padding:10px 12px;background:#f8fafc}
+  .panel h3{margin:0 0 5px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:800}
+  .panel p{margin:0 0 3px;font-size:11px;line-height:1.4;color:#334155}
+  .panel strong{color:#0f172a}
+  .grid{display:grid;grid-template-columns:1fr 1fr 1fr;border:1px solid #e8eef3;border-radius:12px;overflow:hidden;margin-top:12px}
+  .cell{padding:10px 12px;border-right:1px solid #eef2f6;border-bottom:1px solid #eef2f6}
   .cell:nth-child(3n){border-right:none}
   .cell:nth-child(n+4){border-bottom:none}
-  .cell-top{display:flex;align-items:flex-start;gap:10px}
-  .ico{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-  .ico svg{width:16px;height:16px}
-  .lbl{font-size:11px;color:#94a3b8;font-weight:600;margin:0 0 4px}
-  .val{font-size:15px;font-weight:800;color:#0f172a;margin:0;line-height:1.25}
-  .meta{font-size:12px;color:#64748b;margin:4px 0 0;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
-  .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;background:#d1fae5;color:#047857;font-size:10px;font-weight:700}
-  .amounts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:18px 0 14px}
-  .amt{border-radius:16px;padding:16px 14px;position:relative;overflow:hidden}
-  .amt .ai{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:10px}
-  .amt span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:6px}
-  .amt strong{display:block;font-size:22px;font-weight:800;letter-spacing:-.02em}
-  .total{background:#ecfdf5}.total span{color:#047857}.total strong{color:#064e3b}.total .ai{background:#a7f3d0;color:#047857}
-  .advance{background:#d1fae5}.advance span{color:#047857}.advance strong{color:#064e3b}.advance .ai{background:#6ee7b7;color:#047857}
-  .balance{background:#ffedd5}.balance span{color:#c2410c}.balance strong{color:#9a3412}.balance .ai{background:#fdba74;color:#c2410c}
-  .company{margin-top:16px;display:grid;grid-template-columns:1.2fr .8fr;gap:12px}
-  .panel{border:1px solid #e8eef3;border-radius:14px;padding:14px 16px;background:#f8fafc}
-  .panel h3{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:800}
-  .panel p{margin:0 0 4px;font-size:12px;line-height:1.45;color:#334155}
-  .panel strong{color:#0f172a}
-  .tax{margin-top:14px;border:1px solid #e8eef3;border-radius:14px;overflow:hidden}
-  .tax table{width:100%;border-collapse:collapse;font-size:12px}
-  .tax th,.tax td{padding:9px 14px;border-bottom:1px solid #eef2f6}
-  .tax th{text-align:left;background:#f8fafc;color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:.06em}
+  .lbl{margin:0 0 3px;font-size:10px;color:#94a3b8;font-weight:600}
+  .val{margin:0;font-size:13px;font-weight:800;color:#0f172a;line-height:1.3;word-break:break-word}
+  .meta{margin:3px 0 0;font-size:11px;color:#64748b;line-height:1.3}
+  .badge{display:inline-block;margin-top:4px;padding:2px 8px;border-radius:999px;background:#d1fae5;color:#047857;font-size:10px;font-weight:700}
+  .amounts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:12px 0}
+  .amt{border-radius:12px;padding:12px}
+  .amt span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:5px}
+  .amt strong{display:block;font-size:18px;font-weight:800;letter-spacing:-.02em}
+  .total{background:#ecfdf5}.total span{color:#047857}.total strong{color:#064e3b}
+  .advance{background:#d1fae5}.advance span{color:#047857}.advance strong{color:#064e3b}
+  .balance{background:#ffedd5}.balance span{color:#c2410c}.balance strong{color:#9a3412}
+  .tax{margin-top:0;border:1px solid #e8eef3;border-radius:12px;overflow:hidden}
+  .tax table{width:100%;border-collapse:collapse;font-size:11px}
+  .tax th,.tax td{padding:7px 12px;border-bottom:1px solid #eef2f6}
+  .tax th{text-align:left;background:#f8fafc;color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:.05em}
   .tax td.tar{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
-  .tax tr:last-child td{border-bottom:none;background:#ecfdf5;font-weight:800;font-size:13px;color:#064e3b}
-  .bank{margin-top:14px;border-radius:14px;padding:14px 16px;background:#fefce8;border:1px solid #fde68a}
-  .bank h3{margin:0 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#a16207;font-weight:800}
-  .bank p{margin:0;font-size:12px;line-height:1.5;color:#713f12;font-weight:600}
-  .terms{margin-top:14px;border-radius:14px;padding:14px 16px;background:#fffbeb;border:1px solid #fde68a}
-  .terms h3{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#a16207;font-weight:800}
-  .terms ol{margin:0;padding-left:18px}
-  .terms li{margin:3px 0;font-size:11px;line-height:1.45;color:#57534e}
-  .note{display:flex;gap:12px;align-items:flex-start;background:#eff6ff;border-radius:14px;padding:14px 16px;margin-top:14px}
-  .note-ico{width:22px;height:22px;border-radius:50%;background:#3b82f6;color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px;font-weight:800;margin-top:1px}
-  .note strong{display:block;color:#1d4ed8;font-size:13px;margin-bottom:3px}
-  .note p{margin:0;font-size:12px;line-height:1.55;color:#475569}
-  .foot{margin-top:18px;padding-top:14px;border-top:1px solid #e8eef3;font-size:11px;color:#94a3b8;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
-  @media (max-width:640px){
-    .grid,.amounts,.company{grid-template-columns:1fr}
-    .cell{border-right:none!important}
-    .cell:nth-child(n+4){border-bottom:1px solid #eef2f6}
-    .cell:last-child{border-bottom:none}
+  .tax tr:last-child td{border-bottom:none;background:#ecfdf5;font-weight:800;font-size:12px;color:#064e3b}
+  .bank{margin-top:10px;border-radius:12px;padding:10px 12px;background:#fefce8;border:1px solid #fde68a}
+  .bank h3{margin:0 0 4px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#a16207;font-weight:800}
+  .bank p{margin:0;font-size:11px;line-height:1.4;color:#713f12;font-weight:600}
+  .terms{margin-top:10px;border-radius:12px;padding:10px 12px;background:#fffbeb;border:1px solid #fde68a}
+  .terms h3{margin:0 0 5px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#a16207;font-weight:800}
+  .terms ol{margin:0;padding-left:17px}
+  .terms li{margin:2px 0;font-size:10px;line-height:1.35;color:#57534e}
+  .note{display:flex;gap:10px;align-items:flex-start;background:#eff6ff;border-radius:12px;padding:10px 12px;margin-top:10px}
+  .note-ico{width:20px;height:20px;border-radius:50%;background:#3b82f6;color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:800}
+  .note strong{display:block;color:#1d4ed8;font-size:12px;margin-bottom:2px}
+  .note p{margin:0;font-size:11px;line-height:1.4;color:#475569}
+  .foot{margin-top:10px;padding-top:8px;border-top:1px solid #e8eef3;font-size:10px;color:#94a3b8;display:flex;justify-content:space-between;gap:10px}
+  @media print{
+    @page{size:A4;margin:8mm}
+    body{background:#fff;padding:0}
+    .sheet{box-shadow:none;border-radius:0;max-width:none}
   }
-  @media print{body{background:#fff;padding:0}.sheet{box-shadow:none;border-radius:0;max-width:none}}
 </style></head>
 <body>
 <!-- receipt-template-v${RECEIPT_TEMPLATE_VERSION} -->
@@ -239,7 +230,7 @@ function buildPaymentReceiptHtml({
       </div>
       <div class="status">
         <div class="status-row">
-          <div class="check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="check">✓</div>
           <div>
             <strong>Payment Received</strong>
             <span>Thank you for your payment</span>
@@ -253,108 +244,62 @@ function buildPaymentReceiptHtml({
     <div class="company">
       <div class="panel">
         <h3>Company</h3>
-        <p><strong>${escapeHtml(COMPANY.name)}</strong> · ${escapeHtml(COMPANY.tagline)}</p>
+        <p><strong>${escapeHtml(COMPANY.name)}</strong>${COMPANY.tagline ? ` · ${escapeHtml(COMPANY.tagline)}` : ''}</p>
         <p>${escapeHtml(COMPANY.address)}</p>
-        ${COMPANY.gstin || COMPANY.pan ? `<p>${COMPANY.gstin ? `<strong>GSTIN:</strong> ${escapeHtml(COMPANY.gstin)}` : ''}${COMPANY.gstin && COMPANY.pan ? ' &nbsp;·&nbsp; ' : ''}${COMPANY.pan ? `<strong>PAN:</strong> ${escapeHtml(COMPANY.pan)}` : ''}</p>` : ''}
-        <p><strong>HSN:</strong> ${escapeHtml(COMPANY.hsn)} &nbsp;·&nbsp; Original for Recipient</p>
-        ${COMPANY.phone ? `<p><strong>Phone:</strong> ${escapeHtml(COMPANY.phone)}</p>` : ''}
+        ${COMPANY.gstin || COMPANY.pan ? `<p>${COMPANY.gstin ? `<strong>GSTIN:</strong> ${escapeHtml(COMPANY.gstin)}` : ''}${COMPANY.gstin && COMPANY.pan ? ' · ' : ''}${COMPANY.pan ? `<strong>PAN:</strong> ${escapeHtml(COMPANY.pan)}` : ''}</p>` : ''}
+        <p><strong>HSN:</strong> ${escapeHtml(COMPANY.hsn)} · Original for Recipient${COMPANY.phone ? ` · <strong>Phone:</strong> ${escapeHtml(COMPANY.phone)}` : ''}</p>
       </div>
       <div class="panel">
         <h3>Guest</h3>
-        <p><strong>${escapeHtml(v.customerName)}</strong> · ${escapeHtml(v.leadBadge)}</p>
+        <p><strong>${escapeHtml(v.customerName)}</strong></p>
         <p><strong>Phone:</strong> ${escapeHtml(v.customerPhone)}</p>
         ${v.customerEmail ? `<p><strong>Email:</strong> ${escapeHtml(v.customerEmail)}</p>` : ''}
-        <p><strong>GSTIN:</strong> ${escapeHtml(v.customerGstin || '—')}</p>
+        ${v.leadBadge ? `<p><span class="badge">${escapeHtml(v.leadBadge)}</span></p>` : ''}
       </div>
     </div>
 
     <div class="grid">
       <div class="cell">
-        <div class="cell-top">
-          <div class="ico" style="background:#d1fae5;color:#059669">
-            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21a8 8 0 1 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
-          </div>
-          <div>
-            <p class="lbl">Customer</p>
-            <p class="val">${escapeHtml(v.customerName)} <span class="badge">${escapeHtml(v.leadBadge)}</span></p>
-            <p class="meta"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>${escapeHtml(v.customerPhone)}</p>
-          </div>
-        </div>
+        <p class="lbl">Customer</p>
+        <p class="val">${escapeHtml(v.customerName)}</p>
+        <p class="meta">${escapeHtml(v.customerPhone)}</p>
       </div>
       <div class="cell">
-        <div class="cell-top">
-          <div class="ico" style="background:#ede9fe;color:#7c3aed">
-            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-          </div>
-          <div>
-            <p class="lbl">Destination</p>
-            <p class="val">${escapeHtml(v.destination)}</p>
-            ${v.destinationSub ? `<p class="meta">${escapeHtml(v.destinationSub)}</p>` : ''}
-          </div>
-        </div>
+        <p class="lbl">Destination</p>
+        <p class="val">${escapeHtml(v.destination)}</p>
+        ${v.destinationSub ? `<p class="meta">${escapeHtml(v.destinationSub)}</p>` : ''}
       </div>
       <div class="cell">
-        <div class="cell-top">
-          <div class="ico" style="background:#dbeafe;color:#2563eb">
-            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-          </div>
-          <div>
-            <p class="lbl">Travel Date</p>
-            <p class="val">${escapeHtml(v.travelDate)}</p>
-            ${v.travelWeekday ? `<p class="meta">${escapeHtml(v.travelWeekday)}</p>` : ''}
-          </div>
-        </div>
+        <p class="lbl">Travel Date</p>
+        <p class="val">${escapeHtml(v.travelDate)}</p>
+        ${v.travelWeekday ? `<p class="meta">${escapeHtml(v.travelWeekday)}</p>` : ''}
       </div>
       <div class="cell">
-        <div class="cell-top">
-          <div class="ico" style="background:#fef3c7;color:#d97706">
-            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/></svg>
-          </div>
-          <div>
-            <p class="lbl">Booking / Quote</p>
-            <p class="val">${escapeHtml(quoteOrBooking)}</p>
-          </div>
-        </div>
+        <p class="lbl">Booking / Quote</p>
+        <p class="val">${escapeHtml(quoteOrBooking)}</p>
       </div>
       <div class="cell">
-        <div class="cell-top">
-          <div class="ico" style="background:#e0e7ff;color:#4f46e5">
-            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
-          </div>
-          <div>
-            <p class="lbl">Invoice No.</p>
-            <p class="val">${escapeHtml(v.invoiceNumber)}</p>
-            <p class="meta">Generated on ${escapeHtml(v.invoiceGeneratedOn)}</p>
-          </div>
-        </div>
+        <p class="lbl">Invoice No.</p>
+        <p class="val">${escapeHtml(v.invoiceNumber)}</p>
+        <p class="meta">Generated on ${escapeHtml(v.invoiceGeneratedOn)}</p>
       </div>
       <div class="cell">
-        <div class="cell-top">
-          <div class="ico" style="background:#fce7f3;color:#db2777">
-            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
-          </div>
-          <div>
-            <p class="lbl">Payment Mode</p>
-            <p class="val">${escapeHtml(v.paymentMethod)}</p>
-            <p class="meta">${refLine}</p>
-          </div>
-        </div>
+        <p class="lbl">Payment Mode</p>
+        <p class="val">${escapeHtml(v.paymentMethod)}</p>
+        <p class="meta">${refLine}</p>
       </div>
     </div>
 
     <div class="amounts">
       <div class="amt total">
-        <div class="ai"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></div>
         <span>Package Total</span>
         <strong>${escapeHtml(v.totalLabel)}</strong>
       </div>
       <div class="amt advance">
-        <div class="ai"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7 7 7-7"/></svg></div>
         <span>Advance Received</span>
         <strong>${escapeHtml(v.advanceLabel)}</strong>
       </div>
       <div class="amt balance">
-        <div class="ai"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></div>
         <span>Balance Due</span>
         <strong>${escapeHtml(v.balanceLabel)}</strong>
       </div>
@@ -370,18 +315,18 @@ function buildPaymentReceiptHtml({
 
     <div class="bank">
       <h3>Bank Details</h3>
-      <p>${escapeHtml(COMPANY.bankName)} &nbsp;·&nbsp; A/C: ${escapeHtml(COMPANY.accountNo)} &nbsp;·&nbsp; IFSC: ${escapeHtml(COMPANY.ifsc)}</p>
+      <p>${escapeHtml(COMPANY.bankName)} · A/C: ${escapeHtml(COMPANY.accountNo)} · IFSC: ${escapeHtml(COMPANY.ifsc)}</p>
     </div>
 
     <div class="terms">
       <h3>Terms &amp; Conditions</h3>
       <ol>
-        <li>All payments to be made against the receipt of Him Journey Tours.</li>
-        <li>Interest will be charged @ 18% if not paid to us on presentation.</li>
-        <li>No claim and discrepancy shall be considered if not sent to us in writing and acknowledged by us within three days.</li>
-        <li>Please credit the amount in our bank account as mentioned above.</li>
-        <li>Computer generated signature is not required.</li>
-        <li>All disputes are subject to HO Shimla.</li>
+        <li>All payments made to Him Journey Tours are valid only against an official receipt issued by the company.</li>
+        <li>Late payment charges of 18% p.a. may apply to overdue outstanding amounts.</li>
+        <li>Any discrepancy regarding this receipt should be communicated in writing within 3 days of receipt.</li>
+        <li>The remaining balance must be paid before the travel date, as per the agreed booking terms.</li>
+        <li>This is a computer-generated receipt and does not require a physical signature.</li>
+        <li>All disputes shall be subject to the jurisdiction of Shimla, Himachal Pradesh.</li>
       </ol>
     </div>
 
@@ -395,7 +340,7 @@ function buildPaymentReceiptHtml({
 
     <div class="foot">
       <span>Prepared by ${escapeHtml(executive)}</span>
-      <span>${escapeHtml(COMPANY.email)} · ${escapeHtml(COMPANY.website)}</span>
+      <span>${escapeHtml(COMPANY.email || '')}${COMPANY.website ? ` · ${escapeHtml(COMPANY.website)}` : ''}</span>
     </div>
   </div>
 </div>
@@ -551,10 +496,21 @@ function formatOpsLabel(value) {
 }
 
 /** Slim ops + installment snapshot for sales (no vendor emails / internal notes). */
-function buildOpsFulfillment(payment, booking) {
-  if (!booking && !payment) return null;
+function resolveHotelStatus(h, hotelConfirmation) {
+  if (h?.status && h.status !== 'pending') return h.status;
+  if (hotelConfirmation === 'confirmed') return 'confirmed';
+  return h?.status || 'pending';
+}
 
-  const hotels = (booking?.hotels || []).map((h) => ({
+function resolveCabStatus(t, cabConfirmation) {
+  if (t?.status && t.status !== 'pending') return t.status;
+  if (cabConfirmation === 'confirmed') return 'confirmed';
+  return t?.status || 'pending';
+}
+
+function hotelsFromBookingOrItinerary(booking) {
+  const hotelConfirmation = booking?.hotelConfirmation || 'pending';
+  const assigned = (booking?.hotels || []).map((h) => ({
     id: h._id,
     name: h.hotelName || 'Hotel',
     day: h.day || null,
@@ -563,12 +519,42 @@ function buildOpsFulfillment(payment, booking) {
     mealPlan: h.mealPlan || '',
     checkIn: h.checkIn || null,
     checkOut: h.checkOut || null,
-    status: h.status || 'pending',
+    status: resolveHotelStatus(h, hotelConfirmation),
     confirmationNumber: h.confirmationNumber || '',
     voucherSent: Boolean(h.voucherSentAt),
   }));
+  if (assigned.length) return assigned;
 
-  const transport = (booking?.transport || []).map((t) => ({
+  const stays = [];
+  for (const day of booking?.itinerary || []) {
+    const name = day?.dayHotel?.hotelName || day?.accommodation || '';
+    if (!name) continue;
+    const dayNum = Number(day.day) || stays.length + 1;
+    const prev = stays[stays.length - 1];
+    if (prev && String(prev.name).toLowerCase() === String(name).toLowerCase()) {
+      prev.nights = (Number(prev.nights) || 1) + 1;
+      continue;
+    }
+    stays.push({
+      id: null,
+      name,
+      day: dayNum,
+      nights: 1,
+      roomType: day?.dayHotel?.roomType || '',
+      mealPlan: day?.dayHotel?.mealPlan || day?.meals || '',
+      checkIn: day?.date || null,
+      checkOut: null,
+      status: resolveHotelStatus(null, hotelConfirmation),
+      confirmationNumber: '',
+      voucherSent: false,
+    });
+  }
+  return stays;
+}
+
+function transportFromBookingOrItinerary(booking) {
+  const cabConfirmation = booking?.cabConfirmation || 'pending';
+  const assigned = (booking?.transport || []).map((t) => ({
     id: t._id,
     vehicleType: t.vehicleType || 'cab',
     day: t.day || null,
@@ -579,15 +565,60 @@ function buildOpsFulfillment(payment, booking) {
     pickupLocation: t.pickupLocation || '',
     dropLocation: t.dropLocation || '',
     pickupDate: t.pickupDate || null,
-    status: t.status || 'pending',
+    status: resolveCabStatus(t, cabConfirmation),
     voucherSent: Boolean(t.voucherSentAt),
   }));
+  if (assigned.length) return assigned;
+
+  const seen = new Set();
+  const rows = [];
+  for (const day of booking?.itinerary || []) {
+    const vehicleRaw = day?.dayCab?.vehicleType || day?.transport || '';
+    if (!vehicleRaw) continue;
+    const vehicleType = String(vehicleRaw).toLowerCase().replace(/\s+/g, '_');
+    const key = `${vehicleType}|${day?.dayCab?.pickupLocation || ''}|${day?.day || ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rows.push({
+      id: null,
+      vehicleType,
+      day: day?.day || null,
+      days: [],
+      driverName: day?.dayCab?.driverName || '',
+      driverPhone: day?.dayCab?.driverPhone || '',
+      vehicleNumber: day?.dayCab?.vehicleNumber || '',
+      pickupLocation: day?.dayCab?.pickupLocation || '',
+      dropLocation: day?.dayCab?.dropLocation || '',
+      pickupDate: day?.date || null,
+      status: resolveCabStatus(null, cabConfirmation),
+      voucherSent: false,
+    });
+  }
+  return rows;
+}
+
+function buildOpsFulfillment(payment, booking) {
+  if (!booking && !payment) return null;
+
+  const hotels = hotelsFromBookingOrItinerary(booking);
+  const transport = transportFromBookingOrItinerary(booking);
 
   const activities = (booking?.activities || []).map((a) => ({
     id: a._id,
     name: a.name || 'Activity',
     scheduledAt: a.scheduledAt || null,
     status: a.status || 'pending',
+  }));
+
+  const itinerary = (booking?.itinerary || []).map((d) => ({
+    day: d.day || null,
+    title: d.title || (d.day ? `Day ${d.day}` : 'Day'),
+    description: d.description || '',
+    meals: d.meals || '',
+    accommodation: d.accommodation || d.dayHotel?.hotelName || '',
+    transport: d.transport || d.dayCab?.vehicleType || '',
+    activities: d.activities || '',
+    date: d.date || null,
   }));
 
   const scheduledInstallments = (payment?.scheduledInstallments || []).map((row) => ({
@@ -611,6 +642,14 @@ function buildOpsFulfillment(payment, booking) {
   const installmentsPaid = scheduledInstallments.filter((r) => r.status === 'paid').length;
 
   return {
+    packageName: booking?.packageName || '',
+    destination: booking?.destination || '',
+    travelDate: booking?.travelDate || null,
+    returnDate: booking?.returnDate || null,
+    adults: booking?.adults ?? null,
+    children: booking?.children ?? null,
+    quotationReference: booking?.quotationReference || '',
+    bookingNumber: booking?.bookingNumber || payment?.bookingNumber || '',
     bookingStatus: booking?.status || null,
     bookingStatusLabel: formatOpsLabel(booking?.status),
     hotelConfirmation: booking?.hotelConfirmation || 'pending',
@@ -620,6 +659,7 @@ function buildOpsFulfillment(payment, booking) {
     hotels,
     transport,
     activities,
+    itinerary,
     scheduledInstallments,
     receivedInstallments,
     counts: {
@@ -676,11 +716,30 @@ async function attachPaymentSummariesToLeads(leads = []) {
   });
 }
 
+async function ensureBookingFulfillment(booking) {
+  if (!booking?._id) return booking;
+  const needs =
+    !booking.packageName ||
+    !(booking.hotels || []).length ||
+    !(booking.transport || []).length ||
+    !(booking.itinerary || []).length;
+  if (!needs) return booking;
+
+  try {
+    const { syncBookingFromQuotation } = require('./operationsQuotationSyncService');
+    const result = await syncBookingFromQuotation(booking._id, { force: false });
+    return result?.booking || booking;
+  } catch {
+    return booking;
+  }
+}
+
 async function getLeadPaymentSummary(leadId) {
-  const [payment, booking] = await Promise.all([
+  const [payment, bookingRaw] = await Promise.all([
     Payment.findOne({ lead: leadId }).sort({ createdAt: -1 }).lean(),
     Booking.findOne({ lead: leadId }).sort({ createdAt: -1 }).lean(),
   ]);
+  const booking = await ensureBookingFulfillment(bookingRaw);
   const summary = summarizePayment(payment, booking);
   if (!summary) return null;
   return {

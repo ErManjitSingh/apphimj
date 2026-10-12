@@ -68,7 +68,8 @@ const LOST_LEAD_STATUSES = ['lost', 'booked_from_another_company'];
 
 const BOOKED_LEAD_STATUSES = ['booked', 'converted'];
 
-const LEAD_TEMPERATURES = ['hot', 'warm', 'cold'];
+/** Includes `na` for closed (lost/booked) leads so they leave Hot/Warm/Cold buckets. */
+const LEAD_TEMPERATURES = ['hot', 'warm', 'cold', 'na'];
 
 const CALL_OUTCOMES = [
   'connected',
@@ -109,6 +110,7 @@ function normalizeLeadStatus(raw) {
 function normalizeTemperature(raw) {
   const key = String(raw || '').trim().toLowerCase();
   if (key === 'vip') return 'hot';
+  if (key === 'n/a' || key === 'n_a' || key === 'none') return 'na';
   if (LEAD_TEMPERATURES.includes(key)) return key;
   return 'cold';
 }

@@ -191,7 +191,10 @@ async function updateFollowUpRecord({ followup, body, user } = {}) {
     }
     if (action === 'complete') {
       notifyFollowUpOutcome(followup, lead).catch(() => {});
-      if (followup.category === 'converted' && lead.status === 'converted') {
+      if (
+        followup.category === 'converted' &&
+        (lead.status === 'converted' || lead.status === 'booked')
+      ) {
         await onLeadConverted(lead, user).catch((err) => {
           console.error('[LeadConversion]', err.message);
         });

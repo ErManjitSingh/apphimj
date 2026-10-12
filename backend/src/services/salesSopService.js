@@ -161,8 +161,12 @@ function assertQualifiedForQuotation(lead) {
 
 /** Accepts enum key or `key — comment`. Returns normalized storage value. */
 function assertValidLostReason(reason, { requireComment = false } = {}) {
-  const value = String(reason || '').trim();
-  if (!value) throw new ApiError(400, 'Lost reason is required');
+  let value = String(reason || '').trim();
+  // Allow quick "Mark Lost" / status-only closes without a picked reason.
+  if (!value) {
+    if (requireComment) throw new ApiError(400, 'Lost reason is required');
+    return 'no_response';
+  }
 
   // Accept em/en dash or plain " - " between key and free-text comment
   const parts = value.split(/\s*[—–]\s*|\s+-\s+/).map((p) => p.trim()).filter(Boolean);
@@ -180,8 +184,9 @@ function assertValidLostReason(reason, { requireComment = false } = {}) {
       `Invalid lost reason. Use one of: ${LOST_REASONS.map((r) => r.label).join(', ')}`
     );
   }
-  // Free-text comment only required for "Other"
-  const needsComment = requireComment || key === 'other';
+  // Free-text comment only strictly required when caller asks for it.
+  // Plain "other" is allowed (stored as other) so Lost never blocks the pipeline.
+  const needsComment = requireComment && key === 'other';
   if (needsComment && !comment) {
     throw new ApiError(400, 'Please add a short comment for this lost reason');
   }

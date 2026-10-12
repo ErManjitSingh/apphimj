@@ -405,6 +405,8 @@ const addCallNote = asyncHandler(async (req, res) => {
     lead.status = 'lost';
     lead.lostReason = bodyLostReason || outcomeKey;
     lead.coldReason = outcomeKey;
+    lead.temperature = 'na';
+    lead.isHot = false;
   } else if (nextTemp === 'cold') {
     lead.coldReason = outcomeKey;
   } else {
@@ -427,7 +429,7 @@ const addCallNote = asyncHandler(async (req, res) => {
     lead.status = nextStatus;
     if (nextStatus === 'lost') {
       lead.lostReason = bodyLostReason || lead.lostReason || 'other';
-      lead.temperature = 'cold';
+      lead.temperature = 'na';
       lead.isHot = false;
     }
   }
@@ -575,7 +577,11 @@ const bulkUpdateStatus = asyncHandler(async (req, res) => {
       lead.statusReason = String(nextReason).trim();
       lead.statusReasonUpdatedAt = new Date();
     }
-    if (temperature === 'cold' || coldReason) {
+    if (temperature === 'na' || temperature === 'n/a' || ['lost', 'booked_from_another_company', 'booked', 'converted'].includes(String(nextStatus))) {
+      lead.temperature = 'na';
+      lead.isHot = false;
+      lead.coldReason = undefined;
+    } else if (temperature === 'cold' || coldReason) {
       lead.temperature = 'cold';
       lead.isHot = false;
       if (coldReason) lead.coldReason = String(coldReason).trim();

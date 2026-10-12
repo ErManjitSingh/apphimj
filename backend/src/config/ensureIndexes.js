@@ -151,6 +151,12 @@ async function ensureIndexes() {
     safeIndex(Package.collection, { sourceType: 1, sourcePackageId: 1 }, { background: true }),
     safeIndex(Package.collection, { name: 1 }, { background: true }),
     safeIndex(Package.collection, { destination: 1 }, { background: true }),
+    safeIndex(Quotation.collection, { branchId: 1, teamLeader: 1, status: 1 }, { background: true }),
+    safeIndex(Quotation.collection, { branchId: 1, status: 1, updatedAt: -1 }, { background: true }),
+    safeIndex(Payment.collection, { lead: 1, createdAt: -1 }, { background: true }),
+    safeIndex(Lead.collection, { branchId: 1, isDeleted: 1, assignedTo: 1, createdAt: -1 }, { background: true }),
+    safeIndex(Lead.collection, { branchId: 1, isDeleted: 1, travelDate: 1 }, { background: true }),
+    safeIndex(CallNote.collection, { branchId: 1, outcome: 1, leadId: 1 }, { background: true }),
   ]);
 
   console.log('[MongoDB] Performance indexes ensured');

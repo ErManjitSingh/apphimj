@@ -13,73 +13,64 @@ import {
   Layers,
   FileSpreadsheet,
   CreditCard,
-  Wallet,
-  ArrowDownToLine,
   Phone,
   Check,
+  Building2,
+  Landmark,
 } from 'lucide-react';
 import AppModal from '../ui/AppModal';
 import { Button } from '../ui/button';
 import { cn } from '../../lib/utils';
 import { toast } from '../../context/ToastContext';
 import API from '../../api/axios';
-import { downloadVoucherPdf, printVoucherHtml } from './voucherPdf';
+import { downloadVoucherPdf, downloadVoucherHtml, printVoucherHtml } from './voucherPdf';
 
 function formatINR(n) {
   const num = Number(n || 0);
   return `₹${num.toLocaleString('en-IN', { maximumFractionDigits: 1 })}`;
 }
 
-function InfoCell({ icon: Icon, iconClass, label, value, children }) {
+function InfoChip({ icon: Icon, label, value, sub, tone = 'slate' }) {
+  const tones = {
+    slate: 'from-slate-50 to-white ring-slate-200/80 text-slate-900',
+    teal: 'from-teal-50 to-white ring-teal-200/70 text-teal-950',
+    orange: 'from-orange-50 to-white ring-orange-200/70 text-orange-950',
+    sky: 'from-sky-50 to-white ring-sky-200/70 text-sky-950',
+  };
+  const icons = {
+    slate: 'bg-slate-900 text-white',
+    teal: 'bg-teal-600 text-white',
+    orange: 'bg-orange-500 text-white',
+    sky: 'bg-sky-500 text-white',
+  };
   return (
-    <div className="p-3.5 sm:p-4 min-h-[88px]">
-      <div className="flex items-start gap-2.5">
-        <span className={cn('inline-flex h-8 w-8 items-center justify-center rounded-xl shrink-0', iconClass)}>
-          <Icon className="w-4 h-4" />
+    <div className={cn('rounded-2xl bg-gradient-to-br p-4 ring-1', tones[tone])}>
+      <div className="flex items-start gap-3">
+        <span className={cn('inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl', icons[tone])}>
+          <Icon className="h-4 w-4" />
         </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-medium text-slate-400">{label}</p>
-          <div className="mt-0.5 text-[15px] font-extrabold text-slate-900 leading-snug break-words">
-            {value}
-          </div>
-          {children}
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-500">{label}</p>
+          <p className="mt-1 text-[15px] font-extrabold leading-snug break-words">{value}</p>
+          {sub ? <p className="mt-1 text-[11px] text-slate-500">{sub}</p> : null}
         </div>
       </div>
     </div>
   );
 }
 
-function MoneyCard({ icon: Icon, label, value, tone }) {
-  const tones = {
-    total: {
-      card: 'bg-emerald-50',
-      icon: 'bg-emerald-200/80 text-emerald-700',
-      label: 'text-emerald-700',
-      value: 'text-emerald-950',
-    },
-    advance: {
-      card: 'bg-emerald-100/80',
-      icon: 'bg-emerald-300/70 text-emerald-800',
-      label: 'text-emerald-700',
-      value: 'text-emerald-950',
-    },
-    balance: {
-      card: 'bg-orange-100/70',
-      icon: 'bg-orange-300/70 text-orange-700',
-      label: 'text-orange-700',
-      value: 'text-orange-800',
-    },
+function MoneyHero({ label, value, hint, accent }) {
+  const map = {
+    total: 'from-slate-900 to-slate-800',
+    advance: 'from-teal-500 to-teal-700',
+    balance: 'from-orange-400 to-orange-600',
   };
-  const t = tones[tone] || tones.total;
   return (
-    <div className={cn('rounded-2xl p-4', t.card)}>
-      <span className={cn('inline-flex h-7 w-7 items-center justify-center rounded-lg mb-2.5', t.icon)}>
-        <Icon className="w-3.5 h-3.5" />
-      </span>
-      <p className={cn('text-[10px] font-bold uppercase tracking-wide mb-1', t.label)}>{label}</p>
-      <p className={cn('text-xl sm:text-2xl font-extrabold tracking-tight metric-tabular', t.value)}>
-        {formatINR(value)}
-      </p>
+    <div className={cn('relative overflow-hidden rounded-[22px] bg-gradient-to-br p-5 text-white shadow-lg', map[accent])}>
+      <div className="pointer-events-none absolute -right-6 -top-8 h-24 w-24 rounded-full bg-white/15" />
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/75">{label}</p>
+      <p className="mt-2 text-[28px] font-black tracking-tight metric-tabular leading-none">{formatINR(value)}</p>
+      {hint ? <p className="mt-2 text-[11px] text-white/75">{hint}</p> : null}
     </div>
   );
 }
@@ -113,15 +104,21 @@ export default function PaymentVoucherModal({
 
   const downloadPdf = async () => {
     if (!html) {
-      toast.error('Voucher not ready');
+      toast.error('Voucher not ready — open View Voucher again');
       return;
     }
     setDownloading(true);
     try {
       await downloadVoucherPdf(html, `${receiptNo}.pdf`);
       toast.success('PDF downloaded');
-    } catch {
-      toast.error('Failed to download PDF');
+    } catch (err) {
+      console.error('[voucherPdf]', err);
+      try {
+        downloadVoucherHtml(html, `${receiptNo}.html`);
+        toast.success('PDF failed — HTML voucher downloaded instead. Open it and Print → Save as PDF');
+      } catch {
+        toast.error(err?.message || 'Failed to download PDF');
+      }
     } finally {
       setDownloading(false);
     }
@@ -154,227 +151,180 @@ export default function PaymentVoucherModal({
   };
 
   return (
-    <AppModal open={open} onClose={onClose} size="3xl" className="p-0 overflow-hidden bg-white" panelClassName="max-w-[760px]">
-      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3 bg-white sticky top-0 z-10">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 shrink-0">
-            <FileText className="w-5 h-5" />
-          </span>
-          <div className="min-w-0">
-            <h3 className="text-base sm:text-lg font-bold text-slate-900">Payment Voucher</h3>
-            <p className="text-xs text-slate-500 truncate">Voucher {receiptNo}</p>
+    <AppModal open={open} onClose={onClose} size="3xl" className="p-0 overflow-hidden bg-[#f1f5f9]" panelClassName="max-w-[820px]">
+      <div className="relative overflow-hidden bg-[radial-gradient(900px_280px_at_0%_0%,rgba(45,212,191,0.35),transparent),linear-gradient(120deg,#020617,#0f172a_55%,#115e59)] px-5 py-4 sm:px-6">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-teal-200 ring-1 ring-white/20 shrink-0">
+              <FileText className="w-5 h-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-teal-200/90">Him Journey Tours</p>
+              <h3 className="text-lg font-black text-white truncate">Payment Voucher</h3>
+              <p className="text-xs text-slate-300 truncate">#{receiptNo}</p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={printVoucher}
-            className="rounded-xl h-9 gap-2 border-slate-200 text-slate-700 bg-white hover:bg-slate-50 hidden sm:inline-flex"
-          >
-            <Printer className="w-4 h-4" /> Print Voucher
-          </Button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 transition-colors"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              type="button"
+              onClick={printVoucher}
+              className="rounded-xl h-9 gap-2 border-0 bg-white/10 text-white hover:bg-white/20 hidden sm:inline-flex"
+            >
+              <Printer className="w-4 h-4" /> Print
+            </Button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-white/80 hover:bg-white/10"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="max-h-[min(72vh,780px)] overflow-y-auto bg-white">
+      <div className="max-h-[min(72vh,820px)] overflow-y-auto">
         {v ? (
-          <div className="p-4 sm:p-5">
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-emerald-600 to-teal-700 text-white px-5 py-6 sm:px-7 sm:py-7">
-              <div className="absolute -right-10 -top-16 w-56 h-56 rounded-full bg-white/10 pointer-events-none" />
-              <div className="absolute -left-16 -bottom-20 w-48 h-48 rounded-full bg-black/10 pointer-events-none" />
-              <div className="relative z-[1] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="p-4 sm:p-6 space-y-4">
+            <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-slate-950 via-slate-900 to-teal-900 text-white px-5 py-7 sm:px-8 sm:py-8 shadow-xl">
+              <div className="pointer-events-none absolute -right-12 -top-16 h-64 w-64 rounded-full bg-teal-400/25 blur-2xl" />
+              <div className="pointer-events-none absolute -left-10 bottom-[-50px] h-48 w-48 rounded-full bg-orange-400/20 blur-2xl" />
+              <div className="relative z-[1] flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/85">HIM JOURNEY TOURS</p>
-                  <h2 className="text-2xl sm:text-[28px] font-extrabold tracking-tight mt-1.5 leading-tight">
-                    Advance / Token Receipt
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-teal-200/90">Advance receipt</p>
+                  <h2 className="mt-2 text-3xl sm:text-4xl font-black tracking-tight leading-[1.05]">
+                    Payment confirmed
                   </h2>
-                  <p className="text-sm text-white/90 mt-2">
-                    Voucher ID: {v.receiptNumber} · {v.paidAtLabel}
+                  <p className="mt-3 text-sm text-slate-300">
+                    {v.receiptNumber} · {v.paidAtLabel}
                   </p>
                 </div>
-                <div className="bg-white rounded-2xl px-4 py-3.5 shadow-lg shadow-black/15 min-w-[180px]">
-                  <div className="flex items-center gap-2.5">
-                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white shrink-0">
-                      <Check className="w-3.5 h-3.5" strokeWidth={3} />
+                <div className="rounded-[22px] bg-white px-5 py-4 text-slate-900 shadow-2xl min-w-[190px]">
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-teal-500 text-white">
+                      <Check className="w-5 h-5" strokeWidth={3} />
                     </span>
                     <div>
-                      <p className="text-sm font-extrabold text-emerald-600 leading-tight">Payment Received</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Thank you for your payment</p>
+                      <p className="text-sm font-black text-teal-700">Received</p>
+                      <p className="text-[11px] text-slate-500">Guest payment logged</p>
                     </div>
                   </div>
+                  <p className="mt-3 text-2xl font-black metric-tabular text-slate-900">
+                    {formatINR(v.advanceReceived)}
+                  </p>
                 </div>
               </div>
             </div>
 
-            {v.company ? (
-              <div className="mt-4 grid grid-cols-1 sm:grid-cols-[1.2fr_.8fr] gap-3">
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3.5">
-                  <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500 mb-2">Company</p>
-                  <p className="text-xs text-slate-700 leading-relaxed">
-                    <span className="font-bold text-slate-900">{v.company.name}</span>
-                    {v.company.tagline ? ` · ${v.company.tagline}` : ''}
-                  </p>
-                  <p className="text-xs text-slate-600 mt-1 leading-relaxed">{v.company.address}</p>
-                  {(v.company.gstin || v.company.pan) ? (
-                    <p className="text-xs text-slate-600 mt-1">
-                      {v.company.gstin ? (
-                        <><span className="font-semibold text-slate-800">GSTIN:</span> {v.company.gstin}</>
-                      ) : null}
-                      {v.company.gstin && v.company.pan ? ' · ' : null}
-                      {v.company.pan ? (
-                        <><span className="font-semibold text-slate-800">PAN:</span> {v.company.pan}</>
-                      ) : null}
-                    </p>
-                  ) : null}
-                  <p className="text-xs text-slate-600 mt-0.5">
-                    <span className="font-semibold text-slate-800">HSN:</span> {v.company.hsn || v.hsn}
-                    {' · '}Original for Recipient
-                  </p>
-                  {v.company.phone ? (
-                    <p className="text-xs text-slate-600 mt-0.5">
-                      <span className="font-semibold text-slate-800">Phone:</span> {v.company.phone}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3.5">
-                  <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500 mb-2">Guest</p>
-                  <p className="text-xs text-slate-700">
-                    <span className="font-bold text-slate-900">{v.customerName}</span> · {v.leadBadge}
-                  </p>
-                  <p className="text-xs text-slate-600 mt-1">
-                    <span className="font-semibold text-slate-800">Phone:</span> {v.customerPhone}
-                  </p>
-                  {v.customerEmail ? (
-                    <p className="text-xs text-slate-600 mt-0.5">
-                      <span className="font-semibold text-slate-800">Email:</span> {v.customerEmail}
-                    </p>
-                  ) : null}
-                  <p className="text-xs text-slate-600 mt-0.5">
-                    <span className="font-semibold text-slate-800">GSTIN:</span> {v.customerGstin || '—'}
-                  </p>
-                </div>
-              </div>
-            ) : null}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <MoneyHero label="Package Total" value={v.totalAmount} accent="total" />
+              <MoneyHero label="Advance Received" value={v.advanceReceived} accent="advance" hint="Token / booking amount" />
+              <MoneyHero label="Balance Due" value={v.balanceDue} accent="balance" hint="Before travel date" />
+            </div>
 
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 rounded-2xl border border-slate-100 overflow-hidden divide-y sm:divide-y-0 sm:[&>*]:border-r sm:[&>*:nth-child(3n)]:border-r-0 sm:[&>*:nth-child(n+4)]:border-t border-slate-100 [&>*]:border-slate-100">
-              <InfoCell
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <InfoChip
                 icon={User}
-                iconClass="bg-emerald-100 text-emerald-600"
+                tone="teal"
                 label="Customer"
-                value={(
-                  <span className="inline-flex items-center gap-2 flex-wrap">
-                    <span>{v.customerName}</span>
-                    <span className="inline-flex px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold">
-                      {v.leadBadge}
-                    </span>
-                  </span>
-                )}
-              >
-                <p className="mt-1 text-xs text-slate-500 inline-flex items-center gap-1">
-                  <Phone className="w-3 h-3" /> {v.customerPhone}
-                </p>
-              </InfoCell>
-
-              <InfoCell
-                icon={MapPin}
-                iconClass="bg-violet-100 text-violet-600"
-                label="Destination"
-                value={v.destination}
-              >
-                {v.destinationSub ? <p className="mt-1 text-xs text-slate-500">{v.destinationSub}</p> : null}
-              </InfoCell>
-
-              <InfoCell
-                icon={Calendar}
-                iconClass="bg-sky-100 text-sky-600"
-                label="Travel Date"
-                value={v.travelDate}
-              >
-                {v.travelWeekday ? <p className="mt-1 text-xs text-slate-500">{v.travelWeekday}</p> : null}
-              </InfoCell>
-
-              <InfoCell
+                value={v.customerName}
+                sub={`${v.leadBadge || ''} · ${v.customerPhone || ''}`.trim()}
+              />
+              <InfoChip icon={MapPin} tone="orange" label="Destination" value={v.destination} sub={v.destinationSub} />
+              <InfoChip icon={Calendar} tone="sky" label="Travel Date" value={v.travelDate} sub={v.travelWeekday} />
+              <InfoChip
                 icon={Layers}
-                iconClass="bg-amber-100 text-amber-600"
+                tone="slate"
                 label="Booking / Quote"
                 value={v.quoteNumber !== '—' ? v.quoteNumber : v.bookingNumber}
               />
-
-              <InfoCell
+              <InfoChip
                 icon={FileSpreadsheet}
-                iconClass="bg-indigo-100 text-indigo-600"
-                label="Invoice No."
+                tone="slate"
+                label="Invoice"
                 value={v.invoiceNumber}
-              >
-                <p className="mt-1 text-xs text-slate-500">Generated on {v.invoiceGeneratedOn}</p>
-              </InfoCell>
-
-              <InfoCell
+                sub={`Generated ${v.invoiceGeneratedOn}`}
+              />
+              <InfoChip
                 icon={CreditCard}
-                iconClass="bg-pink-100 text-pink-600"
+                tone="teal"
                 label="Payment Mode"
                 value={v.paymentMethod}
-              >
-                <p className="mt-1 text-xs text-slate-500">
-                  {v.paymentRef ? `Ref: ${v.paymentRef}` : 'Confirmed'}
-                </p>
-              </InfoCell>
+                sub={v.paymentRef ? `Ref: ${v.paymentRef}` : 'Confirmed'}
+              />
             </div>
 
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <MoneyCard icon={Wallet} label="Package Total" value={v.totalAmount} tone="total" />
-              <MoneyCard icon={ArrowDownToLine} label="Advance Received" value={v.advanceReceived} tone="advance" />
-              <MoneyCard icon={FileText} label="Balance Due" value={v.balanceDue} tone="balance" />
-            </div>
+            {v.company ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-[22px] border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
+                  <div className="mb-3 flex items-center gap-2">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-slate-900 text-white">
+                      <Building2 className="h-4 w-4" />
+                    </span>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">Company</p>
+                  </div>
+                  <p className="text-sm font-bold text-slate-900">{v.company.name}</p>
+                  {v.company.tagline ? <p className="text-xs text-slate-500 mt-0.5">{v.company.tagline}</p> : null}
+                  <p className="mt-2 text-xs leading-relaxed text-slate-600">{v.company.address}</p>
+                  <div className="mt-3 space-y-1 text-xs text-slate-600">
+                    {v.company.gstin ? <p><span className="font-semibold text-slate-800">GSTIN:</span> {v.company.gstin}</p> : null}
+                    {v.company.pan ? <p><span className="font-semibold text-slate-800">PAN:</span> {v.company.pan}</p> : null}
+                    <p><span className="font-semibold text-slate-800">HSN:</span> {v.company.hsn || v.hsn}</p>
+                    {v.company.phone ? (
+                      <p className="inline-flex items-center gap-1">
+                        <Phone className="h-3 w-3" /> {v.company.phone}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
 
-            <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3.5 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-extrabold uppercase tracking-wide text-emerald-700">Advance / Token</p>
-                <p className="text-xs text-emerald-800/80 mt-0.5">GST included — no separate tax added</p>
-              </div>
-              <p className="text-lg font-extrabold text-emerald-950 metric-tabular">
-                {formatINR(v.advanceReceived)}
-              </p>
-            </div>
-
-            {v.company?.bankName ? (
-              <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5">
-                <p className="text-[10px] font-extrabold uppercase tracking-wide text-amber-800 mb-1">Bank Details</p>
-                <p className="text-xs font-semibold text-amber-950 leading-relaxed">
-                  {v.company.bankName} · A/C: {v.company.accountNo} · IFSC: {v.company.ifsc}
-                </p>
+                <div className="rounded-[22px] border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-4 sm:p-5 shadow-sm">
+                  <div className="mb-3 flex items-center gap-2">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-orange-500 text-white">
+                      <Landmark className="h-4 w-4" />
+                    </span>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-orange-700">Bank details</p>
+                  </div>
+                  {v.company.bankName ? (
+                    <div className="space-y-1.5 text-sm text-orange-950">
+                      <p className="font-bold">{v.company.bankName}</p>
+                      <p className="text-xs"><span className="font-semibold">A/C:</span> {v.company.accountNo}</p>
+                      <p className="text-xs"><span className="font-semibold">IFSC:</span> {v.company.ifsc}</p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-orange-800/80">Bank details not configured.</p>
+                  )}
+                  <div className="mt-4 rounded-xl bg-white/80 px-3 py-2.5 ring-1 ring-orange-100">
+                    <p className="text-[11px] font-semibold text-orange-900">Guest</p>
+                    <p className="text-sm font-bold text-slate-900 mt-0.5">{v.customerName}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{v.customerPhone}</p>
+                    {v.customerEmail ? <p className="text-xs text-slate-500">{v.customerEmail}</p> : null}
+                  </div>
+                </div>
               </div>
             ) : null}
 
-            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3.5">
-              <p className="text-[10px] font-extrabold uppercase tracking-wide text-amber-800 mb-2">Terms &amp; Conditions</p>
-              <ol className="list-decimal pl-4 space-y-1 text-[11px] leading-relaxed text-stone-600">
-                <li>All payments to be made against the receipt of Him Journey Tours.</li>
-                <li>Interest will be charged @ 18% if not paid to us on presentation.</li>
-                <li>No claim and discrepancy shall be considered if not sent to us in writing and acknowledged by us within three days.</li>
-                <li>Please credit the amount in our bank account as mentioned above.</li>
-                <li>Computer generated signature is not required.</li>
-                <li>All disputes are subject to HO Shimla.</li>
+            <div className="rounded-[22px] border border-slate-200 bg-white p-4 sm:p-5">
+              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 mb-3">Terms &amp; conditions</p>
+              <ol className="list-decimal space-y-1.5 pl-4 text-[12px] leading-relaxed text-slate-600">
+                <li>All payments made to Him Journey Tours are valid only against an official receipt issued by the company.</li>
+                <li>Late payment charges of 18% p.a. may apply to overdue outstanding amounts.</li>
+                <li>Any discrepancy regarding this receipt should be communicated in writing within 3 days of receipt.</li>
+                <li>The remaining balance must be paid before the travel date, as per the agreed booking terms.</li>
+                <li>This is a computer-generated receipt and does not require a physical signature.</li>
+                <li>All disputes shall be subject to the jurisdiction of Shimla, Himachal Pradesh.</li>
               </ol>
             </div>
 
-            <div className="mt-4 flex gap-3 rounded-2xl bg-sky-50 px-4 py-3.5">
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-white text-[11px] font-bold shrink-0 mt-0.5">
+            <div className="flex gap-3 rounded-[22px] bg-gradient-to-r from-sky-600 to-teal-600 px-4 py-4 text-white shadow-lg shadow-sky-700/20">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-sm font-black shrink-0">
                 i
               </span>
               <div>
-                <p className="text-sm font-bold text-blue-700">Important Note</p>
-                <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
-                  This is an advance receipt for the above booking. Balance payment is required before the travel date.
+                <p className="text-sm font-bold">Important note</p>
+                <p className="text-xs text-white/85 mt-1 leading-relaxed">
+                  This is an advance receipt for the booking. Balance payment is required before the travel date.
                 </p>
               </div>
             </div>
@@ -384,13 +334,13 @@ export default function PaymentVoucherModal({
         )}
       </div>
 
-      <div className="px-5 py-4 border-t border-slate-100 bg-white flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sticky bottom-0">
+      <div className="sticky bottom-0 border-t border-slate-200 bg-white/95 backdrop-blur-md px-5 py-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <Button
           type="button"
           variant="outline"
           onClick={downloadPdf}
           disabled={downloading || !html}
-          className="rounded-xl h-10 gap-2 border-slate-200 text-slate-700 bg-white hover:bg-slate-50 font-semibold"
+          className="rounded-2xl h-11 gap-2 border-slate-200 bg-slate-50 text-slate-800 hover:bg-white font-semibold"
         >
           {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
           {downloading ? 'Preparing PDF…' : 'Download PDF'}
@@ -401,7 +351,7 @@ export default function PaymentVoucherModal({
             type="button"
             disabled={sending || !sendEndpoint}
             onClick={sendToCustomer}
-            className="rounded-l-xl rounded-r-none h-10 gap-2 flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-md shadow-emerald-600/20 border-0"
+            className="rounded-l-2xl rounded-r-none h-11 gap-2 flex-1 sm:flex-none bg-teal-600 hover:bg-teal-500 text-white font-bold shadow-lg shadow-teal-700/25 border-0"
           >
             <Send className="w-4 h-4" />
             {sending ? 'Sending…' : 'Send to Customer'}
@@ -410,23 +360,23 @@ export default function PaymentVoucherModal({
             type="button"
             disabled={sending || !sendEndpoint}
             onClick={() => setSendOpen((o) => !o)}
-            className="rounded-r-xl h-10 px-2.5 bg-emerald-600 hover:bg-emerald-500 text-white border-l border-emerald-500/40 disabled:opacity-50"
+            className="rounded-r-2xl h-11 px-3 bg-teal-700 hover:bg-teal-600 text-white border-l border-teal-500/40 disabled:opacity-50"
             aria-label="More send options"
           >
             <ChevronDown className="w-4 h-4" />
           </button>
           {sendOpen && (
-            <div className="absolute right-0 bottom-full mb-2 w-48 rounded-xl border border-slate-200 bg-white shadow-xl p-1 z-20">
+            <div className="absolute right-0 bottom-full mb-2 w-48 rounded-2xl border border-slate-200 bg-white shadow-xl p-1.5 z-20">
               <button
                 type="button"
-                className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-50 text-slate-700"
+                className="w-full text-left px-3 py-2.5 text-sm rounded-xl hover:bg-slate-50 text-slate-700 font-medium"
                 onClick={sendToCustomer}
               >
                 Email customer
               </button>
               <button
                 type="button"
-                className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-50 text-slate-700"
+                className="w-full text-left px-3 py-2.5 text-sm rounded-xl hover:bg-slate-50 text-slate-700 font-medium"
                 onClick={() => {
                   setSendOpen(false);
                   printVoucher();
@@ -439,7 +389,7 @@ export default function PaymentVoucherModal({
         </div>
       </div>
       {!lead?.email ? (
-        <p className="px-5 pb-3 -mt-2 text-[11px] text-amber-600">
+        <p className="px-5 pb-3 -mt-1 text-[11px] text-amber-600">
           Tip: add customer email on the lead to send this voucher.
         </p>
       ) : null}

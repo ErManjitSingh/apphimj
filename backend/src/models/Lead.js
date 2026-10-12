@@ -72,7 +72,7 @@ const leadSchema = new mongoose.Schema(
     budgetRange: { type: String, enum: BUDGET_RANGES, default: 'custom' },
     leadScore: { type: String, enum: LEAD_SCORES, default: 'low', index: true },
     smartScore: { type: Number, default: 0, min: 0, max: 100, index: true },
-    temperature: { type: String, enum: [...LEAD_TEMPERATURES, 'vip'], default: 'cold', index: true },
+    temperature: { type: String, enum: [...LEAD_TEMPERATURES, 'vip'], default: 'na', index: true },
     /** Add/Edit Lead form's "Lead Score" (Step 6) — booking potential from customer+travel details
      *  entered on the form, distinct from smartScore's post-creation engagement signals. See
      *  services/leadScoringService.js computeBookingPotential(). */
@@ -223,6 +223,26 @@ const leadSchema = new mongoose.Schema(
     channel: { type: String, default: 'crm' },
     externalLeadId: { type: String, trim: true, index: true, sparse: true },
     externalLeadSource: { type: String, trim: true },
+    /** Structured Meta / Facebook Instant Form answers for lead detail UI */
+    externalFormCapture: {
+      provider: { type: String, trim: true, default: '' },
+      capturedAt: { type: Date },
+      leadgenId: { type: String, trim: true, default: '' },
+      campaignName: { type: String, trim: true, default: '' },
+      adsetName: { type: String, trim: true, default: '' },
+      adName: { type: String, trim: true, default: '' },
+      formName: { type: String, trim: true, default: '' },
+      formId: { type: String, trim: true, default: '' },
+      adId: { type: String, trim: true, default: '' },
+      pageId: { type: String, trim: true, default: '' },
+      answers: [
+        {
+          key: { type: String, trim: true, default: '' },
+          label: { type: String, trim: true, default: '' },
+          value: { type: String, trim: true, default: '' },
+        },
+      ],
+    },
     reactivation: {
       isReactivated: { type: Boolean, default: false, index: true },
       previousLostStatus: { type: String, enum: ['lost', 'booked_from_another_company', ''] },

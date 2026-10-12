@@ -63,8 +63,14 @@ export default function ExecutiveMonthlyTargetCard({ target, now = new Date(), c
   const monthlyTarget = Number(
     target.monthlyTarget || target.totalSalesTarget || target.revenueTarget || 0
   );
-  const revenueAchieved = Number(target.revenueAchieved || 0);
-  const remaining = Math.max(0, monthlyTarget - revenueAchieved);
+  const revenueAchieved = Number(
+    target.packageTurnoverAchieved ?? target.revenueAchieved ?? 0
+  );
+  const collectionAchieved = Number(target.collectionAchieved || 0);
+  const remaining = Math.max(
+    0,
+    Number(target.remaining != null ? target.remaining : monthlyTarget - revenueAchieved)
+  );
   const revenueTarget = Number(target.revenueTarget || monthlyTarget || 0);
   const packageTarget = Number(target.packageTarget || 0);
   const totalSalesTarget = Number(target.totalSalesTarget || monthlyTarget || 0);
@@ -142,7 +148,7 @@ export default function ExecutiveMonthlyTargetCard({ target, now = new Date(), c
 
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                Revenue progress
+                Achieved vs target
               </p>
               <p className={`mt-1 font-bold tabular-nums text-slate-900 ${compact ? 'text-base' : 'text-xl'}`}>
                 {formatCurrency(revenueAchieved)}
@@ -160,8 +166,9 @@ export default function ExecutiveMonthlyTargetCard({ target, now = new Date(), c
                 />
               </div>
               <p className="mt-2 text-[11px] text-slate-500">
-                <span className="font-semibold text-slate-700">{formatCurrency(remaining)}</span> remaining
-                to hit this month&apos;s goal
+                <span className="font-semibold text-slate-700">{formatCurrency(remaining)}</span> left on
+                target · Converted package cost counts here · Collection{' '}
+                {formatCurrency(collectionAchieved)}
               </p>
             </div>
           </div>
@@ -174,10 +181,10 @@ export default function ExecutiveMonthlyTargetCard({ target, now = new Date(), c
         </div>
 
         <div className={`mt-3 grid grid-cols-2 gap-2 ${compact ? '' : 'sm:grid-cols-4'}`}>
-          <MetricTile icon={IndianRupee} label="Revenue" value={revenueTarget} tone="sky" />
-          <MetricTile icon={Package} label="Package" value={packageTarget} tone="amber" />
-          <MetricTile icon={TrendingUp} label="Total sales" value={totalSalesTarget} tone="emerald" />
-          <MetricTile icon={Target} label="Profit" value={profitTarget} tone="rose" />
+          <MetricTile icon={IndianRupee} label="Collection tgt" value={revenueTarget} tone="sky" />
+          <MetricTile icon={Package} label="Package tgt" value={packageTarget} tone="amber" />
+          <MetricTile icon={TrendingUp} label="Turnover tgt" value={totalSalesTarget} tone="emerald" />
+          <MetricTile icon={Target} label="Profit tgt" value={profitTarget} tone="rose" />
         </div>
 
         <div className="mt-3 flex items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50/70 px-3 py-2 text-[11px] font-medium text-indigo-800">

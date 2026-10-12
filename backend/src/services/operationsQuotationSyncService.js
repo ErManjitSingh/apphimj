@@ -93,8 +93,36 @@ function mapQuoteItinerary(quotation, travelDate, executiveName = '') {
 
 function mapQuoteHotels(quotation, travelDate) {
   const selected = quotation?.selectedHotels || [];
-  if (!selected.length) {
-    const snap = quotation?.packageSnapshot || {};
+  if (selected.length) {
+    return selected.map((h) => {
+      const checkIn = travelDate && h.day ? addDays(travelDate, Number(h.day) - 1) : h.checkIn || null;
+      const nights = Number(h.nights) || 1;
+      const checkOut = checkIn ? addDays(checkIn, nights) : h.checkOut || null;
+
+      return {
+        hotelName: h.name || h.hotelName || '',
+        externalHotelId: textValue(h.hotelId || h.id || h.uuid),
+        destination: h.location || h.city || h.destination || '',
+        category: h.category || '',
+        roomType: textValue(h.room) || textValue(h.roomType),
+        mealPlan: textValue(h.mealPlan),
+        day: h.day,
+        nights,
+        rooms: Number(h.rooms) || 1,
+        checkIn,
+        checkOut,
+        address: h.address || h.location || '',
+        contactPerson: h.contactPerson || h.contact?.name || '',
+        phone: h.phone || h.contact?.phone || '',
+        email: h.email || h.contact?.email || '',
+        notes: h.externalSource ? `Source: ${h.externalSource}` : '',
+        status: 'pending',
+      };
+    });
+  }
+
+  const snap = quotation?.packageSnapshot || {};
+  if ((snap.hotels || []).length) {
     return (snap.hotels || []).map((h) => ({
       hotelName: h.name || h.hotelName || '',
       externalHotelId: textValue(h.hotelId || h.id || h.uuid),
@@ -111,50 +139,97 @@ function mapQuoteHotels(quotation, travelDate) {
     }));
   }
 
-  return selected.map((h) => {
-    const checkIn = travelDate && h.day ? addDays(travelDate, Number(h.day) - 1) : h.checkIn || null;
-    const nights = Number(h.nights) || 1;
-    const checkOut = checkIn ? addDays(checkIn, nights) : h.checkOut || null;
-
-    return {
-      hotelName: h.name || h.hotelName || '',
-      externalHotelId: textValue(h.hotelId || h.id || h.uuid),
-      destination: h.location || h.city || h.destination || '',
-      category: h.category || '',
-      roomType: textValue(h.room) || textValue(h.roomType),
-      mealPlan: textValue(h.mealPlan),
-      day: h.day,
-      nights,
-      rooms: Number(h.rooms) || 1,
+  // Derive stay list from package day plan (e.g. "Man Ko Chalo" style itinerary).
+  const stays = [];
+  for (const d of snap.itinerary || []) {
+    const hotelName = d.accommodation || d.hotel || d.dayHotel?.hotelName || '';
+    if (!hotelName) continue;
+    const dayNum = Number(d.day) || stays.length + 1;
+    const prev = stays[stays.length - 1];
+    if (prev && String(prev.hotelName).toLowerCase() === String(hotelName).toLowerCase()) {
+      prev.nights = (Number(prev.nights) || 1) + 1;
+      if (prev.checkIn) prev.checkOut = addDays(prev.checkIn, prev.nights);
+      continue;
+    }
+    const checkIn = travelDate ? addDays(travelDate, dayNum - 1) : null;
+    stays.push({
+      hotelName,
+      destination: d.dayHotel?.destination || d.dayHotel?.location || '',
+      roomType: textValue(d.dayHotel?.roomType),
+      mealPlan: textValue(d.dayHotel?.mealPlan) || textValue(d.meals),
+      day: dayNum,
+      nights: 1,
+      rooms: 1,
       checkIn,
-      checkOut,
-      address: h.address || h.location || '',
-      contactPerson: h.contactPerson || h.contact?.name || '',
-      phone: h.phone || h.contact?.phone || '',
-      email: h.email || h.contact?.email || '',
-      notes: h.externalSource ? `Source: ${h.externalSource}` : '',
+      checkOut: checkIn ? addDays(checkIn, 1) : null,
       status: 'pending',
-    };
-  });
+    });
+  }
+  return stays;
 }
 
 function mapQuoteTransport(quotation) {
   const selected = quotation?.selectedCabs || [];
-  return selected.map((t) => ({
-    vendorName: t.vendorName || t.vendor || '',
-    day: Number(t.day) || undefined,
-    days: Array.isArray(t.days) ? t.days.map(Number).filter(Boolean) : [],
-    vehicleType: normalizeVehicleType(t.vehicleType || t.type || 'suv'),
-    pickupLocation: t.pickup || t.pickupLocation || '',
-    dropLocation: t.drop || t.dropLocation || '',
-    driverName: t.driverName || '',
-    driverPhone: t.driverPhone || '',
-    contactPerson: t.contactPerson || t.contact?.name || '',
-    phone: t.phone || t.contact?.phone || t.driverPhone || '',
-    email: t.email || t.contact?.email || '',
-    vehicleNumber: t.vehicleNumber || '',
-    status: 'pending',
-  }));
+  if (selected.length) {
+    return selected.map((t) => ({
+      vendorName: t.vendorName || t.vendor || '',
+      day: Number(t.day) || undefined,
+      days: Array.isArray(t.days) ? t.days.map(Number).filter(Boolean) : [],
+      vehicleType: normalizeVehicleType(t.vehicleType || t.type || 'suv'),
+      pickupLocation: t.pickup || t.pickupLocation || '',
+      dropLocation: t.drop || t.dropLocation || '',
+      driverName: t.driverName || '',
+      driverPhone: t.driverPhone || '',
+      contactPerson: t.contactPerson || t.contact?.name || '',
+      phone: t.phone || t.contact?.phone || t.driverPhone || '',
+      email: t.email || t.contact?.email || '',
+      vehicleNumber: t.vehicleNumber || '',
+      status: 'pending',
+    }));
+  }
+
+  const snap = quotation?.packageSnapshot || {};
+  const snapCabs = snap.cabs || snap.transport || [];
+  if (Array.isArray(snapCabs) && snapCabs.length && typeof snapCabs[0] === 'object') {
+    return snapCabs.map((t) => ({
+      vendorName: t.vendorName || t.vendor || '',
+      day: Number(t.day) || undefined,
+      days: Array.isArray(t.days) ? t.days.map(Number).filter(Boolean) : [],
+      vehicleType: normalizeVehicleType(t.vehicleType || t.type || t.name || 'suv'),
+      pickupLocation: t.pickup || t.pickupLocation || '',
+      dropLocation: t.drop || t.dropLocation || '',
+      driverName: t.driverName || '',
+      driverPhone: t.driverPhone || '',
+      contactPerson: t.contactPerson || '',
+      phone: t.phone || t.driverPhone || '',
+      email: t.email || '',
+      vehicleNumber: t.vehicleNumber || '',
+      status: 'pending',
+    }));
+  }
+
+  // One cab row per unique vehicle mentioned on itinerary days.
+  const seen = new Set();
+  const rows = [];
+  for (const d of snap.itinerary || []) {
+    const vehicleRaw = d.dayCab?.vehicleType || d.transport || '';
+    if (!vehicleRaw) continue;
+    const vehicleType = normalizeVehicleType(vehicleRaw);
+    const key = `${vehicleType}|${d.dayCab?.pickupLocation || ''}|${d.dayCab?.dropLocation || ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rows.push({
+      day: Number(d.day) || undefined,
+      vehicleType,
+      pickupLocation: d.dayCab?.pickupLocation || '',
+      dropLocation: d.dayCab?.dropLocation || '',
+      driverName: d.dayCab?.driverName || '',
+      driverPhone: d.dayCab?.driverPhone || '',
+      vehicleNumber: d.dayCab?.vehicleNumber || '',
+      status: 'pending',
+    });
+  }
+  return rows;
 }
 
 function mapQuoteActivities(quotation) {

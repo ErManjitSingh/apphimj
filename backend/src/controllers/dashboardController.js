@@ -16,7 +16,7 @@ const getStats = asyncHandler(async (req, res) => {
 
   const stats = await getOrSetFresh(
     req,
-    cacheKey('admin', `dashboard:${req.branchId || 'all'}:${filterKey}`),
+    cacheKey('admin', `dashboard-v3:${req.branchId || 'all'}:${filterKey}`),
     () =>
       buildAdminDashboard({
         branchId: req.branchId,

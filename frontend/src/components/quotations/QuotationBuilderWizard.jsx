@@ -17,6 +17,69 @@ import {
   isLikelyMongoId,
   mapLocalHotelToCatalogDetail,
 } from '../../lib/localHotelCatalog';
+
+/** Refresh day-wise hotel room rates from Hotel Control (on + off season). */
+async function enrichDayWiseHotelsFromCatalog(selections = []) {
+  const list = Array.isArray(selections) ? selections : [];
+  return Promise.all(
+    list.map(async (entry) => {
+      try {
+        const localId =
+          entry?.hotel?.localHotelId ||
+          entry?.hotel?._id ||
+          (isLikelyMongoId(entry?.hotel?.id) ? entry.hotel.id : null);
+        let detail = null;
+        if (localId) {
+          const res = await API.get(`/hotels/${localId}`, { skipErrorToast: true });
+          detail = mapLocalHotelToCatalogDetail(res.data);
+        } else {
+          const name = String(entry?.hotel?.name || '').trim();
+          if (!name) return entry;
+          const searchRes = await API.get('/hotels', {
+            params: { status: 'active', search: name },
+            skipErrorToast: true,
+          });
+          const items = Array.isArray(searchRes.data) ? searchRes.data : [];
+          const needle = name.toLowerCase();
+          const hit =
+            items.find((h) => String(h.name || '').toLowerCase() === needle) ||
+            items.find((h) => String(h.name || '').toLowerCase().includes(needle)) ||
+            items[0];
+          if (!hit?._id) return entry;
+          const detailRes = await API.get(`/hotels/${hit._id}`, { skipErrorToast: true });
+          detail = mapLocalHotelToCatalogDetail(detailRes.data);
+        }
+        if (!detail) return entry;
+        const rooms = detail?.rooms || [];
+        const match =
+          rooms.find(
+            (r) =>
+              String(r.id) === String(entry?.room?.id) ||
+              String(r._id) === String(entry?.room?.id) ||
+              String(r.name || '').toLowerCase() === String(entry?.room?.name || '').toLowerCase()
+          ) || rooms[0];
+        if (!match?.rates) return entry;
+        return {
+          ...entry,
+          hotel: {
+            ...(entry.hotel || {}),
+            localHotelId: detail.localHotelId || detail._id || detail.id,
+            _id: detail._id || detail.id,
+          },
+          room: {
+            ...(entry.room || {}),
+            ...match,
+            rates: match.rates,
+            extraBedRates: match.extraBedRates || entry.room?.extraBedRates,
+            extraBedRate: match.extraBedRate || entry.room?.extraBedRate,
+          },
+        };
+      } catch {
+        return entry;
+      }
+    })
+  );
+}
 import { shortLeadMealPlan } from '../lead-wizard/leadWizardUtils';
 import { resolvePackageCabs } from '../../lib/packageCabMapper';
 import { suggestCompanionCabs } from '../../lib/packageCabCompanions';
@@ -312,7 +375,7 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
   const dayWiseHotelsRef = useRef(dayWiseHotels);
   dayWiseHotelsRef.current = dayWiseHotels;
 
-  // When On/Off season toggles, enrich room rates from Hotel Control then remap rack.
+  // When On/Off season toggles, refresh rates from Hotel Control then remap rack.
   useEffect(() => {
     if (hotelSeasonInitRef.current) {
       hotelSeasonInitRef.current = false;
@@ -323,47 +386,7 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
     (async () => {
       const current = Array.isArray(dayWiseHotelsRef.current) ? dayWiseHotelsRef.current : [];
       setDayWiseHotels(applyHotelSeasonToSelections(current, hotelSeason));
-
-      const enriched = await Promise.all(
-        current.map(async (entry) => {
-          const off = entry?.room?.rates?.offSeason;
-          const on = entry?.room?.rates?.onSeason;
-          const hasOff =
-            off && typeof off === 'object' && Object.values(off).some((n) => Number(n) > 0);
-          const hasOn =
-            on && typeof on === 'object' && Object.values(on).some((n) => Number(n) > 0);
-          if (hasOff && hasOn) return entry;
-          const id = entry?.hotel?.localHotelId || entry?.hotel?._id || entry?.hotel?.id || '';
-          if (!isLikelyMongoId(id)) return entry;
-          try {
-            const res = await API.get(`/hotels/${id}`, { skipErrorToast: true });
-            if (cancelled) return entry;
-            const detail = mapLocalHotelToCatalogDetail(res.data);
-            const rooms = detail?.rooms || [];
-            const match =
-              rooms.find(
-                (r) =>
-                  String(r.id) === String(entry?.room?.id) ||
-                  String(r.name || '').toLowerCase() ===
-                    String(entry?.room?.name || '').toLowerCase()
-              ) || rooms[0];
-            if (!match?.rates) return entry;
-            return {
-              ...entry,
-              room: {
-                ...(entry.room || {}),
-                ...match,
-                rates: match.rates,
-                extraBedRates: match.extraBedRates || entry.room?.extraBedRates,
-                extraBedRate: match.extraBedRate || entry.room?.extraBedRate,
-              },
-            };
-          } catch {
-            return entry;
-          }
-        })
-      );
-
+      const enriched = await enrichDayWiseHotelsFromCatalog(current);
       if (cancelled) return;
       setDayWiseHotels(applyHotelSeasonToSelections(enriched, hotelSeason));
     })();
@@ -636,6 +659,10 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
       normalized._apiRaw?.dayOptions?.stays || normalized.stays || []
     );
     setDayWiseHotels(seededHotels);
+    // Pull real on/off season racks from Hotel Control (package seed often lacks offSeason).
+    enrichDayWiseHotelsFromCatalog(seededHotels).then((enriched) => {
+      setDayWiseHotels(applyHotelSeasonToSelections(enriched, hotelSeason));
+    });
     // Volvo packages: keep Alto (default) as primary + auto-attach Volvo bus as extra cab(s)
     const defaultCab = packageCabs.find((c) => c.isDefault) || packageCabs[0] || null;
     const companions = suggestCompanionCabs(packageCabs, defaultCab);

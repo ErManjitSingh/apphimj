@@ -174,6 +174,7 @@ async function buildDashboard(branchId) {
     pendingTasks,
     pendingConfirmations,
     openTicketsList,
+    operationsTasksList,
   ] = await Promise.all([
     Booking.countDocuments({ ...base, travelDate: { $gte: todayStart, $lte: todayEnd } }),
     Booking.countDocuments({ ...base, returnDate: { $gte: todayStart, $lte: todayEnd } }),
@@ -199,7 +200,7 @@ async function buildDashboard(branchId) {
       { $group: { _id: '$branchId', count: { $sum: 1 } } },
     ]),
     Booking.find(base).sort({ createdAt: -1 }).limit(8).select(
-      'bookingNumber customerName destination travelDate returnDate status totalAmount hotelConfirmation cabConfirmation'
+      'bookingNumber customerName destination packageName travelDate returnDate status totalAmount hotelConfirmation cabConfirmation adults children'
     ).lean(),
     TripTask.countDocuments({ status: { $in: ['pending', 'in_progress'] } }),
     Booking.find({
@@ -214,6 +215,12 @@ async function buildDashboard(branchId) {
     SupportTicket.find({ status: { $in: ['open', 'in_progress'] } })
       .sort({ updatedAt: -1 })
       .limit(8)
+      .lean(),
+    TripTask.find({ status: { $in: ['pending', 'in_progress'] } })
+      .sort({ dueDate: 1, createdAt: -1 })
+      .limit(8)
+      .populate('booking', 'bookingNumber customerName destination packageName travelDate')
+      .select('title type status dueDate booking createdAt')
       .lean(),
   ]);
 
@@ -380,20 +387,45 @@ async function buildDashboard(branchId) {
     recentBookings,
     pendingConfirmations,
     openTickets: openTicketsList,
+    operationsTasks: (operationsTasksList || []).map((task) => {
+      const due = task.dueDate ? new Date(task.dueDate) : null;
+      const overdue = due && due < todayStart && task.status !== 'completed';
+      const priority =
+        overdue || task.type === 'hotel_confirmation' || task.type === 'payment_verification'
+          ? 'high'
+          : task.type === 'cab_confirmation' || task.type === 'voucher_creation'
+            ? 'medium'
+            : 'low';
+      return {
+        _id: task._id,
+        title: task.title,
+        type: task.type,
+        status: task.status,
+        dueDate: task.dueDate,
+        priority,
+        bookingId: task.booking?._id || task.booking,
+        bookingNumber: task.booking?.bookingNumber || '',
+        customerName: task.booking?.customerName || '',
+        destination: task.booking?.destination || '',
+      };
+    }),
     upcomingTrips: await Booking.find({
       ...base,
       travelDate: { $gte: todayStart },
       status: { $nin: ['cancelled', 'completed', 'refund_completed'] },
     })
       .sort({ travelDate: 1 })
-      .limit(10)
-      .select('bookingNumber customerName destination travelDate returnDate status')
+      .limit(8)
+      .select(
+        'bookingNumber customerName destination packageName travelDate returnDate status adults children'
+      )
       .lean(),
+    generatedAt: new Date().toISOString(),
   };
 }
 
 async function getDashboard(branchId) {
-  const key = `ops:dashboard:${branchId || 'all'}`;
+  const key = `ops:dashboard-v2:${branchId || 'all'}`;
   return cacheService.getOrSet(key, () => buildDashboard(branchId), OPS_DASHBOARD_TTL);
 }
 
@@ -946,7 +978,7 @@ async function updateBooking(id, payload, actor) {
     'status', 'paymentStatus', 'itinerary', 'hotels', 'transport', 'activities',
     'hotelConfirmation', 'cabConfirmation', 'activityConfirmation', 'voucherStatus',
     'totalAmount', 'advanceReceived', 'assignedTo', 'travelDate', 'returnDate',
-    'packageName', 'destination',
+    'packageName', 'destination', 'quotationReference', 'executiveName',
   ];
   const patch = Object.fromEntries(
     Object.entries(payload || {}).filter(([key]) => allowed.includes(key))
@@ -1012,7 +1044,8 @@ async function buildBookingPayloadFromPayment(payment) {
     returnDate,
     adults: lead?.adults || lead?.travelers || lead?.pax || 2,
     children: lead?.children || 0,
-    status: payment.status === 'paid' ? 'confirmed' : 'booking_received',
+    // Any converted payment (token/advance) is ops-ready — don't leave tours stuck on booking_received.
+    status: ['paid', 'partial'].includes(payment.status) ? 'confirmed' : 'booking_received',
     paymentStatus: payment.status === 'paid' ? 'paid' : payment.status === 'partial' ? 'partial' : 'pending',
     totalAmount,
     advanceReceived: payment.paidAmount || 0,
@@ -1048,16 +1081,35 @@ async function createBookingFromPayment(paymentId, actor) {
     const advance = Number(payment.paidAmount) || 0;
     const nextStatus = payment.status === 'paid' ? 'paid' : 'partial';
     const bookingStatus =
-      payment.status === 'paid' &&
+      ['paid', 'partial'].includes(payment.status) &&
       ['booking_received', 'pending_verification', 'pending'].includes(existing.status)
         ? 'confirmed'
         : existing.status;
-    const updated = await updateBooking(existing._id, {
+    const patch = {
       totalAmount: total,
       advanceReceived: advance,
       paymentStatus: nextStatus,
       status: bookingStatus,
-    }, actor);
+    };
+    // Backfill trip details if booking was created before hotel/cab mapping.
+    const needsFulfillment =
+      !(existing.hotels || []).length ||
+      !(existing.transport || []).length ||
+      !(existing.itinerary || []).length ||
+      !existing.packageName;
+    if (needsFulfillment) {
+      const fresh = await buildBookingPayloadFromPayment(payment);
+      if (!existing.packageName && fresh.packageName) patch.packageName = fresh.packageName;
+      if (!existing.destination && fresh.destination) patch.destination = fresh.destination;
+      if (!existing.quotationReference && fresh.quotationReference) {
+        patch.quotationReference = fresh.quotationReference;
+      }
+      if (!(existing.hotels || []).length && fresh.hotels?.length) patch.hotels = fresh.hotels;
+      if (!(existing.transport || []).length && fresh.transport?.length) patch.transport = fresh.transport;
+      if (!(existing.itinerary || []).length && fresh.itinerary?.length) patch.itinerary = fresh.itinerary;
+      if (!(existing.activities || []).length && fresh.activities?.length) patch.activities = fresh.activities;
+    }
+    const updated = await updateBooking(existing._id, patch, actor);
     if (String(payment.booking || '') !== String(existing._id)) {
       await Payment.findByIdAndUpdate(paymentId, { booking: existing._id });
     }

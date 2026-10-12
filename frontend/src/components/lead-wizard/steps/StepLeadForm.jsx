@@ -383,6 +383,8 @@ export default function StepLeadForm({ isEdit, leadId }) {
   const whatsapp = watch('whatsapp');
   const isSalesExecutive = user?.role === 'sales_executive';
   const lockIdentity = isEdit && isSalesExecutive;
+  const lockPhone = isEdit && user?.role !== 'admin';
+  const lockSource = isEdit && user?.role !== 'admin';
   const sourceOptions = useMemo(() => {
     const base = getLeadSourcesForRole(user?.role);
     if (isEdit && leadSource && !base.some((s) => s.value === leadSource)) {
@@ -506,14 +508,36 @@ export default function StepLeadForm({ isEdit, leadId }) {
             label="Phone Number"
             required
             error={errors.phone?.message}
-            hint={lockIdentity ? 'Primary phone is locked' : undefined}
+            hint={
+              lockPhone
+                ? 'Primary number locked — only admin can change it. Add another number below.'
+                : undefined
+            }
           >
             <IconInput
               {...register('phone')}
               placeholder="98765 43210"
               error={errors.phone}
-              readOnly={lockIdentity}
-              disabled={lockIdentity}
+              readOnly={lockPhone}
+              disabled={lockPhone}
+              prefix={(
+                <span className="pl-3 pr-2 flex items-center gap-1.5 text-sm font-semibold text-slate-600 border-r border-slate-200 shrink-0">
+                  <span className="text-base leading-none">🇮🇳</span>
+                  +91
+                </span>
+              )}
+            />
+          </WizardField>
+
+          <WizardField
+            label="Alternate Phone"
+            error={errors.alternatePhone?.message}
+            hint={lockPhone ? 'Add a new contact number here' : 'Optional second number'}
+          >
+            <IconInput
+              {...register('alternatePhone')}
+              placeholder="Add another number"
+              error={errors.alternatePhone}
               prefix={(
                 <span className="pl-3 pr-2 flex items-center gap-1.5 text-sm font-semibold text-slate-600 border-r border-slate-200 shrink-0">
                   <span className="text-base leading-none">🇮🇳</span>
@@ -596,9 +620,11 @@ export default function StepLeadForm({ isEdit, leadId }) {
             />
           </WizardField>
         </div>
-        {lockIdentity ? (
+        {lockIdentity || lockPhone ? (
           <p className="mt-3 text-[12px] text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
-            Name, primary phone and primary email are locked. You can still update travel details.
+            {lockIdentity
+              ? 'Name and primary email are locked. Primary phone is locked for everyone except admin — use Alternate phone to add a new number.'
+              : 'Primary phone is locked. Only admin can change it — use Alternate phone to add a new number.'}
           </p>
         ) : null}
       </StepSection>
@@ -621,21 +647,34 @@ export default function StepLeadForm({ isEdit, leadId }) {
       <StepSection id="step-source" number={4} title="Lead Source">
         <WizardField
           label="Source"
-          required
+          required={!lockSource}
           error={errors.leadSource?.message}
-          hint="Where did you get this lead from?"
+          hint={
+            lockSource
+              ? 'Source is locked. Only admin can change it on assigned queries.'
+              : 'Where did you get this lead from?'
+          }
         >
-          <IconSelect
-            icon={Compass}
-            value={leadSource || ''}
-            onChange={(e) => setValue('leadSource', e.target.value)}
-            error={errors.leadSource}
-          >
-            <option value="">Select source</option>
-            {sourceOptions.map((src) => (
-              <option key={src.value} value={src.value}>{src.label}</option>
-            ))}
-          </IconSelect>
+          {lockSource ? (
+            <div className="flex h-11 items-center rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700">
+              {sourceOptions.find((s) => s.value === leadSource)?.label ||
+                LEAD_SOURCES.find((s) => s.value === leadSource)?.label ||
+                leadSource ||
+                '—'}
+            </div>
+          ) : (
+            <IconSelect
+              icon={Compass}
+              value={leadSource || ''}
+              onChange={(e) => setValue('leadSource', e.target.value)}
+              error={errors.leadSource}
+            >
+              <option value="">Select source</option>
+              {sourceOptions.map((src) => (
+                <option key={src.value} value={src.value}>{src.label}</option>
+              ))}
+            </IconSelect>
+          )}
           <input type="hidden" {...register('leadSource')} />
         </WizardField>
 

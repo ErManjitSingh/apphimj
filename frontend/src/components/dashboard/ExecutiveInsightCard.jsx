@@ -31,7 +31,7 @@ export default function ExecutiveInsightCard() {
   const customReady = period !== 'custom' || Boolean(dateFrom || dateTo);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['dashboard', 'executive-insight', period, dateFrom, dateTo],
+    queryKey: ['dashboard', '/dashboard/executive-insight', period, dateFrom, dateTo],
     queryFn: async () => {
       const { data: payload } = await API.get('/dashboard/executive-insight', {
         params: {

@@ -157,6 +157,14 @@ export default function MyLeadsPage() {
     const { statusUpdate, leadOutcome, skipFollowUp, ...followUpData } = data;
     void leadOutcome;
     const isLostClose = skipFollowUp || ['lost', 'booked_from_another_company'].includes(statusUpdate?.status);
+    const alreadyBooked = ['converted', 'booked'].includes(lead?.status);
+
+    // Already booked — open commercial form, never re-PUT status.
+    if (alreadyBooked) {
+      setModal(null);
+      setCommercialLeadId(leadId);
+      return;
+    }
 
     if (!isLostClose) {
       await createExecutiveFollowUp(
@@ -185,7 +193,7 @@ export default function MyLeadsPage() {
             text: data.remarks || statusUpdate.statusReason,
           }).catch(() => {});
         }
-        if (statusUpdate.status === 'converted') {
+        if (statusUpdate.status === 'converted' || statusUpdate.status === 'booked') {
           setCommercialLeadId(leadId);
         }
       } catch (err) {
@@ -194,6 +202,7 @@ export default function MyLeadsPage() {
           err.message ||
           'Lead status could not be updated';
         toast.error(isLostClose ? msg : `Follow-up saved. ${msg}`);
+        throw err;
       }
     }
 

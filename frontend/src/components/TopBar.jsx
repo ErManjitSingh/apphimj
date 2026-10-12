@@ -6,6 +6,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import { NOTIFICATIONS_ENABLED } from '../config/notifications';
+import { APP_BRAND_NAME } from '../config/branding';
 import { getTopBarAccent } from './topbarAccent';
 import {
   DropdownMenuRoot,
@@ -18,6 +19,7 @@ import {
 import { cn } from '../lib/utils';
 import AttendanceTopBarAction from './attendance/AttendanceTopBarAction';
 import HeaderLatestActivity from './HeaderLatestActivity';
+import BrandLogo from './BrandLogo';
 import { refreshAppData } from '../lib/appRefresh';
 import { useSidebar } from '../context/SidebarContext';
 
@@ -47,8 +49,8 @@ function IconButton({ children, className, accent, ...props }) {
       type="button"
       className={cn(
         'relative flex items-center justify-center h-8 w-8 rounded-lg',
-        'bg-white/80 text-slate-500 ring-1 ring-orange-100/80',
-        'transition-all duration-150 hover:text-orange-600 hover:bg-orange-50 hover:ring-orange-200',
+        'bg-white text-slate-500 ring-1 ring-slate-200/80',
+        'transition-all duration-150',
         accent.iconHover,
         className
       )}
@@ -60,6 +62,7 @@ function IconButton({ children, className, accent, ...props }) {
 }
 
 export default function TopBar({ onMenuClick }) {
+  void onMenuClick;
   const { mobileOpen, toggleMobileOpen } = useSidebar();
   const queryClient = useQueryClient();
   const { toggleTheme, isDark } = useTheme();
@@ -92,16 +95,22 @@ export default function TopBar({ onMenuClick }) {
   };
 
   return (
-    <header className="sticky top-0 z-30 border-b border-orange-100/60 bg-white/85 backdrop-blur-2xl">
-      <div className={cn('absolute inset-x-0 top-0 h-px bg-gradient-to-r', accent.stripe)} />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(249,115,22,0.07)_0%,rgba(255,255,255,0)_45%,rgba(251,191,36,0.08)_100%)]" />
-      <div className="relative flex items-center gap-2 px-3 lg:px-5 h-14">
+    <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
+      <div className={cn('absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r', accent.stripe)} />
+      <div
+        className={cn(
+          'pointer-events-none absolute inset-0 bg-gradient-to-r opacity-90',
+          accent.wash
+        )}
+      />
+
+      <div className="relative flex items-center gap-2.5 px-3 lg:px-5 h-14">
         <button
           type="button"
           onClick={() => toggleMobileOpen()}
           className={cn(
             'lg:hidden flex items-center justify-center h-8 w-8 rounded-lg',
-            'bg-white/80 text-slate-500 ring-1 ring-orange-100',
+            'bg-white text-slate-500 ring-1 ring-slate-200',
             accent.iconHover
           )}
           aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
@@ -109,6 +118,25 @@ export default function TopBar({ onMenuClick }) {
         >
           {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
         </button>
+
+        {/* Him Journey brand lockup — always visible in header */}
+        <Link
+          to="/"
+          className="hidden sm:flex items-center gap-2.5 shrink-0 min-w-0 mr-1"
+          title={APP_BRAND_NAME}
+        >
+          <BrandLogo className="h-8 w-8 shadow-sm ring-1 ring-[#5D5FEF]/20" />
+          <div className="min-w-0 leading-tight">
+            <p className="text-[13px] font-bold tracking-tight text-slate-900 truncate">
+              Him Journey
+            </p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#5D5FEF] truncate">
+              Tours CRM
+            </p>
+          </div>
+        </Link>
+
+        <span className="hidden sm:block h-6 w-px bg-slate-200/90 shrink-0" />
 
         {user ? <HeaderLatestActivity /> : <div className="flex-1" />}
 
@@ -128,7 +156,11 @@ export default function TopBar({ onMenuClick }) {
           {canAddLead && (
             <Link
               to={user?.role === 'sales_executive' ? '/sales-executive/leads/add' : '/leads/new'}
-              className="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-semibold text-white bg-gradient-to-r from-orange-500 to-amber-500 shadow-sm shadow-orange-500/25 hover:from-orange-400 hover:to-amber-400 active:scale-[0.98] transition"
+              className={cn(
+                'hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-semibold text-white',
+                'bg-gradient-to-r shadow-sm active:scale-[0.98] transition',
+                accent.addBtn
+              )}
             >
               <Plus className="w-3.5 h-3.5" />
               Add Lead
@@ -140,14 +172,14 @@ export default function TopBar({ onMenuClick }) {
           {canAddLead && (
             <Link
               to={user?.role === 'sales_executive' ? '/sales-executive/leads/add' : '/leads/new'}
-              className="sm:hidden flex items-center justify-center h-8 w-8 rounded-lg text-white bg-orange-500 shadow-sm"
+              className="sm:hidden flex items-center justify-center h-8 w-8 rounded-lg text-white bg-[#5D5FEF] shadow-sm"
               aria-label="Add Lead"
             >
               <Plus className="w-4 h-4" />
             </Link>
           )}
 
-          <span className="hidden sm:block mx-0.5 h-5 w-px bg-orange-100" />
+          <span className="hidden sm:block mx-0.5 h-5 w-px bg-slate-200" />
 
           {NOTIFICATIONS_ENABLED && (
             <IconButton
@@ -173,17 +205,34 @@ export default function TopBar({ onMenuClick }) {
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="flex items-center gap-2 pl-1 pr-1.5 h-8 rounded-lg bg-white/90 ring-1 ring-orange-100 hover:bg-orange-50/80 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/40"
+                  className={cn(
+                    'flex items-center gap-2 pl-1 pr-1.5 h-8 rounded-lg bg-white ring-1 ring-slate-200',
+                    'hover:bg-[#5D5FEF]/[0.06] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5D5FEF]/35'
+                  )}
                 >
                   <div className="relative">
-                    <div className={cn('w-6 h-6 rounded-md bg-gradient-to-br flex items-center justify-center text-[9px] font-bold text-white', accent.avatar)}>
+                    <div
+                      className={cn(
+                        'w-6 h-6 rounded-md bg-gradient-to-br flex items-center justify-center text-[9px] font-bold text-white',
+                        accent.avatar
+                      )}
+                    >
                       {getInitials(user.name)}
                     </div>
                     <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white" />
                   </div>
-                  <div className="hidden lg:block text-left min-w-0 max-w-[96px]">
-                    <p className="text-[11px] font-semibold text-slate-800 truncate leading-none">{user.name}</p>
-                    <p className="mt-0.5 text-[9px] font-medium text-orange-500 truncate leading-none">{adminRoleLine}</p>
+                  <div className="hidden lg:block text-left min-w-0 max-w-[110px]">
+                    <p className="text-[11px] font-semibold text-slate-800 truncate leading-none">
+                      {user.name}
+                    </p>
+                    <p
+                      className={cn(
+                        'mt-0.5 text-[9px] font-semibold truncate leading-none capitalize',
+                        accent.roleText || 'text-[#5D5FEF]'
+                      )}
+                    >
+                      {adminRoleLine}
+                    </p>
                   </div>
                   <ChevronDown className="w-3 h-3 text-slate-400 hidden lg:block shrink-0" />
                 </button>
@@ -218,7 +267,8 @@ export default function TopBar({ onMenuClick }) {
               to="/login"
               className={cn(
                 'inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-semibold text-white',
-                'bg-gradient-to-r shadow-md transition-all', accent.addBtn
+                'bg-gradient-to-r shadow-md transition-all',
+                accent.addBtn
               )}
             >
               <LogIn className="w-4 h-4" />

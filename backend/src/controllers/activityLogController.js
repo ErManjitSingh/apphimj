@@ -1,12 +1,9 @@
 const ActivityLog = require('../models/ActivityLog');
 const ApiError = require('../utils/apiError');
 const asyncHandler = require('../utils/asyncHandler');
-const { logActivity, getClientIp, purgeOldActivityLogs } = require('../services/activityService');
-const { ACTIVITY_LOG_RETENTION_MS } = require('../services/activityService');
+const { logActivity, getClientIp, ACTIVITY_LOG_RETENTION_MS } = require('../services/activityService');
 
 const listActivityLogs = asyncHandler(async (req, res) => {
-  await purgeOldActivityLogs();
-
   const { type, search } = req.query;
   const since = new Date(Date.now() - ACTIVITY_LOG_RETENTION_MS);
   const filter = { createdAt: { $gte: since } };
@@ -22,7 +19,14 @@ const listActivityLogs = asyncHandler(async (req, res) => {
     ];
   }
 
-  const logs = await ActivityLog.find(filter).sort({ createdAt: -1 }).limit(200).lean();
+  // Header ticker only needs a handful; full Activity page can ask for more.
+  const limit = Math.min(Math.max(1, Number(req.query.limit) || 40), 100);
+
+  const logs = await ActivityLog.find(filter)
+    .select('type user action target createdAt meta.leadId leadId')
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .lean();
 
   res.json(
     logs.map((l) => ({

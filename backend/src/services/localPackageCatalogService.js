@@ -9,9 +9,12 @@ const {
   fetchUnoPackageById,
   mapUnoPackage,
 } = require('./unoHotelsPackageService');
+const cacheService = require('./cacheService');
 
 const CATALOG_TYPE = 'uno_catalog';
 const LOCAL_LIST_MAX_LIMIT = 500;
+const LOCAL_CATALOG_LIST_CACHE_MS = 5 * 60 * 1000;
+const LOCAL_CATALOG_COUNT_CACHE_MS = 5 * 60 * 1000;
 
 let importLock = null;
 let lastImportStatus = { running: false };
@@ -38,6 +41,48 @@ function catalogKey(item = {}) {
   return String(item.slug || item.sourceSlug || item.id || item._id || item.sourcePackageId || '').trim();
 }
 
+function normalizeInclusionList(value) {
+  if (value == null || value === '') return [];
+  if (Array.isArray(value)) {
+    return value
+      .flatMap((item) => {
+        if (item == null) return [];
+        if (typeof item === 'string' || typeof item === 'number') {
+          return normalizeInclusionList(String(item));
+        }
+        if (typeof item === 'object') {
+          const text = item.text || item.label || item.title || item.name || item.value || '';
+          return text ? normalizeInclusionList(text) : [];
+        }
+        return [];
+      })
+      .map((line) => String(line || '').trim())
+      .filter(Boolean);
+  }
+  if (typeof value !== 'string' && typeof value !== 'number') return [];
+  const text = String(value)
+    .replace(/<\s*br\s*\/?\s*>/gi, '\n')
+    .replace(/<\/\s*li\s*>/gi, '\n')
+    .replace(/<\/\s*p\s*>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/\r/g, '')
+    .trim();
+  if (!text) return [];
+  return text
+    .split(/\n+|•|\u2022|(?:^|\s)[-–—*]\s+/)
+    .map((line) => line.replace(/^\d+[.)]\s+/, '').trim())
+    .filter((line) => line.length > 1);
+}
+
+function pickInclusionList(...candidates) {
+  for (const candidate of candidates) {
+    const lines = normalizeInclusionList(candidate);
+    if (lines.length) return lines;
+  }
+  return [];
+}
+
 function toListItem(detail = {}, fallback = {}) {
   const mapped = mapUnoPackage(
     {
@@ -60,8 +105,8 @@ function toListItem(detail = {}, fallback = {}) {
       featured_image: detail.coverImage || fallback.coverImage,
       short_description: detail.shortDescription || fallback.shortDescription,
       description: detail.description,
-      inclusions: detail.inclusions || fallback.inclusions,
-      exclusions: detail.exclusions || fallback.exclusions,
+      inclusions: pickInclusionList(detail.inclusions, detail.includes, fallback.inclusions, fallback.includes),
+      exclusions: pickInclusionList(detail.exclusions, detail.excludes, fallback.exclusions, fallback.excludes),
       highlight_icons: detail.highlights,
       status: detail.status,
       booking_count: detail.bookingCount,
@@ -110,8 +155,8 @@ function buildCatalogDoc(detail) {
     packageCode: plain.packageCode || '',
     shortDescription: plain.shortDescription || '',
     coverImage: plain.coverImage || '',
-    inclusions: Array.isArray(plain.inclusions) ? plain.inclusions : [],
-    exclusions: Array.isArray(plain.exclusions) ? plain.exclusions : [],
+    inclusions: pickInclusionList(plain.inclusions, plain.includes, plain._apiRaw?.package?.inclusions),
+    exclusions: pickInclusionList(plain.exclusions, plain.excludes, plain._apiRaw?.package?.exclusions),
     itinerary: mapItineraryForDb(plain.itinerary),
     slug,
     sourceType: CATALOG_TYPE,
@@ -131,7 +176,11 @@ function buildCatalogDoc(detail) {
 }
 
 async function countLocalCatalog() {
-  return Package.countDocuments({ sourceType: CATALOG_TYPE });
+  return cacheService.getOrSet(
+    'local-catalog:count-v1',
+    () => Package.countDocuments({ sourceType: CATALOG_TYPE }),
+    LOCAL_CATALOG_COUNT_CACHE_MS
+  );
 }
 
 function catalogLookupFilter(idOrSlug) {
@@ -164,11 +213,13 @@ async function upsertCatalogPackage(detail) {
   const filter = payload.sourceSlug
     ? { sourceType: CATALOG_TYPE, sourceSlug: payload.sourceSlug }
     : { sourceType: CATALOG_TYPE, sourcePackageId: payload.sourcePackageId };
-  return Package.findOneAndUpdate(filter, { $set: payload }, {
+  const doc = await Package.findOneAndUpdate(filter, { $set: payload }, {
     upsert: true,
     new: true,
     setDefaultsOnInsert: true,
   });
+  cacheService.invalidate('local-catalog:').catch(() => {});
+  return doc;
 }
 
 function applyNameSearch(items, search) {
@@ -193,16 +244,28 @@ function applyNameSearch(items, search) {
   });
 }
 
-async function listLocalCatalog(query = {}) {
-  const docs = await Package.find({ sourceType: CATALOG_TYPE })
-    .select('listData name destination destinationName state sourceSlug sourcePackageId duration durationLabel startingPrice packageType shortDescription coverImage packageCode slug')
-    .sort({ name: 1 })
-    .lean();
+async function loadLocalCatalogItems() {
+  return cacheService.getOrSet(
+    'local-catalog:items-v1',
+    async () => {
+      const docs = await Package.find({ sourceType: CATALOG_TYPE })
+        .select(
+          'listData name destination destinationName state sourceSlug sourcePackageId duration durationLabel startingPrice packageType shortDescription coverImage packageCode slug'
+        )
+        .sort({ name: 1 })
+        .lean();
 
-  let items = docs.map((doc) => {
-    if (doc.listData && doc.listData.name) return doc.listData;
-    return toListItem(doc, doc);
-  });
+      return docs.map((doc) => {
+        if (doc.listData && doc.listData.name) return doc.listData;
+        return toListItem(doc, doc);
+      });
+    },
+    LOCAL_CATALOG_LIST_CACHE_MS
+  );
+}
+
+async function listLocalCatalog(query = {}) {
+  let items = await loadLocalCatalogItems();
 
   if (query.destination) {
     items = items.filter((pkg) => matchesDestination(pkg, query.destination));

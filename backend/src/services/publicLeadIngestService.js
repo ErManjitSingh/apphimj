@@ -226,6 +226,7 @@ async function ingestPublicLead(raw = {}) {
     email,
     destination,
     city: String(raw.city || raw.cityy || '').trim() || undefined,
+    pickupPoint: String(raw.pickupPoint || raw.pickup_point || '').trim() || undefined,
     travelDate: raw.travelDate || raw.travel_date || undefined,
     travelers: Number(raw.travelers || raw.travellers) || 1,
     adults: Number(raw.adults || raw.travelers || raw.travellers) || 1,
@@ -258,6 +259,9 @@ async function ingestPublicLead(raw = {}) {
   if (raw.externalLeadId) {
     data.externalLeadId = String(raw.externalLeadId).trim();
     data.externalLeadSource = String(raw.externalLeadSource || 'facebook_leadgen').trim();
+  }
+  if (raw.externalFormCapture && typeof raw.externalFormCapture === 'object') {
+    data.externalFormCapture = raw.externalFormCapture;
   }
 
   const typeDetection = detectLeadType({ ...body, ...data });

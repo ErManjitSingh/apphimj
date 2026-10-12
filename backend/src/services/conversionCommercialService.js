@@ -160,8 +160,8 @@ async function getCommercialFormDraft({ leadId, executiveId, branchId }) {
     isDeleted: { $ne: true },
   }).lean();
   if (!lead) throw new ApiError(404, 'Lead not found');
-  if (lead.status !== 'converted') {
-    throw new ApiError(400, 'Commercial form is available after lead is converted');
+  if (lead.status !== 'converted' && lead.status !== 'booked') {
+    throw new ApiError(400, 'Commercial form is available after lead is booked');
   }
 
   const quotation = await Quotation.findOne({ lead: leadId }).sort({ updatedAt: -1 }).lean();
@@ -392,6 +392,25 @@ async function saveCommercialForm({ leadId, executiveId, branchId, body }) {
   }
 
   await payment.save();
+
+  // Keep advance voucher HTML in sync with edited commercial amounts
+  try {
+    const { generateAndStoreReceipt } = require('./paymentReceiptService');
+    const Booking = require('../models/Booking');
+    const booking = await Booking.findOne({ lead: leadId }).sort({ createdAt: -1 }).lean();
+    const quotation = payment.quotation
+      ? await Quotation.findById(payment.quotation).lean()
+      : null;
+    await generateAndStoreReceipt({
+      lead,
+      payment,
+      booking,
+      quotation,
+      actor: { _id: executiveId, name: 'Him Journey Tours' },
+    });
+  } catch (err) {
+    console.error('[saveCommercialForm] receipt refresh failed:', err.message);
+  }
 
   if (body.createPaymentReminders !== false) {
     await syncPaymentReminders({

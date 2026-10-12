@@ -17,7 +17,12 @@ const {
   applyMarginToPackage,
   applyMarginToPackages,
 } = require('../services/destinationMarginService');
-const { importHotelsFromPackages, syncHotelRoomsFromUno, enrichHotelDocumentFromUno } = require('../services/localHotelCatalogService');
+const {
+  importHotelsFromPackages,
+  syncHotelRoomsFromUno,
+  enrichHotelDocumentFromUno,
+  sanitizeHotelRoomTypes,
+} = require('../services/localHotelCatalogService');
 const { saveHotelImageBase64 } = require('../services/hotelImageUploadService');
 
 function mapUnoDetailToPackageDoc(detail, userId) {
@@ -264,14 +269,17 @@ const listHotels = asyncHandler(async (req, res) => {
   let hotels = await Hotel.find(filter).sort({ name: 1 }).lean();
   hotels = applySearch(hotels, req.query.search);
   res.json(
-    hotels.map((hotel) => ({
-      ...hotel,
-      displayPrice: hotel.absolutePerNight || hotel.price || 0,
-      displayCity: hotel.destination || hotel.location,
-      coverImage: hotel.coverImage || hotel.images?.[0] || '',
-      roomTypes: Array.isArray(hotel.roomTypes) ? hotel.roomTypes : [],
-      roomCount: Array.isArray(hotel.roomTypes) ? hotel.roomTypes.length : 0,
-    }))
+    hotels.map((hotel) => {
+      const roomTypes = sanitizeHotelRoomTypes(hotel.roomTypes);
+      return {
+        ...hotel,
+        displayPrice: hotel.absolutePerNight || hotel.price || 0,
+        displayCity: hotel.destination || hotel.location,
+        coverImage: hotel.coverImage || hotel.images?.[0] || '',
+        roomTypes,
+        roomCount: roomTypes.length,
+      };
+    })
   );
 });
 
@@ -284,8 +292,13 @@ const createHotel = asyncHandler(async (req, res) => {
   if (body.price != null && body.absolutePerNight == null) {
     body.absolutePerNight = Number(body.price) || 0;
   }
+  if (Array.isArray(body.roomTypes)) {
+    body.roomTypes = sanitizeHotelRoomTypes(body.roomTypes);
+  }
   const hotel = await Hotel.create({ ...body, createdBy: req.user?._id });
-  res.status(201).json(hotel);
+  const plain = hotel.toObject ? hotel.toObject() : hotel;
+  const roomTypes = sanitizeHotelRoomTypes(plain.roomTypes);
+  res.status(201).json({ ...plain, roomTypes, roomCount: roomTypes.length });
 });
 
 const getHotel = asyncHandler(async (req, res) => {
@@ -305,13 +318,14 @@ const getHotel = asyncHandler(async (req, res) => {
   }
 
   const plain = hotel.toObject ? hotel.toObject() : hotel;
+  const roomTypes = sanitizeHotelRoomTypes(plain.roomTypes);
   res.json({
     ...plain,
     displayPrice: plain.absolutePerNight || plain.price || 0,
     displayCity: plain.destination || plain.location,
     coverImage: plain.coverImage || plain.images?.[0] || '',
-    roomTypes: Array.isArray(plain.roomTypes) ? plain.roomTypes : [],
-    roomCount: Array.isArray(plain.roomTypes) ? plain.roomTypes.length : 0,
+    roomTypes,
+    roomCount: roomTypes.length,
   });
 });
 
@@ -323,9 +337,14 @@ const updateHotel = asyncHandler(async (req, res) => {
   if (!body.coverImage && Array.isArray(body.images) && body.images[0]) {
     body.coverImage = body.images[0];
   }
+  if (Array.isArray(body.roomTypes)) {
+    body.roomTypes = sanitizeHotelRoomTypes(body.roomTypes);
+  }
   const hotel = await Hotel.findByIdAndUpdate(req.params.id, body, { new: true, runValidators: true });
   if (!hotel) throw new ApiError(404, 'Hotel not found');
-  res.json(hotel);
+  const plain = hotel.toObject ? hotel.toObject() : hotel;
+  const roomTypes = sanitizeHotelRoomTypes(plain.roomTypes);
+  res.json({ ...plain, roomTypes, roomCount: roomTypes.length });
 });
 
 const deleteHotel = asyncHandler(async (req, res) => {

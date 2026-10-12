@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchFollowUps, fetchFollowUpSummary, fetchFollowUpsCalendar } from '../../../services/followupsApi';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
+import { LIST_STALE_MS, GC_TIME_MS } from '../../../lib/queryConfig';
 
 export function useFollowUpsQuery({
   filters = {},
@@ -31,7 +32,9 @@ export function useFollowUpsQuery({
         endpoint
       ),
     enabled,
-    staleTime: 30_000,
+    staleTime: LIST_STALE_MS,
+    gcTime: GC_TIME_MS,
+    refetchOnMount: false,
     placeholderData: (prev) => prev,
   });
 }
@@ -41,7 +44,10 @@ export function useFollowUpSummaryQuery(endpoint = '/followups/summary', enabled
     queryKey: ['followups', 'summary', endpoint],
     queryFn: () => fetchFollowUpSummary(endpoint),
     enabled,
-    staleTime: 60_000,
+    staleTime: LIST_STALE_MS,
+    gcTime: GC_TIME_MS,
+    refetchOnMount: false,
+    placeholderData: (prev) => prev,
   });
 }
 
@@ -53,6 +59,9 @@ export function useFollowUpsCalendarQuery({ filters = {}, endpoint = '/followups
     queryFn: () =>
       fetchFollowUpsCalendar({ filters: { ...filters, search: debouncedSearch } }, endpoint),
     enabled,
-    staleTime: 30_000,
+    staleTime: LIST_STALE_MS,
+    gcTime: GC_TIME_MS,
+    refetchOnMount: false,
+    placeholderData: (prev) => prev,
   });
 }

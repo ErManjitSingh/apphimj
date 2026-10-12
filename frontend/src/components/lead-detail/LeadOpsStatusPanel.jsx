@@ -1,5 +1,6 @@
 import { ChevronRight, MoreHorizontal } from 'lucide-react';
 import { DETAIL_CARD } from './leadDetailUtils';
+import { isBookedStatus } from '../../lib/leadPipeline';
 import { cn } from '../../lib/utils';
 
 function formatINR(n) {
@@ -245,21 +246,28 @@ function EmptyRow({ text }) {
 }
 
 /**
- * Live operations + installment status for sales (converted leads).
- * Visual layout matches the Operations & Payment Status mockup.
+ * Live operations + installment status for sales (converted / booked leads).
+ * Hotel/cab confirm badges update when Operations confirms on the booking.
  */
 export default function LeadOpsStatusPanel({ lead, paymentSummary }) {
   const summary = paymentSummary || lead?.paymentSummary;
   const ops = summary?.ops;
-  if (!summary || lead?.status !== 'converted') return null;
+
+  if (!summary || !isBookedStatus(lead?.status)) return null;
   if (!ops && !summary.bookingId) return null;
 
   const counts = ops?.counts || {};
   const hotels = ops?.hotels || [];
   const transport = ops?.transport || [];
   const activities = ops?.activities || [];
+  const itinerary = ops?.itinerary || [];
   const installments = ops?.scheduledInstallments || [];
   const received = ops?.receivedInstallments || [];
+  const packageName = ops?.packageName || lead?.packageName || '';
+  const destination = ops?.destination || lead?.destination || '';
+  const paxParts = [];
+  if (ops?.adults != null) paxParts.push(`${ops.adults} Adults`);
+  if (ops?.children) paxParts.push(`${ops.children} Children`);
 
   const hotelsDone =
     counts.hotelsTotal > 0 && counts.hotelsConfirmed === counts.hotelsTotal;
@@ -294,17 +302,24 @@ export default function LeadOpsStatusPanel({ lead, paymentSummary }) {
       <div className="relative overflow-hidden border-b border-slate-100 bg-gradient-to-r from-violet-50/80 via-white to-indigo-50/60 px-5 py-5 sm:px-6">
         <div className="relative z-10 max-w-[70%]">
           <h3 className="text-lg font-extrabold tracking-tight text-slate-900 sm:text-xl">
-            Operations &amp; Payment Status{' '}
-            <span aria-hidden className="inline-block">✨</span>
+            Booking &amp; Ops Status
           </h3>
+          {packageName ? (
+            <p className="mt-1 text-base font-bold text-violet-700">{packageName}</p>
+          ) : null}
           <p className="mt-1 text-sm text-slate-500">
-            Live hotel, cab &amp; installment progress from Operations
-            {summary.bookingNumber ? (
-              <span className="font-semibold text-violet-600">
-                {' '}
-                • {summary.bookingNumber}
-              </span>
-            ) : null}
+            {[
+              destination,
+              formatDateRange(ops?.travelDate, ops?.returnDate),
+              paxParts.join(' · '),
+              summary.bookingNumber || ops?.bookingNumber,
+              ops?.quotationReference,
+            ]
+              .filter(Boolean)
+              .join(' • ')}
+          </p>
+          <p className="mt-1 text-xs font-medium text-slate-400">
+            Hotel &amp; cab confirms update live from Operations team
           </p>
         </div>
         <OpsHeroArt className="pointer-events-none absolute -right-2 top-1 h-24 w-40 opacity-90 sm:right-4 sm:h-28 sm:w-48" />
@@ -401,12 +416,20 @@ export default function LeadOpsStatusPanel({ lead, paymentSummary }) {
                         {h.day ? `Day ${h.day}` : 'Stay'}
                         {h.nights ? ` • ${h.nights}N` : ''}
                         {h.roomType ? ` • ${h.roomType}` : ''}
+                        {h.mealPlan ? ` • ${h.mealPlan}` : ''}
                       </p>
                       <p className="text-[11px] text-slate-400">{formatDateRange(h.checkIn, h.checkOut)}</p>
+                      {h.confirmationNumber ? (
+                        <p className="mt-0.5 text-[11px] font-semibold text-emerald-600">
+                          Conf # {h.confirmationNumber}
+                        </p>
+                      ) : null}
                     </div>
-                    <div className="flex shrink-0 items-center gap-1.5">
+                    <div className="flex shrink-0 flex-col items-end gap-1">
                       <StatusBadge status={h.status} />
-                      <ChevronRight className="h-4 w-4 text-slate-300" />
+                      {h.voucherSent ? (
+                        <span className="text-[10px] font-bold uppercase text-sky-600">Voucher sent</span>
+                      ) : null}
                     </div>
                   </div>
                 ))
@@ -454,14 +477,23 @@ export default function LeadOpsStatusPanel({ lead, paymentSummary }) {
                             {String(t.vehicleType || 'cab').replace(/_/g, ' ')}
                             {t.day ? ` · Day ${t.day}` : ''}
                             {t.driverName ? ` · ${t.driverName}` : ''}
+                            {t.vehicleNumber ? ` · ${t.vehicleNumber}` : ''}
                           </p>
                           {(t.pickupLocation || t.dropLocation) && (
                             <p className="truncate text-[11px] text-slate-500">
                               {[t.pickupLocation, t.dropLocation].filter(Boolean).join(' → ')}
                             </p>
                           )}
+                          {t.driverPhone ? (
+                            <p className="text-[11px] text-slate-400">{t.driverPhone}</p>
+                          ) : null}
                         </div>
-                        <StatusBadge status={t.status} />
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          <StatusBadge status={t.status} />
+                          {t.voucherSent ? (
+                            <span className="text-[10px] font-bold uppercase text-sky-600">Voucher sent</span>
+                          ) : null}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -470,6 +502,44 @@ export default function LeadOpsStatusPanel({ lead, paymentSummary }) {
             </div>
           </section>
         </div>
+
+        {itinerary.length > 0 && (
+          <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+            <div className="flex items-center gap-2.5 border-b border-slate-100 px-4 py-3">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+                <CalendarIconSvg className="h-5 w-5" />
+              </span>
+              <h4 className="text-sm font-bold text-slate-900">Day Plan</h4>
+            </div>
+            <div className="max-h-72 divide-y divide-slate-100 overflow-y-auto">
+              {itinerary.map((day, idx) => (
+                <div key={`day-${day.day || idx}`} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-bold text-slate-900">
+                      {day.day ? `Day ${day.day}` : `Day ${idx + 1}`}
+                      {day.title ? ` · ${day.title}` : ''}
+                    </p>
+                    {day.date ? (
+                      <span className="shrink-0 text-[11px] text-slate-400">{formatDate(day.date)}</span>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    {[
+                      day.accommodation ? `Hotel: ${day.accommodation}` : null,
+                      day.transport ? `Cab: ${String(day.transport).replace(/_/g, ' ')}` : null,
+                      day.meals ? `Meals: ${day.meals}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                  {day.activities ? (
+                    <p className="mt-0.5 line-clamp-2 text-[11px] text-slate-400">{day.activities}</p>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {activities.length > 0 && (
           <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">

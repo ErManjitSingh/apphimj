@@ -48,6 +48,29 @@ async function countFollowUpsToday(extra = {}, branchId = null) {
   });
 }
 
+async function aggregateFollowUpNavCounts(extra = {}, branchId = null) {
+  const { startOfToday, endOfToday } = todayRange();
+  const match = withBranch({ ...extra, status: 'pending' }, branchId);
+  const [row] = await FollowUp.aggregate([
+    { $match: match },
+    {
+      $facet: {
+        total: [{ $count: 'n' }],
+        due: [{ $match: { scheduledAt: { $lte: endOfToday } } }, { $count: 'n' }],
+        today: [
+          { $match: { scheduledAt: { $gte: startOfToday, $lte: endOfToday } } },
+          { $count: 'n' },
+        ],
+      },
+    },
+  ]);
+  return {
+    total: facetCount(row, 'total'),
+    due: facetCount(row, 'due'),
+    today: facetCount(row, 'today'),
+  };
+}
+
 async function unreadNotifications(userId, branchId = null) {
   return Notification.countDocuments(withBranch({ user: userId, read: false }, branchId));
 }
@@ -96,6 +119,14 @@ async function aggregateAdminLeadCounts(branchId) {
           },
           { $count: 'n' },
         ],
+        customers: [
+          {
+            $match: {
+              $or: [{ status: 'converted' }, { isRepeatCustomer: true }],
+            },
+          },
+          { $count: 'n' },
+        ],
       },
     },
   ]);
@@ -111,35 +142,23 @@ async function aggregateAdminLeadCounts(branchId) {
     statusNew: facetCount(row, 'statusNew'),
     hot: facetCount(row, 'hot'),
     returned: facetCount(row, 'returned'),
+    customers: facetCount(row, 'customers'),
   };
 }
 
 async function buildAdminNavCounts(userId, { branchId } = {}) {
   const [
     leads,
-    followUpsTotal,
-    followUpsDue,
-    customers,
+    followUps,
     quotationsTotal,
     quotationsPending,
     packages,
     notificationsUnread,
-    calendarToday,
     opsCounts,
     reminderCounts,
   ] = await Promise.all([
     aggregateAdminLeadCounts(branchId),
-    FollowUp.countDocuments(withBranch({ status: 'pending' }, branchId)),
-    countFollowUpsDue({}, branchId),
-    Lead.countDocuments(
-      withBranch(
-        {
-          isDeleted: { $ne: true },
-          $or: [{ status: 'converted' }, { isRepeatCustomer: true }],
-        },
-        branchId
-      )
-    ),
+    aggregateFollowUpNavCounts({}, branchId),
     Quotation.countDocuments(withBranch({}, branchId)),
     Quotation.countDocuments(withBranch({ status: 'pending_approval' }, branchId)),
     (async () => {
@@ -148,19 +167,18 @@ async function buildAdminNavCounts(userId, { branchId } = {}) {
       return getUnoPackagesTotal().catch(() => Package.countDocuments());
     })(),
     unreadNotifications(userId, branchId),
-    countFollowUpsToday({}, branchId),
     buildOperationsNavCounts(userId, { branchId }),
     getReminderCounts({ _id: userId, role: 'admin' }, branchId),
   ]);
 
   return {
     leads,
-    followups: { total: followUpsTotal, due: followUpsDue },
-    customers,
+    followups: { total: followUps.total, due: followUps.due },
+    customers: leads.customers,
     quotations: { total: quotationsTotal, pending: quotationsPending },
     packages,
     notifications: { unread: notificationsUnread },
-    calendar: { today: calendarToday },
+    calendar: { today: followUps.today },
     reminders: { overdue: reminderCounts?.overdue || 0 },
     bookings: opsCounts.bookings,
     support: opsCounts.support,
@@ -236,33 +254,31 @@ async function aggregateSalesManagerLeadCounts(branchId) {
 async function buildSalesManagerNavCounts(userId, { branchId } = {}) {
   const [
     leads,
-    followUpsDue,
+    followUps,
     quotationsPending,
     quotationsApproved,
     quotationsRejected,
     notificationsUnread,
-    calendarToday,
   ] = await Promise.all([
     aggregateSalesManagerLeadCounts(branchId),
-    countFollowUpsDue({}, branchId),
+    aggregateFollowUpNavCounts({}, branchId),
     Quotation.countDocuments(withBranch({ status: { $in: ['sent', 'negotiation', 'pending_approval'] } }, branchId)),
     Quotation.countDocuments(withBranch({ status: 'approved' }, branchId)),
     Quotation.countDocuments(withBranch({ status: 'rejected' }, branchId)),
     unreadNotifications(userId, branchId),
-    countFollowUpsToday({}, branchId),
   ]);
 
   return {
     leads,
     assignment: leads.unassigned,
-    followups: { due: followUpsDue },
+    followups: { due: followUps.due },
     quotations: {
       pending: quotationsPending,
       approved: quotationsApproved,
       rejected: quotationsRejected,
     },
     notifications: { unread: notificationsUnread },
-    calendar: { today: calendarToday },
+    calendar: { today: followUps.today },
   };
 }
 
@@ -441,9 +457,9 @@ async function aggregateExecutiveLeadCounts(userId, branchId) {
 }
 
 async function buildExecutiveNavCounts(userId, { branchId } = {}) {
-  const [aggregated, followUpsDue, notificationsUnread, quotationsTotal, returnedCount] = await Promise.all([
+  const [aggregated, followUps, notificationsUnread, quotationsTotal, returnedCount] = await Promise.all([
     aggregateExecutiveLeadCounts(userId, branchId),
-    countFollowUpsDue({ assignedTo: userId }, branchId),
+    aggregateFollowUpNavCounts({ assignedTo: userId }, branchId),
     unreadNotifications(userId, branchId),
     Quotation.countDocuments({
       ...(branchId ? { branchId } : {}),
@@ -467,7 +483,7 @@ async function buildExecutiveNavCounts(userId, { branchId } = {}) {
 
   return {
     leads,
-    followups: { due: followUpsDue },
+    followups: { due: followUps.due },
     quotations: { total: quotationsTotal },
     customers,
     notifications: { unread: notificationsUnread },
@@ -565,7 +581,7 @@ async function buildTeamLeaderNavCounts(userId, { branchId } = {}) {
     : { assignedTo: null };
 
   const [
-    followUpsDue,
+    followUps,
     quotationsPending,
     quotationsNegotiation,
     quotationsApproved,
@@ -573,7 +589,7 @@ async function buildTeamLeaderNavCounts(userId, { branchId } = {}) {
     notificationsUnread,
     returnedCount,
   ] = await Promise.all([
-    countFollowUpsDue(squadFollowFilter, branchId),
+    aggregateFollowUpNavCounts(squadFollowFilter, branchId),
     Quotation.countDocuments(withBranch({ ...quoteBase, status: 'pending_approval' }, branchId)),
     Quotation.countDocuments(withBranch({ ...quoteBase, status: 'negotiation' }, branchId)),
     Quotation.countDocuments(withBranch({ ...quoteBase, status: 'approved' }, branchId)),
@@ -604,7 +620,7 @@ async function buildTeamLeaderNavCounts(userId, { branchId } = {}) {
       reactivated: aggregated.reactivated,
       returned: returnedCount,
     },
-    followups: { due: followUpsDue },
+    followups: { due: followUps.due },
     escalations: aggregated.escalations,
     quotations: {
       pending: quotationsPending,

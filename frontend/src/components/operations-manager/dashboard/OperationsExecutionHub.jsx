@@ -1,95 +1,90 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, Bus, Plane, TowerControl } from 'lucide-react';
+import { ArrowRight, Car, MapPin, Plane } from 'lucide-react';
 
-function HubStat({ dotClass, label, value, subtitle }) {
+const HUB_BG =
+  'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1600&q=70';
+
+function HubStat({ icon: Icon, iconWrap, value, label, subtitle }) {
   return (
-    <div className="text-center px-4">
-      <div className="flex items-center justify-center gap-2 mb-1">
-        <span className={`w-2 h-2 rounded-full ${dotClass}`} />
-        <span className="text-xs font-semibold text-content-secondary uppercase tracking-wide">{label}</span>
+    <div className="min-w-[120px] text-center">
+      <div
+        className={`mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full ${iconWrap}`}
+      >
+        <Icon className="h-4.5 w-4.5 h-[18px] w-[18px]" strokeWidth={2.25} />
       </div>
-      <p className="text-3xl font-bold text-content-primary tabular-nums">{value}</p>
-      <p className="text-xs text-content-muted mt-0.5">{subtitle}</p>
+      <p className="text-3xl font-bold tabular-nums leading-none text-slate-900">{value}</p>
+      <p className="mt-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
+      <p className="mt-0.5 text-[11px] text-slate-400">{subtitle}</p>
     </div>
   );
 }
 
 export default function OperationsExecutionHub({ kpis, hubStats }) {
-  const pending = kpis?.pendingBookings ?? 0;
-  const hotel = kpis?.hotelConfirmations ?? kpis?.hotelPending ?? 0;
-  const cab = kpis?.cabConfirmations ?? kpis?.cabPending ?? 0;
-  const onTrip = hubStats?.onTrip ?? kpis?.activeTrips ?? 0;
-  const departures = hubStats?.departuresToday ?? kpis?.todaysDepartures ?? 0;
-  const arrivals = hubStats?.arrivalsToday ?? kpis?.todaysArrivals ?? 0;
+  const pending = Number(kpis?.pendingBookings ?? 0);
+  const hotel = Number(kpis?.hotelConfirmations ?? kpis?.hotelPending ?? 0);
+  const cab = Number(kpis?.cabConfirmations ?? kpis?.cabPending ?? 0);
+  const onTrip = Number(hubStats?.onTrip ?? kpis?.activeTrips ?? 0);
+  const departures = Number(hubStats?.departuresToday ?? kpis?.todaysDepartures ?? 0);
+  const arrivals = Number(hubStats?.arrivalsToday ?? kpis?.todaysArrivals ?? 0);
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="relative overflow-hidden rounded-2xl border border-sky-200/80 bg-gradient-to-r from-sky-50 via-blue-50/80 to-indigo-50 p-6 sm:p-8"
+      className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm"
     >
-      <div className="relative z-10 grid grid-cols-1 lg:grid-cols-[1.2fr_auto_1fr] gap-6 items-center">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-sky-600 mb-2">
+      <div
+        className="pointer-events-none absolute inset-y-0 right-0 w-[55%] bg-cover bg-center opacity-[0.18] sm:opacity-[0.22]"
+        style={{ backgroundImage: `url(${HUB_BG})` }}
+        aria-hidden
+      />
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-[55%] bg-gradient-to-l from-transparent via-white/40 to-white" aria-hidden />
+
+      <div className="relative z-10 grid grid-cols-1 gap-6 p-6 sm:p-8 lg:grid-cols-[1.15fr_auto]">
+        <div className="max-w-xl">
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-orange-500">
             Trip Execution Hub
           </p>
-          <h2 className="text-xl sm:text-2xl font-bold text-content-primary leading-tight">
-            {pending} booking{pending === 1 ? '' : 's'} need{pending === 1 ? 's' : ''} operations setup
+          <h2 className="text-2xl font-bold leading-tight tracking-tight text-slate-900 sm:text-[28px]">
+            <span className="text-orange-500">{pending}</span>{' '}
+            booking{pending === 1 ? '' : 's'} need{pending === 1 ? 's' : ''} operations setup
           </h2>
-          <p className="text-sm text-content-secondary mt-2">
+          <p className="mt-2 text-sm text-slate-500">
             {hotel} hotel · {cab} cab confirmations pending
           </p>
           <Link
             to="/operations-manager/bookings/pending"
-            className="inline-flex items-center gap-1.5 mt-4 text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+            className="mt-5 inline-flex h-11 items-center gap-2 rounded-xl bg-orange-500 px-5 text-sm font-bold text-white shadow-md shadow-orange-500/25 transition hover:bg-orange-600"
           >
             View Pending Bookings
-            <ArrowRight className="w-4 h-4" />
+            <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
 
-        <div className="hidden lg:flex items-center justify-center gap-6 border-x border-sky-200/60 px-6">
+        <div className="flex flex-wrap items-center justify-start gap-6 border-t border-slate-100 pt-5 lg:justify-end lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
           <HubStat
-            dotClass="bg-emerald-500"
-            label="On Trip"
+            icon={Car}
+            iconWrap="bg-emerald-50 text-emerald-600"
             value={onTrip}
-            subtitle="Bookings in progress"
+            label="On Trip"
+            subtitle={onTrip ? 'Bookings in progress' : 'Bookings in progress'}
           />
           <HubStat
-            dotClass="bg-blue-500"
-            label="Departures Today"
+            icon={Plane}
+            iconWrap="bg-sky-50 text-sky-600"
             value={departures}
+            label="Departures Today"
             subtitle={departures ? 'Departing today' : 'No departures'}
           />
           <HubStat
-            dotClass="bg-violet-500"
-            label="Arrivals Today"
+            icon={MapPin}
+            iconWrap="bg-violet-50 text-violet-600"
             value={arrivals}
+            label="Arrivals Today"
             subtitle={arrivals ? 'Arriving today' : 'No arrivals'}
           />
         </div>
-
-        <div className="hidden lg:flex justify-end">
-          <div className="relative w-44 h-32">
-            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-20 h-24 rounded-t-2xl bg-gradient-to-t from-sky-400 to-sky-300 shadow-lg flex items-end justify-center pb-2">
-              <TowerControl className="w-8 h-8 text-white/90" />
-            </div>
-            <div className="absolute bottom-2 left-2 w-12 h-8 rounded-lg bg-amber-400/90 shadow-md flex items-center justify-center">
-              <Bus className="w-5 h-5 text-amber-900/80" />
-            </div>
-            <div className="absolute top-2 right-0 w-14 h-10 rounded-xl bg-white shadow-md flex items-center justify-center border border-sky-100">
-              <Plane className="w-6 h-6 text-sky-500 -rotate-12" />
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 h-3 rounded-full bg-emerald-200/60" />
-          </div>
-        </div>
-      </div>
-
-      <div className="lg:hidden grid grid-cols-3 gap-3 mt-6 pt-5 border-t border-sky-200/60">
-        <HubStat dotClass="bg-emerald-500" label="On Trip" value={onTrip} subtitle="In progress" />
-        <HubStat dotClass="bg-blue-500" label="Departures" value={departures} subtitle="Today" />
-        <HubStat dotClass="bg-violet-500" label="Arrivals" value={arrivals} subtitle="Today" />
       </div>
     </motion.div>
   );

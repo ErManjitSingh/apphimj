@@ -37,15 +37,45 @@ function normalizeMealRates(raw = {}, fallback = {}) {
   };
 }
 
+function mealRatesHaveValue(rates = {}) {
+  return ['ep', 'cp', 'map', 'ap'].some((key) => toNumber(rates?.[key], 0) > 0);
+}
+
+function mealRatesEqual(a = {}, b = {}) {
+  return ['ep', 'cp', 'map', 'ap'].every(
+    (key) => toNumber(a?.[key], 0) === toNumber(b?.[key], 0)
+  );
+}
+
 function normalizeRoomRates(raw = {}) {
   const flat = normalizeMealRates(raw);
   const onSeason = normalizeMealRates(raw.onSeason, flat);
-  const offSeason = normalizeMealRates(raw.offSeason, flat);
+  // Off-season must stay independent — never fill blanks from on-season/flat.
+  // That clone made On/Off season toggles show the same price.
+  const explicitOff = raw.offSeason && typeof raw.offSeason === 'object' ? raw.offSeason : {};
+  let offSeason = {
+    ep: toNumber(explicitOff.ep, 0),
+    cp: toNumber(explicitOff.cp, 0),
+    map: toNumber(explicitOff.map, 0),
+    ap: toNumber(explicitOff.ap, 0),
+  };
+  if (!mealRatesHaveValue(offSeason) || mealRatesEqual(offSeason, onSeason)) {
+    offSeason = { ep: 0, cp: 0, map: 0, ap: 0 };
+  }
   return {
     ...flat,
     onSeason,
     offSeason,
   };
+}
+
+/** Clear polluted off-season clones (= on-season) on read for API clients. */
+function sanitizeHotelRoomTypes(roomTypes = []) {
+  return (Array.isArray(roomTypes) ? roomTypes : []).map((room) => {
+    if (!room || typeof room !== 'object') return room;
+    const rates = normalizeRoomRates(room.rates || {});
+    return { ...room, rates };
+  });
 }
 
 function maxMealRates(a = {}, b = {}) {
@@ -620,4 +650,6 @@ module.exports = {
   syncHotelRoomsFromUno,
   enrichHotelDocumentFromUno,
   mapUnoRoomsToRoomTypes,
+  sanitizeHotelRoomTypes,
+  normalizeRoomRates,
 };

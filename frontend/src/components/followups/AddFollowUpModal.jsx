@@ -110,6 +110,10 @@ export default function AddFollowUpModal({
       setError('Select a lost reason');
       return;
     }
+    if (showLeadOutcome && isLost && form.lostReason === 'other' && !form.remarks?.trim()) {
+      setError('Add a short comment for “Other” lost reason');
+      return;
+    }
     if (showLeadOutcome && form.status === 'postponed' && !form.postponedReason.trim()) {
       setError('Enter postponed reason');
       return;
@@ -143,17 +147,22 @@ export default function AddFollowUpModal({
         : `${tempLabel} follow-up`;
       remarks = remarks ? `${prefix}. ${remarks}` : prefix;
 
-      const statusUpdate = showLeadOutcome
-        ? buildPipelineStatusPayload({
-            status: form.status,
-            temperature: isLost || isBooked ? 'na' : form.temperature,
-            callOutcome: form.callOutcome || undefined,
-            lostReason: isLost ? form.lostReason : undefined,
-            postponedReason: form.status === 'postponed' ? form.postponedReason : undefined,
-            postponedAt: form.status === 'postponed' ? form.postponedAt || undefined : undefined,
-            comment: form.remarks,
-          })
-        : null;
+      const leadAlreadyBooked = isBookedStatus(lead?.status);
+
+      // Already-booked leads must not send status updates (causes lock errors).
+      // Parent handlers open the commercial / advance form instead.
+      let statusUpdate =
+        showLeadOutcome && !leadAlreadyBooked
+          ? buildPipelineStatusPayload({
+              status: form.status,
+              temperature: isLost || isBooked ? 'na' : form.temperature,
+              callOutcome: form.callOutcome || undefined,
+              lostReason: isLost ? form.lostReason : undefined,
+              postponedReason: form.status === 'postponed' ? form.postponedReason : undefined,
+              postponedAt: form.status === 'postponed' ? form.postponedAt || undefined : undefined,
+              comment: form.remarks,
+            })
+          : null;
 
       if (statusUpdate && isBooked) {
         statusUpdate.totalPackageCost = Number(form.totalPackageCost);
@@ -173,7 +182,8 @@ export default function AddFollowUpModal({
         outcome: form.callOutcome || undefined,
         callOutcome: form.callOutcome || undefined,
         statusUpdate,
-        skipFollowUp: isLost,
+        skipFollowUp: isLost || leadAlreadyBooked,
+        leadAlreadyBooked,
       });
       if (!editData) {
         setForm({ ...emptyForm, lead: fixedLeadId || '', date: localTodayInput() });

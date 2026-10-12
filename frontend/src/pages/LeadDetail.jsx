@@ -227,6 +227,12 @@ export default function LeadDetail() {
             const { statusUpdate, skipFollowUp, ...followUpData } = data;
             const isLostClose =
               skipFollowUp || ['lost', 'booked_from_another_company'].includes(statusUpdate?.status);
+            const alreadyBooked = lead?.status === 'booked' || lead?.status === 'converted';
+            if (alreadyBooked) {
+              toast.success('Lead is already booked — use Edit Advance / View Voucher');
+              setOutcomeModalOpen(false);
+              return;
+            }
             if (canCreateFollowUp && !isLostClose) {
               await createExecutiveFollowUp(
                 buildFollowUpPayload({

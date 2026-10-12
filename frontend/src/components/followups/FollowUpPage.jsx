@@ -148,7 +148,14 @@ export default function FollowUpPage() {
     }
 
     if (!editFollowup && statusUpdate && followUpData.lead) {
-      await API.put(`/sales-executive/leads/${followUpData.lead}`, statusUpdate);
+      // Skip status PUT when payload would conflict with an already-booked lead
+      const next = statusUpdate.status;
+      const bookingStatus = next === 'booked' || next === 'converted';
+      await API.put(`/sales-executive/leads/${followUpData.lead}`, statusUpdate).catch((err) => {
+        const msg = err.response?.data?.message || err.message || '';
+        if (/cannot be changed after conversion/i.test(msg) && bookingStatus) return null;
+        throw err;
+      });
     }
 
     setEditFollowup(null);

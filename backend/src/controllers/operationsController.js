@@ -196,7 +196,8 @@ const getDashboard = asyncHandler(async (req, res) => {
 });
 
 const listBookings = asyncHandler(async (req, res) => {
-  const result = await ops.listBookings(req.query, { branchId: req.branchId });
+  // Org-wide like dashboard / trip-tracker — ops must see every converted tour.
+  const result = await ops.listBookings(req.query, { branchId: null });
   res.json(result);
 });
 
@@ -261,25 +262,32 @@ const updateBooking = asyncHandler(async (req, res) => {
 });
 
 const confirmHotel = asyncHandler(async (req, res) => {
-  const booking = await Booking.findById(req.params.id);
-  if (!booking) throw new ApiError(404, 'Booking not found');
-  booking.hotelConfirmation = 'confirmed';
-  booking.hotels = (booking.hotels || []).map((h) => ({ ...h.toObject?.() || h, status: 'confirmed' }));
-  if (['booking_received', 'pending_verification', 'pending'].includes(booking.status)) {
-    booking.status = 'confirmed';
+  const existing = await Booking.findById(req.params.id).lean();
+  if (!existing) throw new ApiError(404, 'Booking not found');
+  const hotels = (existing.hotels || []).map((h) => ({ ...h, status: 'confirmed' }));
+  const patch = {
+    hotelConfirmation: 'confirmed',
+    hotels,
+  };
+  if (['booking_received', 'pending_verification', 'pending'].includes(existing.status)) {
+    patch.status = 'confirmed';
   }
-  await booking.save();
-  await cacheService.invalidate('ops:');
+  const booking = await ops.updateBooking(req.params.id, patch, req.user);
   res.json(booking);
 });
 
 const confirmCab = asyncHandler(async (req, res) => {
-  const booking = await Booking.findById(req.params.id);
-  if (!booking) throw new ApiError(404, 'Booking not found');
-  booking.cabConfirmation = 'confirmed';
-  booking.transport = (booking.transport || []).map((t) => ({ ...t.toObject?.() || t, status: 'confirmed' }));
-  await booking.save();
-  await cacheService.invalidate('ops:');
+  const existing = await Booking.findById(req.params.id).lean();
+  if (!existing) throw new ApiError(404, 'Booking not found');
+  const transport = (existing.transport || []).map((t) => ({ ...t, status: 'confirmed' }));
+  const patch = {
+    cabConfirmation: 'confirmed',
+    transport,
+  };
+  if (['booking_received', 'pending_verification', 'pending'].includes(existing.status)) {
+    patch.status = 'confirmed';
+  }
+  const booking = await ops.updateBooking(req.params.id, patch, req.user);
   res.json(booking);
 });
 

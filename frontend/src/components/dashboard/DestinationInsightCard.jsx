@@ -30,7 +30,7 @@ export default function DestinationInsightCard() {
   const customReady = period !== 'custom' || Boolean(dateFrom || dateTo);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['dashboard', 'destination-insight', period, dateFrom, dateTo],
+    queryKey: ['dashboard', '/dashboard/destination-insight', period, dateFrom, dateTo],
     queryFn: async () => {
       const { data: payload } = await API.get('/dashboard/destination-insight', {
         params: {

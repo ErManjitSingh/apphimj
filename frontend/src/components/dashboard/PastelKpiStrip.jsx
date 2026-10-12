@@ -7,7 +7,6 @@ import {
   IndianRupee,
   TrendingDown,
   TrendingUp,
-  UserRound,
   Users,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -71,11 +70,12 @@ const CARDS = [
     ring: 'hover:ring-emerald-200',
   },
   {
-    key: 'customers',
-    label: 'Active Customers',
-    icon: UserRound,
-    path: '/leads/converted',
-    sparkKey: 'converted',
+    key: 'totalToken',
+    label: 'Total Token',
+    icon: IndianRupee,
+    path: '/payments',
+    currency: true,
+    sparkKey: 'revenue',
     spark: '#8B5CF6',
     iconBg: 'from-violet-400 to-purple-600',
     iconShadow: 'shadow-violet-500/35',
@@ -83,6 +83,7 @@ const CARDS = [
     blob: 'bg-violet-400/25',
     bar: 'from-violet-400 to-fuchsia-500',
     ring: 'hover:ring-violet-200',
+    allTime: true,
   },
   {
     key: 'hot',
@@ -99,8 +100,8 @@ const CARDS = [
     ring: 'hover:ring-amber-200',
   },
   {
-    key: 'conversions',
-    label: 'Converted',
+    key: 'totalConverted',
+    label: 'Total Converted',
     icon: CheckCircle2,
     path: '/leads/converted',
     sparkKey: 'converted',
@@ -111,6 +112,7 @@ const CARDS = [
     blob: 'bg-pink-400/25',
     bar: 'from-pink-400 to-rose-500',
     ring: 'hover:ring-pink-200',
+    allTime: true,
   },
 ];
 
@@ -123,36 +125,39 @@ function kpiMeta(kpis, key) {
 export default function PastelKpiStrip({ stats, filters }) {
   const kpis = stats?.report?.kpis || {};
   const sparks = stats?.kpiSparklines || {};
-  const customers = {
-    value: Number(stats?.convertedLeads || kpis.bookings?.value || 0),
-    change: kpis.bookings?.change || 0,
-    changeType: kpis.bookings?.changeType || 'neutral',
-  };
-  const converted = {
+  const totalToken = {
     value: Number(
-      stats?.convertedLeads ??
-        kpis.conversions?.value ??
-        kpis.bookings?.value ??
+      kpis.totalToken?.value ?? stats?.totalTokenCollected ?? stats?.revenue ?? 0
+    ),
+    change: kpis.totalToken?.change ?? 0,
+    changeType: kpis.totalToken?.changeType || 'neutral',
+  };
+  const totalConverted = {
+    value: Number(
+      kpis.totalConverted?.value ??
+        stats?.allTimeConvertedLeads ??
+        stats?.convertedLeads ??
         0
     ),
-    change: kpis.conversions?.change ?? kpis.bookings?.change ?? 0,
-    changeType: kpis.conversions?.changeType ?? kpis.bookings?.changeType ?? 'neutral',
+    change: kpis.totalConverted?.change ?? 0,
+    changeType: kpis.totalConverted?.changeType || 'neutral',
   };
 
   return (
     <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-6">
       {CARDS.map((cfg, index) => {
         const meta =
-          cfg.key === 'customers'
-            ? customers
-            : cfg.key === 'conversions'
-              ? converted
+          cfg.key === 'totalToken'
+            ? totalToken
+            : cfg.key === 'totalConverted'
+              ? totalConverted
               : kpiMeta(kpis, cfg.key);
         const isUp = meta.changeType === 'up';
         const isDown = meta.changeType === 'down';
         const Icon = cfg.icon;
         const Trend = isDown ? TrendingDown : TrendingUp;
-        const href = withPeriodParams(cfg.path, filters);
+        // Lifetime cards ignore month filter so click shows full totals
+        const href = cfg.allTime ? cfg.path : withPeriodParams(cfg.path, filters);
         const changeAbs = Math.abs(Number(meta.change || 0));
 
         return (
@@ -212,7 +217,9 @@ export default function PastelKpiStrip({ stats, filters }) {
               </div>
 
               <div className="mt-auto flex items-end justify-between gap-2 pt-1.5">
-                <p className="text-[9px] font-medium text-slate-400">vs last week</p>
+                <p className="text-[9px] font-medium text-slate-400">
+                  {cfg.allTime ? 'all time' : 'vs last week'}
+                </p>
                 <MiniSparkline
                   data={sparks[cfg.sparkKey] || []}
                   color={cfg.spark}

@@ -169,7 +169,8 @@ const getDashboard = asyncHandler(async (req, res) => {
   const destinationPeriod = req.query.destinationPeriod || 'all';
   const dateFrom = typeof req.query.dateFrom === 'string' ? req.query.dateFrom : '';
   const dateTo = typeof req.query.dateTo === 'string' ? req.query.dateTo : '';
-  const cacheSuffix = `${req.user._id}:${req.branchId || 'all'}:${destinationPeriod}:${dateFrom || '-'}:${dateTo || '-'}`;
+  // v3 = package-cost Achieved (Payment.amount / budget); bump to drop stale Redis payloads
+  const cacheSuffix = `v3:${req.user._id}:${req.branchId || 'all'}:${destinationPeriod}:${dateFrom || '-'}:${dateTo || '-'}`;
   const stats = await getOrSetFresh(
     req,
     cacheKey('sales_executive', cacheSuffix),
@@ -272,6 +273,7 @@ const getLeadPaymentReceiptDoc = asyncHandler(async (req, res) => {
   const data = await getLeadPaymentReceipt(req.params.id, {
     branchId: req.branchId,
     extraFilter: { assignedTo: req.user._id },
+    refreshHtml: req.query.refresh === '1' || req.query.refresh === 'true',
   });
   res.json(data);
 });
@@ -413,14 +415,16 @@ const updateLead = asyncHandler(async (req, res) => {
         throw new ApiError(400, 'Token amount received cannot exceed total package cost');
       }
     }
-    // Booked stays locked. Lost can be reopened to an active pipeline status from this form.
+    // Booked stays locked (except payment refresh). Lost can always be reopened when
+    // the customer comes back — including straight to Booked.
     const { isLostStatus: isLostStatusFn, isBookedStatus: isBookedStatusFn } = require('../constants/leadPipeline');
     if (isLeadStatusLocked(lead.status)) {
-      const reopeningFromLost =
-        isLostStatusFn(lead.status) &&
-        !isLostStatusFn(nextStatus) &&
-        !isBookedStatusFn(nextStatus);
-      if (!reopeningFromLost) {
+      const reopeningFromLost = isLostStatusFn(lead.status) && !isLostStatusFn(nextStatus);
+      const stayingBooked = isBookedStatusFn(lead.status) && isBookedStatusFn(nextStatus);
+      if (isBookedStatusFn(lead.status) && !stayingBooked) {
+        // Keep terminal booked status; still allow payment fields below.
+        nextStatus = 'booked';
+      } else if (!reopeningFromLost && !stayingBooked) {
         throw new ApiError(400, 'Lead status cannot be changed after conversion or closure');
       }
     }
@@ -444,6 +448,16 @@ const updateLead = asyncHandler(async (req, res) => {
     const nextReason = trimmedReason;
 
     lead.status = nextStatus;
+
+    // Customer came back — clear lost markers when reopening into active / booked pipeline
+    if (
+      ['lost', 'booked_from_another_company'].includes(String(prevStatus || '')) &&
+      !['lost', 'booked_from_another_company'].includes(String(nextStatus || ''))
+    ) {
+      lead.lostReason = undefined;
+      if (!nextReason) lead.statusReason = 'reopened';
+    }
+
     if (
       (nextStatus === 'converted' || nextStatus === 'booked') &&
       prevStatus !== 'converted' &&
@@ -471,11 +485,21 @@ const updateLead = asyncHandler(async (req, res) => {
     }
     lead.statusReasonUpdatedAt = new Date();
 
-    // Stamp Warm / Hot / Cold from follow-up / status modal.
-    // 'na' is a UI sentinel for booked/lost — do not write it (mongoose enum rejects it).
+    // Stamp Warm / Hot / Cold / N/A from follow-up / status modal.
+    // Lost + Booked always clear heat so they never stay in Cold/Warm/Hot lists.
     const tempRaw = String(req.body.temperature || '').toLowerCase();
-    if (tempRaw === 'na') {
-      // leave existing temperature; booked/lost are identified by status
+    const closedPipeline = ['lost', 'booked_from_another_company', 'booked', 'converted'].includes(
+      String(nextStatus || '')
+    );
+    if (tempRaw === 'na' || tempRaw === 'n/a' || closedPipeline) {
+      lead.temperature = 'na';
+      lead.isHot = false;
+      if (closedPipeline) {
+        lead.coldReason = undefined;
+        lead.coldCallPending = false;
+        lead.coldCallReminderAt = undefined;
+        lead.coldCallFollowUpId = undefined;
+      }
     } else if (tempRaw === 'cold' || req.body.coldReason) {
       lead.temperature = 'cold';
       lead.isHot = false;
@@ -488,7 +512,7 @@ const updateLead = asyncHandler(async (req, res) => {
       lead.temperature = 'warm';
       lead.isHot = false;
       lead.coldReason = undefined;
-    } else if (typeof req.body.isHot === 'boolean' && tempRaw !== 'na') {
+    } else if (typeof req.body.isHot === 'boolean') {
       lead.isHot = req.body.isHot;
     }
 
@@ -621,12 +645,24 @@ const updateLead = asyncHandler(async (req, res) => {
       }
     }
 
-    if (nextStatus === 'converted' && prevStatus !== 'converted') {
+    const becameBooked =
+      (nextStatus === 'converted' || nextStatus === 'booked') &&
+      prevStatus !== 'converted' &&
+      prevStatus !== 'booked';
+    const refreshBookedPayment =
+      (nextStatus === 'converted' || nextStatus === 'booked') &&
+      (prevStatus === 'converted' || prevStatus === 'booked') &&
+      (totalPackageCost != null || tokenAmount != null || advanceAmount != null);
+
+    if (becameBooked || refreshBookedPayment) {
       await onLeadConverted(lead, req.user, {
         totalPackageCost: Number(totalPackageCost),
         advanceAmount: Number(tokenAmount ?? advanceAmount),
         paymentMethod,
         sendReceipt: sendReceipt !== false,
+        paymentScreenshotBase64: req.body.paymentScreenshotBase64,
+        paymentScreenshotName: req.body.paymentScreenshotName,
+        paymentScreenshots: req.body.paymentScreenshots,
       }).catch((err) => {
         console.error('[LeadConversion]', err.message);
       });
@@ -648,7 +684,14 @@ const updateLead = asyncHandler(async (req, res) => {
   const data = normalizeLeadInput(req.body, { isUpdate: true });
   const before = lead.toObject();
 
-  // Identity locks for sales executive
+  const {
+    applyLeadSourceEditPolicy,
+    applyPrimaryPhoneEditPolicy,
+  } = require('../utils/leadSourceEditPolicy');
+  applyLeadSourceEditPolicy(req.user, lead, req.body, data);
+  applyPrimaryPhoneEditPolicy(req.user, lead, req.body, data);
+
+  // Identity locks for sales executive (name/email; phone enforced above for all non-admin)
   delete data.name;
   delete data.phone;
   delete data.email;
@@ -658,10 +701,9 @@ const updateLead = asyncHandler(async (req, res) => {
 
   const lockedAttempt =
     (req.body.name != null && String(req.body.name).trim() !== String(lead.name || '').trim()) ||
-    (req.body.phone != null && String(req.body.phone).trim() !== String(lead.phone || '').trim()) ||
     (req.body.email != null && String(req.body.email || '').trim() !== String(lead.email || '').trim());
   if (lockedAttempt) {
-    throw new ApiError(403, 'Name, phone and email cannot be changed. You can add another phone or email.');
+    throw new ApiError(403, 'Name and email cannot be changed. You can add another phone or email.');
   }
 
   Object.keys(data).forEach((key) => {

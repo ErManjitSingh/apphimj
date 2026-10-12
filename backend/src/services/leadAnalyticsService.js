@@ -2,7 +2,7 @@ const Lead = require('../models/Lead');
 const FollowUp = require('../models/FollowUp');
 const User = require('../models/User');
 const { withBranch } = require('../utils/branchScope');
-const { startOfDay, endOfDay } = require('../utils/queryHelpers');
+const { startOfDay, endOfDay, applyConvertedPeriodFilter } = require('../utils/queryHelpers');
 const { leadSourceLabel, expandLeadSourceFilter } = require('../constants/leadSources');
 
 const SOURCE_LABELS = {
@@ -157,12 +157,11 @@ async function getExecutivePerformance(branchId, options = {}) {
   };
   const periodLeadMatch = isAllTime ? baseLeadMatch : { ...baseLeadMatch, ...touch };
   const convertedMatch = isAllTime
-    ? { ...baseLeadMatch, status: 'converted' }
-    : {
-        ...baseLeadMatch,
-        status: 'converted',
-        updatedAt: { $gte: periodStart, $lte: periodEnd },
-      };
+    ? { ...baseLeadMatch, status: { $in: ['converted', 'booked'] } }
+    : applyConvertedPeriodFilter(
+        { ...baseLeadMatch, status: { $in: ['converted', 'booked'] } },
+        { $gte: periodStart, $lte: periodEnd }
+      );
   const quoteMatch = isAllTime
     ? { ...baseLeadMatch, status: { $in: ['quotation_sent', 'follow_up', 'negotiation'] } }
     : {

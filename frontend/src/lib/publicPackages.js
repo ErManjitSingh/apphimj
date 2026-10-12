@@ -2,6 +2,7 @@ import API from '../api/axios';
 import { resolvePackageCabs } from './packageCabMapper';
 import { buildMergedItinerary, resolvePackageItinerary } from './packageItineraryMapper';
 import { expandDestinationMatchTerms, preferredDestinationSearch } from './destinationFamilies';
+import { pickInclusionExclusionList } from './inclusionExclusionLines';
 
 /** Local package catalog (proxied via CRM /api/public-packages). */
 export const PUBLIC_PACKAGES_API_PATH = '/public-packages';
@@ -217,8 +218,18 @@ export function mapCatalogPackage(raw = {}, { includeDetail = false } = {}) {
     coverImage: raw.featured_image || raw.coverImage || '',
     shortDescription: raw.short_description || raw.shortDescription || '',
     description: raw.description || '',
-    inclusions: Array.isArray(raw.inclusions) ? raw.inclusions : [],
-    exclusions: Array.isArray(raw.exclusions) ? raw.exclusions : [],
+    inclusions: pickInclusionExclusionList(
+      raw.inclusions,
+      raw.includes,
+      raw._apiRaw?.package?.inclusions,
+      raw._apiRaw?.package?.includes
+    ),
+    exclusions: pickInclusionExclusionList(
+      raw.exclusions,
+      raw.excludes,
+      raw._apiRaw?.package?.exclusions,
+      raw._apiRaw?.package?.excludes
+    ),
     externalSource: 'catalog',
     status: raw.status,
     bookingCount: toNumber(raw.booking_count ?? raw.bookingCount, 0),

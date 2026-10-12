@@ -163,11 +163,13 @@ async function buildLeadListFilter(query = {}, { branchId } = {}) {
     if (dateTo) dateRange.$lte = parseLocalDayEnd(dateTo);
   }
 
-  // Arrivals = travel date; Bookings/converted = conversion date; else lead createdAt
+  // Arrivals = travel date; Bookings/converted = conversion date; else lead createdAt.
+  // Pass raw query.status (not mongoFilter.status) — after alias expand status is { $in: [...] }
+  // and would miss the conversion-date branch (showing create-month bookings only).
   if (dateRange) {
     if (listFilter === 'arrivals') {
       mongoFilter.travelDate = dateRange;
-    } else if (isConvertedListQuery({ status: mongoFilter.status, filter: listFilter })) {
+    } else if (isConvertedListQuery({ status, filter: listFilter })) {
       applyConvertedPeriodFilter(mongoFilter, dateRange);
     } else {
       mongoFilter.createdAt = dateRange;

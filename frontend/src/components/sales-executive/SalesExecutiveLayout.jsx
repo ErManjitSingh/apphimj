@@ -22,10 +22,12 @@ import { DASHBOARD_STALE_MS, GC_TIME_MS } from '../../lib/queryConfig';
 function usePrefetchExecutiveWarmData() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { pathname } = useLocation();
   const userId = user?._id || user?.id;
+  const onDashboard = pathname === '/sales-executive/dashboard';
 
   useEffect(() => {
-    if (!userId) return undefined;
+    if (!userId || !onDashboard) return undefined;
     const filters = getDefaultExecDashboardFilters();
     const endpoint = '/sales-executive/dashboard';
     queryClient.prefetchQuery({
@@ -40,12 +42,18 @@ function usePrefetchExecutiveWarmData() {
       staleTime: DASHBOARD_STALE_MS,
       gcTime: GC_TIME_MS,
     });
-    const t = window.setTimeout(() => {
+    const idle = typeof window !== 'undefined' && window.requestIdleCallback
+      ? window.requestIdleCallback.bind(window)
+      : (cb) => window.setTimeout(cb, 1500);
+    const cancelIdle = typeof window !== 'undefined' && window.cancelIdleCallback
+      ? window.cancelIdleCallback.bind(window)
+      : window.clearTimeout.bind(window);
+    const idleId = idle(() => {
       import('./MyLeadsPage').catch(() => {});
       import('./ExecutiveFollowUpsPage').catch(() => {});
-    }, 1200);
-    return () => window.clearTimeout(t);
-  }, [queryClient, userId]);
+    });
+    return () => cancelIdle(idleId);
+  }, [queryClient, userId, onDashboard]);
 }
 
 function SalesExecutiveShell() {

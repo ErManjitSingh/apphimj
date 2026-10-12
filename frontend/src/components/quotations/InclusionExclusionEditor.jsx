@@ -2,19 +2,18 @@ import { useState } from 'react';
 import { CheckCircle2, CircleOff, Plus, Trash2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { cn } from '../../lib/utils';
+import { cleanInclusionExclusionLines } from '../../lib/inclusionExclusionLines';
+
+export {
+  normalizeInclusionExclusionList,
+  cleanInclusionExclusionLines,
+  pickInclusionExclusionList,
+} from '../../lib/inclusionExclusionLines';
 
 const TABS = [
   { key: 'inclusions', label: 'Inclusions', icon: CheckCircle2 },
   { key: 'exclusions', label: 'Exclusions', icon: CircleOff },
 ];
-
-function normalizeLines(items = []) {
-  return (Array.isArray(items) ? items : []).map((item) => String(item || '').trim());
-}
-
-export function cleanInclusionExclusionLines(items = []) {
-  return normalizeLines(items).filter(Boolean);
-}
 
 function LineEditor({ title, description, items, onChange, placeholder, accent }) {
   const lines = items.length ? items : [''];

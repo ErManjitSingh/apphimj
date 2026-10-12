@@ -13,6 +13,7 @@ import API from '../../api/axios';
 import { toast } from '../../context/ToastContext';
 import { invalidateLeadDetail } from '../../lib/queryInvalidation';
 import { DETAIL_STALE_MS, GC_TIME_MS } from '../../lib/queryConfig';
+import { isBookedStatus } from '../../lib/leadPipeline';
 
 const LeadActivityTimeline = lazy(() => import('./LeadActivityTimeline'));
 const LeadFollowUpSection = lazy(() => import('./LeadFollowUpSection'));
@@ -55,6 +56,7 @@ export default function LeadDetailLayout({
   sidebarExtra,
   bottomExtra,
   receiptEndpoint,
+  onEditCommercial,
   flashMessage,
   highlightQuotationId,
 }) {
@@ -100,6 +102,85 @@ export default function LeadDetailLayout({
       (relatedBasePath ? `${relatedBasePath}/${leadId}/payment-receipt` : `/leads/${leadId}/payment-receipt`),
     [receiptEndpoint, relatedBasePath, leadId]
   );
+
+  const [sendingBannerVoucher, setSendingBannerVoucher] = useState(false);
+  const editAdvanceHandler = onEditCommercial || onChangeStatus;
+
+  const refreshBookingStatus = useCallback(() => {
+    if (!leadId) return;
+    invalidateLeadDetail(queryClient, leadId);
+  }, [queryClient, leadId]);
+
+  useEffect(() => {
+    if (tab === 'bookings' && isBookedStatus(lead?.status)) {
+      refreshBookingStatus();
+    }
+  }, [tab, lead?.status, refreshBookingStatus]);
+
+  const openVoucherFromBanner = useCallback(async () => {
+    if (!paymentReceiptEndpoint) {
+      toast.error('Voucher not available');
+      return;
+    }
+    try {
+      const { data } = await API.get(paymentReceiptEndpoint, {
+        params: { refresh: 1 },
+        skipSuccessToast: true,
+        skipErrorToast: true,
+      });
+      if (!data?.html) {
+        toast.error('Voucher missing — tap Edit Advance first');
+        return;
+      }
+      document.getElementById('payment-advance')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      window.dispatchEvent(
+        new CustomEvent('hj:open-voucher', {
+          detail: {
+            html: data.html,
+            voucher: data.voucher,
+            sendEndpoint: `${paymentReceiptEndpoint}/send`,
+          },
+        })
+      );
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Unable to load voucher');
+    }
+  }, [paymentReceiptEndpoint]);
+
+  const sendVoucherFromBanner = useCallback(async () => {
+    if (!paymentReceiptEndpoint) {
+      toast.error('Send is not available');
+      return;
+    }
+    setSendingBannerVoucher(true);
+    try {
+      await API.get(paymentReceiptEndpoint, {
+        params: { refresh: 1 },
+        skipSuccessToast: true,
+        skipErrorToast: true,
+      });
+      const { data } = await API.post(
+        `${paymentReceiptEndpoint}/send`,
+        {},
+        { skipSuccessToast: true, skipErrorToast: true }
+      );
+      if (data?.sent === false) {
+        const reasons = {
+          no_email: 'Customer email is missing',
+          email_not_configured: 'Email is not configured on server',
+          no_receipt: 'Receipt not found — edit advance first',
+        };
+        toast.error(reasons[data.reason] || 'Could not send voucher');
+        return;
+      }
+      toast.success(`Voucher sent${data?.to?.length ? ` to ${data.to.join(', ')}` : ''}`);
+      onEmailSent?.();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to send voucher');
+    } finally {
+      setSendingBannerVoucher(false);
+    }
+  }, [paymentReceiptEndpoint, onEmailSent]);
 
   const canMarkLost = Boolean(
     canEditLead && (relatedBasePath === '/leads' || relatedBasePath === '/sales-executive/leads')
@@ -164,7 +245,13 @@ export default function LeadDetailLayout({
     });
     if (!ok) return;
     try {
-      await API.put(`${relatedBasePath}/${leadId}`, { status: 'lost' });
+      await API.put(`${relatedBasePath}/${leadId}`, {
+        status: 'lost',
+        lostReason: 'no_response',
+        statusReason: 'no_response',
+        temperature: 'na',
+        isHot: false,
+      });
       toast.success('Lead moved to lost');
       await invalidateLeadDetail(queryClient, leadId);
       onContactLogged?.();
@@ -209,6 +296,10 @@ export default function LeadDetailLayout({
         status={lead.status}
         bookingNumber={lead.paymentSummary?.bookingNumber}
         onViewBooking={() => setTabAndHash('bookings')}
+        onEditAdvance={editAdvanceHandler}
+        onSendVoucher={paymentReceiptEndpoint ? sendVoucherFromBanner : undefined}
+        onViewVoucher={paymentReceiptEndpoint ? openVoucherFromBanner : undefined}
+        sendingVoucher={sendingBannerVoucher}
       />
 
       {tab === 'overview' ? (
@@ -230,6 +321,7 @@ export default function LeadDetailLayout({
           onAssign={onAssign}
           onAddNote={handleAddNote}
           onUpdateStatus={onChangeStatus || onScheduleFollowUp}
+          onEditCommercial={onEditCommercial || onChangeStatus}
           sidebarExtra={sidebarExtra}
         />
       ) : null}
@@ -262,7 +354,7 @@ export default function LeadDetailLayout({
         ) : null}
 
         {tab === 'bookings' ? (
-          lead.status === 'converted' ? (
+          isBookedStatus(lead.status) ? (
             <LeadOpsStatusPanel lead={lead} paymentSummary={lead.paymentSummary} />
           ) : (
             <div className="rounded-[20px] border border-slate-100 bg-white p-8 text-center text-sm text-slate-400">
@@ -277,6 +369,7 @@ export default function LeadDetailLayout({
               lead={lead}
               paymentSummary={lead.paymentSummary}
               receiptEndpoint={paymentReceiptEndpoint}
+              onEditCommercial={onEditCommercial || onChangeStatus}
             />
           ) : (
             <div className="rounded-[20px] border border-slate-100 bg-white p-8 text-center text-sm text-slate-400">

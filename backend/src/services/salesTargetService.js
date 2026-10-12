@@ -216,10 +216,12 @@ async function listTargetsForLeader(req, { year, month } = currentPeriod()) {
 
 function buildTargetProgress(revenueAchieved, monthlyTarget) {
   const target = monthlyTarget || DEFAULT_TARGETS.sales_executive;
+  const achieved = Number(revenueAchieved) || 0;
   return {
     monthlyTarget: target,
-    revenueAchieved,
-    progress: target ? Math.min(100, Math.round((revenueAchieved / target) * 100)) : 0,
+    revenueAchieved: achieved,
+    remaining: Math.max(0, target - achieved),
+    progress: target ? Math.min(100, Math.round((achieved / target) * 100)) : 0,
   };
 }
 

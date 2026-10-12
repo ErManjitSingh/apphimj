@@ -4,8 +4,8 @@ const { getFollowUpSummary } = require('../repositories/roleScopedRepository');
 const { buildFollowUpTabFilter, startOfDay } = require('../utils/queryHelpers');
 const { withBranch } = require('../utils/branchScope');
 
-async function getAdminFollowUpSummary() {
-  return getFollowUpSummary({});
+async function getAdminFollowUpSummary({ branchId = null } = {}) {
+  return getFollowUpSummary({}, { branchId });
 }
 
 async function getExecutiveFollowUpSummary(userId) {
@@ -14,13 +14,18 @@ async function getExecutiveFollowUpSummary(userId) {
   });
 }
 
-async function getMissedFollowUpsPreview(baseFilter, limit = 8) {
+async function getMissedFollowUpsPreview(baseFilter = {}, limit = 8) {
   const tabFilter = buildFollowUpTabFilter('missed');
-  const filter =
-    baseFilter?.$or && tabFilter?.$or
-      ? { ...baseFilter, $and: [{ $or: baseFilter.$or }, { $or: tabFilter.$or }] }
-      : { ...baseFilter, ...tabFilter };
-  if (baseFilter?.$or && tabFilter?.$or) delete filter.$or;
+  const branchId = baseFilter?.branchId || null;
+  const scopedBase = { ...baseFilter };
+  delete scopedBase.branchId;
+
+  let filter =
+    scopedBase?.$or && tabFilter?.$or
+      ? { ...scopedBase, $and: [{ $or: scopedBase.$or }, { $or: tabFilter.$or }] }
+      : { ...scopedBase, ...tabFilter };
+  if (scopedBase?.$or && tabFilter?.$or) delete filter.$or;
+  filter = withBranch(filter, branchId);
 
   return FollowUp.find(filter)
     .populate('lead', 'name phone destination')

@@ -587,9 +587,17 @@ function MealPlanCard({ plan, room, nights, onSelect, basePrice = 0, selected = 
   const total = perNight * Math.max(1, nights);
   const rel = formatRelativePrice(perNight, basePrice, { isCurrent: false });
   const hasSupplement = Number(plan.price || 0) > 0;
-  const seasonLabel = seasonKey === 'offSeason' ? 'Off Season Price' : 'On Season Price';
-  const seasonClass =
+  const mealKey = normalizeMealPlanKey(plan?.key || plan?.label) || 'map';
+  const hasDedicatedOff =
+    seasonKey === 'offSeason' && Number(room?.rates?.offSeason?.[mealKey] || 0) > 0;
+  const seasonLabel =
     seasonKey === 'offSeason'
+      ? hasDedicatedOff
+        ? 'Off Season Price'
+        : 'On Season Price (off not set)'
+      : 'On Season Price';
+  const seasonClass =
+    seasonKey === 'offSeason' && hasDedicatedOff
       ? 'rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800'
       : 'rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800';
 

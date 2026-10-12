@@ -75,7 +75,7 @@ export default function KpiCard({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.05 }}
-      className="group relative flex flex-col justify-between rounded-2xl border border-subtle bg-surface shadow-sm hover:shadow-md transition-all duration-300 p-5 min-h-[148px]"
+      className="group relative flex min-h-[148px] flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition-all duration-300 hover:shadow-md"
     >
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className={cn('rounded-full flex items-center justify-center shrink-0 shadow-sm w-10 h-10', iconColor)}>

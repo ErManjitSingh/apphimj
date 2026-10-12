@@ -220,7 +220,12 @@ function buildExecutiveLeadFilter(filterKey, query = {}) {
       status: { $nin: ['lost', 'booked_from_another_company', 'converted'] },
     };
   }
-  if (filterKey === 'hot') return { isHot: true };
+  if (filterKey === 'hot') {
+    return {
+      $or: [{ isHot: true }, { temperature: 'hot' }],
+      status: { $nin: ['lost', 'booked_from_another_company', 'converted', 'booked'] },
+    };
+  }
   if (filterKey === 'duplicates' || filterKey === 'repeated') {
     return { isRepeatCustomer: true };
   }
@@ -398,8 +403,17 @@ async function findExecutiveLeadsPaginated(userId, query = {}, options = {}) {
   }
   if (query.temperature === 'hot' || query.priority === 'hot') {
     andParts.push({ $or: [{ temperature: 'hot' }, { isHot: true }] });
-  } else if (query.temperature === 'warm' || query.temperature === 'cold' || query.temperature === 'na') {
+    // Closed leads must never appear in heat buckets (even if temp was left cold historically).
+    andParts.push({
+      status: { $nin: ['lost', 'booked_from_another_company', 'converted', 'booked'] },
+    });
+  } else if (query.temperature === 'warm' || query.temperature === 'cold') {
     owned.temperature = query.temperature;
+    andParts.push({
+      status: { $nin: ['lost', 'booked_from_another_company', 'converted', 'booked'] },
+    });
+  } else if (query.temperature === 'na') {
+    owned.temperature = 'na';
   }
   // Destination / state also useful outside Total view
   if (filterKey && filterKey !== 'all' && filterKey !== 'package-shared' && filterKey !== 'package_shared') {

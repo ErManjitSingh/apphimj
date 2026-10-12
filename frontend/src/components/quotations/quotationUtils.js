@@ -235,7 +235,7 @@ export function defaultItineraryDay(day, destination) {
     hotel: '',
     activities: '',
     meals: 'Breakfast',
-    transport: 'Private Cab',
+    transport: '',
   };
 }
 

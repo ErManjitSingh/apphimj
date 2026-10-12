@@ -264,9 +264,14 @@ export default function BookingDetailPage() {
 
   const updateStatus = async (status) => {
     setActionLoading(status);
-    await API.put(`/operations-manager/bookings/${id}`, { status });
-    fetchBooking();
-    setActionLoading(null);
+    try {
+      await API.put(`/operations-manager/bookings/${id}`, { status });
+      await fetchBooking();
+    } catch (err) {
+      console.error('[BookingStatus]', err?.response?.data?.message || err.message);
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const addDocument = async (e) => {
@@ -524,6 +529,17 @@ export default function BookingDetailPage() {
 
           <div className="rounded-3xl border border-subtle bg-surface/90 p-5 space-y-2">
             <h3 className="font-bold mb-3">Quick Actions</h3>
+            {['booking_received', 'pending_verification', 'pending'].includes(booking.status) && (
+              <Button
+                variant="emerald"
+                className="w-full rounded-xl gap-2"
+                disabled={actionLoading === 'confirmed'}
+                onClick={() => updateStatus('confirmed')}
+              >
+                {actionLoading === 'confirmed' ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                Confirm Tour
+              </Button>
+            )}
             {booking.hotelConfirmation === 'pending' && (
               <Button variant="teal" className="w-full rounded-xl gap-2" disabled={actionLoading === 'hotel'} onClick={confirmHotel}>
                 {actionLoading === 'hotel' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Hotel className="w-4 h-4" />}
@@ -541,10 +557,21 @@ export default function BookingDetailPage() {
                 Mark In Progress
               </Button>
             )}
-            {booking.status === 'in_progress' && (
-              <Button variant="secondary" className="w-full rounded-xl gap-2" disabled={actionLoading === 'completed'} onClick={() => updateStatus('completed')}>
-                Mark Completed
+            {['confirmed', 'in_progress'].includes(booking.status) && (
+              <Button
+                variant="secondary"
+                className="w-full rounded-xl gap-2"
+                disabled={actionLoading === 'completed'}
+                onClick={() => updateStatus('completed')}
+              >
+                {actionLoading === 'completed' ? <Loader2 className="w-4 h-4 animate-spin" /> : <ClipboardCheck className="w-4 h-4" />}
+                Mark Tour Completed
               </Button>
+            )}
+            {booking.status === 'completed' && (
+              <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-center text-xs font-semibold text-emerald-700">
+                Tour marked completed
+              </p>
             )}
             <Link to="/operations-manager/vouchers">
               <Button variant="outline" className="w-full rounded-xl gap-2">

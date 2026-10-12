@@ -247,6 +247,7 @@ const getLeadPaymentReceiptDoc = asyncHandler(async (req, res) => {
   const data = await getLeadPaymentReceipt(req.params.id, {
     branchId: req.branchId,
     extraFilter,
+    refreshHtml: req.query.refresh === '1' || req.query.refresh === 'true',
   });
   res.json(data);
 });
@@ -586,6 +587,12 @@ const updateLead = asyncHandler(async (req, res) => {
   const prevStatus = lead.status;
   const before = lead.toObject();
   const data = normalizeLeadInput(req.body, { isUpdate: true });
+  const {
+    applyLeadSourceEditPolicy,
+    applyPrimaryPhoneEditPolicy,
+  } = require('../utils/leadSourceEditPolicy');
+  applyLeadSourceEditPolicy(req.user, lead, req.body, data);
+  applyPrimaryPhoneEditPolicy(req.user, lead, req.body, data);
   const nextStatus = data.status || lead.status;
   if (nextStatus === 'qualified') {
     const { getMissingQualificationFields } = require('../services/salesSopService');
@@ -624,7 +631,18 @@ const updateLead = asyncHandler(async (req, res) => {
     }
   }
   if (data.status && data.status !== prevStatus && isLeadStatusLocked(prevStatus)) {
-    throw new ApiError(400, 'Lead status cannot be changed after conversion or closure');
+    const stayingBooked = isBookedStatus(prevStatus) && isBookedStatus(data.status);
+    const reopeningFromLost = isLostStatus(prevStatus) && !isLostStatus(data.status);
+    if (isBookedStatus(prevStatus) && !stayingBooked) {
+      // Keep booked — ignore attempted status change from UI follow-up forms.
+      delete data.status;
+    } else if (!stayingBooked && !reopeningFromLost) {
+      throw new ApiError(400, 'Lead status cannot be changed after conversion or closure');
+    }
+  }
+  if (data.status && isLostStatus(prevStatus) && !isLostStatus(data.status)) {
+    data.lostReason = undefined;
+    if (!data.statusReason) data.statusReason = 'reopened';
   }
   if (isBookedStatus(data.status) && !isBookedStatus(prevStatus)) {
     // Must run before Object.assign/lead.save() below — a missing advance amount or payment
@@ -647,6 +665,15 @@ const updateLead = asyncHandler(async (req, res) => {
 
   Object.assign(lead, data);
   if (data.temperature === 'warm') {
+    lead.coldReason = undefined;
+  }
+  // Lost / Booked must leave Hot/Warm/Cold — persist N/A even if client omitted temperature.
+  if (
+    ['lost', 'booked_from_another_company', 'booked', 'converted'].includes(String(lead.status || '')) ||
+    String(data.temperature || '').toLowerCase() === 'na'
+  ) {
+    lead.temperature = 'na';
+    lead.isHot = false;
     lead.coldReason = undefined;
   }
   if (isBookedStatus(data.status) && !isBookedStatus(prevStatus)) {

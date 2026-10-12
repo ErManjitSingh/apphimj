@@ -348,9 +348,6 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
                         <h3 className="quote-ht-day-title">{day.title}</h3>
                         <div className="quote-ht-day-date">
                           {dayDate ? formatQuoteDate(dayDate) : `Day ${day.day}`}
-                          {(day.transport || pkg.cabCategory) && (
-                            <span> · {day.transport || pkg.cabCategory}</span>
-                          )}
                         </div>
                       </div>
                       {dayPhoto?.url && (

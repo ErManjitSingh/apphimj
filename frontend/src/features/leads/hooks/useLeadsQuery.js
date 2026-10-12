@@ -17,6 +17,7 @@ export function useLeadsQuery({ filters, page, limit, sortBy, sortOrder, cursor,
     enabled,
     staleTime: LIST_STALE_MS,
     gcTime: GC_TIME_MS,
+    refetchOnMount: false,
     placeholderData: (prev) => prev,
   });
 }

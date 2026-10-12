@@ -20,13 +20,14 @@ import {
   DropdownMenuContent,
 } from './ui/dropdown-menu';
 import { cn } from '../lib/utils';
+import { HEADER_ACTIVITY_REFETCH_MS, HEADER_ACTIVITY_STALE_MS } from '../lib/queryConfig';
 
 const TYPE_META = {
   login: { icon: LogIn, wrap: 'bg-emerald-500/15 text-emerald-600', label: 'Login' },
   logout: { icon: LogOut, wrap: 'bg-slate-500/15 text-slate-600', label: 'Logout' },
-  lead_created: { icon: UserPlus, wrap: 'bg-orange-500/15 text-orange-600', label: 'New lead' },
-  lead_updated: { icon: Pencil, wrap: 'bg-violet-500/15 text-violet-600', label: 'Lead update' },
-  quotation_created: { icon: FileText, wrap: 'bg-amber-500/15 text-amber-600', label: 'Quotation' },
+  lead_created: { icon: UserPlus, wrap: 'bg-[#5D5FEF]/15 text-[#5D5FEF]', label: 'New lead' },
+  lead_updated: { icon: Pencil, wrap: 'bg-indigo-500/15 text-indigo-600', label: 'Lead update' },
+  quotation_created: { icon: FileText, wrap: 'bg-sky-500/15 text-sky-600', label: 'Quotation' },
   user_action: { icon: Shield, wrap: 'bg-rose-500/15 text-rose-600', label: 'Team' },
 };
 
@@ -76,7 +77,7 @@ function ActivityLine({ item, compact = false }) {
       <p className={cn('min-w-0 flex-1 truncate text-slate-700', compact ? 'text-[12px] leading-none' : 'text-[13px]')}>
         <span className="font-semibold text-slate-800">{item.user}</span>{' '}
         <span className="text-slate-500">{item.action}</span>
-        {item.target ? <span className="font-medium text-orange-600"> · {item.target}</span> : null}
+        {item.target ? <span className="font-medium text-[#5D5FEF]"> · {item.target}</span> : null}
       </p>
       <span className={cn('shrink-0 font-medium text-slate-400', compact ? 'text-[10px]' : 'text-[11px]')}>
         {timeAgo(item.date)}
@@ -94,33 +95,20 @@ export default function HeaderLatestActivity() {
     queryKey: ['header-activity'],
     queryFn: async () => {
       const { data } = await API.get('/activity-logs', {
+        params: { limit: 12 },
         skipSuccessToast: true,
         skipErrorToast: true,
       });
       const rows = Array.isArray(data) ? data : [];
-      if (rows.length) return rows.slice(0, 12).map(normalizeLog);
-
-      const leadsRes = await API.get('/leads', {
-        params: { page: 1, limit: 6 },
-        skipSuccessToast: true,
-        skipErrorToast: true,
-      });
-      const leads = leadsRes.data?.data || leadsRes.data?.leads || [];
-      return (Array.isArray(leads) ? leads : []).slice(0, 6).map((lead) =>
-        normalizeLog({
-          _id: lead._id,
-          type: 'lead_created',
-          user: lead.assignedTo?.name || 'System',
-          action: 'New lead',
-          target: lead.name,
-          createdAt: lead.createdAt,
-          meta: { leadId: lead._id },
-        })
-      );
+      return rows.slice(0, 12).map(normalizeLog);
     },
     enabled: Boolean(user),
-    refetchInterval: 25000,
-    staleTime: 15000,
+    refetchInterval: HEADER_ACTIVITY_REFETCH_MS,
+    refetchIntervalInBackground: false,
+    staleTime: HEADER_ACTIVITY_STALE_MS,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    placeholderData: (prev) => prev,
   });
 
   const items = useMemo(() => logs, [logs]);
@@ -150,13 +138,13 @@ export default function HeaderLatestActivity() {
           className={cn(
             'group relative flex min-w-0 flex-1 items-center gap-2 overflow-hidden rounded-lg',
             'h-8 px-2 sm:px-2.5 text-left',
-            'bg-white/75 ring-1 ring-orange-100/90',
+            'bg-white/75 ring-1 ring-[#5D5FEF]/15',
             'shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]',
-            'transition hover:ring-orange-200 hover:bg-orange-50/60',
-            'focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/40'
+            'transition hover:ring-[#5D5FEF]/30 hover:bg-[#5D5FEF]/[0.05]',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5D5FEF]/35'
           )}
         >
-          <span className="pointer-events-none absolute inset-y-1 left-0 w-[3px] rounded-full bg-gradient-to-b from-orange-400 to-amber-500" />
+          <span className="pointer-events-none absolute inset-y-1 left-0 w-[3px] rounded-full bg-gradient-to-b from-[#5D5FEF] to-[#C9A227]" />
           <span className="hidden shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 ring-1 ring-emerald-100 sm:inline-flex">
             <span className="relative flex h-1.5 w-1.5">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-70" />
@@ -187,7 +175,7 @@ export default function HeaderLatestActivity() {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-[min(440px,calc(100vw-2rem))] p-0 overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-orange-50 to-white px-3.5 py-2.5">
+        <div className="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-[#5D5FEF]/[0.06] to-white px-3.5 py-2.5">
           <div>
             <p className="text-[13px] font-semibold text-slate-900">Latest activity</p>
             <p className="text-[11px] text-slate-400">Live team updates from the last 24 hours</p>
@@ -195,7 +183,7 @@ export default function HeaderLatestActivity() {
           {canViewTeam && (
             <Link
               to="/teams"
-              className="text-[11px] font-semibold text-orange-600 hover:underline"
+              className="text-[11px] font-semibold text-[#5D5FEF] hover:underline"
             >
               View all
             </Link>
@@ -207,7 +195,7 @@ export default function HeaderLatestActivity() {
               <Link
                 key={item.id}
                 to={item.href}
-                className="block px-3.5 py-2.5 hover:bg-orange-50/70"
+                className="block px-3.5 py-2.5 hover:bg-[#5D5FEF]/[0.05]"
               >
                 <ActivityLine item={item} />
               </Link>

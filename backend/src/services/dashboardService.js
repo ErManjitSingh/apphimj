@@ -7,7 +7,12 @@ const User = require('../models/User');
 const Team = require('../models/Team');
 const Booking = require('../models/Booking');
 const LeadActivity = require('../models/LeadActivity');
-const { startOfDay, endOfDay, enrichLead } = require('../utils/queryHelpers');
+const {
+  startOfDay,
+  endOfDay,
+  enrichLead,
+  applyConvertedPeriodFilter,
+} = require('../utils/queryHelpers');
 const {
   sumConvertedPackageRevenue,
   aggregateConvertedPackageRevenueByMonth,
@@ -466,6 +471,15 @@ function activeLeadScope(extra = {}, branchId) {
   return withBranch({ ...extra, isDeleted: { $ne: true } }, branchId);
 }
 
+/** Converted/booked leads whose conversion happened in [start, end] — not lead create month. */
+function convertedInPeriodScope(start, end, extra = {}, branchId) {
+  const filter = activeLeadScope(
+    { status: { $in: ['converted', 'booked'] }, ...extra },
+    branchId
+  );
+  return applyConvertedPeriodFilter(filter, { $gte: start, $lte: end });
+}
+
 async function buildReactivationWidget(branchId, assigneeIds = null) {
   const base = activeLeadScope({ 'reactivation.isReactivated': true }, branchId);
   if (Array.isArray(assigneeIds)) {
@@ -576,6 +590,9 @@ async function buildAdminDashboard(options = {}) {
     prevTotalLeads,
     periodStatusAgg,
     prevStatusAgg,
+    periodConvertedCount,
+    prevConvertedCount,
+    momConvertedCount,
     periodRevenue,
     prevRevenue,
     periodSourceAgg,
@@ -672,6 +689,9 @@ async function buildAdminDashboard(options = {}) {
     Lead.countDocuments(prevLeadScope),
     Lead.aggregate([{ $match: periodLeadScope }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
     Lead.aggregate([{ $match: prevLeadScope }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+    Lead.countDocuments(convertedInPeriodScope(periodStart, periodEnd, sourceFilter, branchId)),
+    Lead.countDocuments(convertedInPeriodScope(prevStart, prevEnd, sourceFilter, branchId)),
+    Lead.countDocuments(convertedInPeriodScope(momStart, momEnd, sourceFilter, branchId)),
     sumRevenueInRange(branchId, periodStart, periodEnd),
     sumRevenueInRange(branchId, prevStart, prevEnd),
     Lead.aggregate([
@@ -713,15 +733,27 @@ async function buildAdminDashboard(options = {}) {
         $match: activeLeadScope(
           {
             status: { $in: ['converted', 'booked'] },
-            createdAt: { $gte: trendStart, $lte: periodEnd },
             ...sourceFilter,
           },
           branchId
         ),
       },
       {
+        $addFields: {
+          conversionEventAt: { $ifNull: ['$convertedAt', '$updatedAt'] },
+        },
+      },
+      {
+        $match: {
+          conversionEventAt: { $gte: trendStart, $lte: periodEnd },
+        },
+      },
+      {
         $group: {
-          _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
+          _id: {
+            year: { $year: '$conversionEventAt' },
+            month: { $month: '$conversionEventAt' },
+          },
           count: { $sum: 1 },
         },
       },
@@ -834,17 +866,27 @@ async function buildAdminDashboard(options = {}) {
   const periodStatusCounts = Object.fromEntries(periodStatusAgg.map((s) => [s._id, s.count]));
   const prevStatusCounts = Object.fromEntries(prevStatusAgg.map((s) => [s._id, s.count]));
   const momStatusCounts = Object.fromEntries(momStatusAgg.map((s) => [s._id, s.count]));
-  const periodBuckets = mapStatusBucket(periodStatusCounts);
-  const prevBuckets = mapStatusBucket(prevStatusCounts);
-  const momBuckets = mapStatusBucket(momStatusCounts);
+  // Bookings/conversions follow conversion day (convertedAt), not lead create day.
+  const periodBuckets = {
+    ...mapStatusBucket(periodStatusCounts),
+    conversions: periodConvertedCount,
+  };
+  const prevBuckets = {
+    ...mapStatusBucket(prevStatusCounts),
+    conversions: prevConvertedCount,
+  };
+  const momBuckets = {
+    ...mapStatusBucket(momStatusCounts),
+    conversions: momConvertedCount,
+  };
   const periodConversionRate = periodTotalLeads
-    ? Math.round((periodBuckets.conversions / periodTotalLeads) * 1000) / 10
+    ? Math.round((periodConvertedCount / periodTotalLeads) * 1000) / 10
     : 0;
   const prevConversionRate = prevTotalLeads
-    ? Math.round((prevBuckets.conversions / prevTotalLeads) * 1000) / 10
+    ? Math.round((prevConvertedCount / prevTotalLeads) * 1000) / 10
     : 0;
   const momConversionRate = momTotalLeads
-    ? Math.round((momBuckets.conversions / momTotalLeads) * 1000) / 10
+    ? Math.round((momConvertedCount / momTotalLeads) * 1000) / 10
     : 0;
 
   const leadMap = Object.fromEntries(
@@ -1095,6 +1137,12 @@ async function buildAdminDashboard(options = {}) {
     bookings: withValue(changeMeta(changeBuckets.conversions, prevBuckets.conversions), valueBuckets.conversions),
     lostLeads: withValue(changeMeta(changeBuckets.lost, prevBuckets.lost), valueBuckets.lost),
     conversions: withValue(changeMeta(changeBuckets.conversions, prevBuckets.conversions), valueBuckets.conversions),
+    // Lifetime totals (ignore dashboard period filter on these cards)
+    totalToken: withValue(changeMeta(periodRevenue, prevRevenue), allTimeRevenue),
+    totalConverted: withValue(
+      changeMeta(periodConvertedCount, prevConvertedCount),
+      convertedLeads
+    ),
     revenue: withValue(changeMeta(changeRevenue, prevRevenue), kpiRevenue),
     conversionRate: withValue(changeMeta(changeConvRate, prevConversionRate), kpiConversionRate),
   };
@@ -1226,11 +1274,11 @@ async function buildAdminDashboard(options = {}) {
 
   const usePeriodAsPrimary = Boolean(dateFrom || dateTo);
   const primaryTotalLeads = usePeriodAsPrimary ? periodTotalLeads : totalLeads;
-  // Bookings / Revenue / Conv. Rate stay all-time even when a period filter is applied
-  const primaryConverted = convertedLeads;
+  // Converted count for selected period = conversion day (convertedAt), not lead create day.
+  const primaryConverted = usePeriodAsPrimary ? periodConvertedCount : convertedLeads;
   const primaryLost = usePeriodAsPrimary ? periodBuckets.lost : lostLeads;
-  const primaryConversionRate = conversionRate;
-  const primaryRevenue = revenue;
+  const primaryConversionRate = usePeriodAsPrimary ? periodConversionRate : conversionRate;
+  const primaryRevenue = usePeriodAsPrimary ? periodRevenue : revenue;
 
   return {
     totalLeads: primaryTotalLeads,
@@ -1240,6 +1288,8 @@ async function buildAdminDashboard(options = {}) {
     followUpsToday: todayFollowUps.length,
     convertedLeads: primaryConverted,
     wonLeads: primaryConverted,
+    allTimeConvertedLeads: convertedLeads,
+    totalTokenCollected: allTimeRevenue,
     lostLeads: primaryLost,
     pendingFollowups,
     overdueFollowups,
@@ -1377,20 +1427,32 @@ async function buildDestinationDetail(options = {}) {
 
   const destinationValues = await resolveDestinationGroupValues(names, baseScope);
   const scope = { ...baseScope, destination: { $in: destinationValues } };
+  const bookingsScope = isAllTime
+    ? activeLeadScope(
+        { status: { $in: ['converted', 'booked'] }, destination: { $in: destinationValues }, ...sourceFilter },
+        branchId
+      )
+    : convertedInPeriodScope(
+        periodStart,
+        periodEnd,
+        { destination: { $in: destinationValues }, ...sourceFilter },
+        branchId
+      );
 
   const statusOptionKeys = await resolveStatusOptionKeys();
-  const [totalLeads, statusAgg, warmCount, hotCount, coldCount, revenue] = await Promise.all([
+  const [totalLeads, statusAgg, warmCount, hotCount, coldCount, bookingsCount, revenue] = await Promise.all([
     Lead.countDocuments(scope),
     Lead.aggregate([{ $match: scope }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
     countLeadsByStatusOption(branchId, statusOptionKeys.warm, scope),
     countLeadsByStatusOption(branchId, statusOptionKeys.hot, scope),
     countLeadsByStatusOption(branchId, statusOptionKeys.cold, scope),
+    Lead.countDocuments(bookingsScope),
     sumRevenueForDestination(branchId, isAllTime ? null : periodStart, isAllTime ? null : periodEnd, destinationValues),
   ]);
 
   const statusCounts = Object.fromEntries(statusAgg.map((s) => [s._id, s.count]));
   const buckets = mapStatusBucket(statusCounts);
-  const conversionRate = totalLeads ? Math.round((buckets.conversions / totalLeads) * 1000) / 10 : 0;
+  const conversionRate = totalLeads ? Math.round((bookingsCount / totalLeads) * 1000) / 10 : 0;
 
   return {
     period: {
@@ -1408,7 +1470,7 @@ async function buildDestinationDetail(options = {}) {
       warm: warmCount,
       hot: hotCount,
       cold: coldCount,
-      bookings: buckets.conversions,
+      bookings: bookingsCount,
       revenue,
       conversionRate,
     },
@@ -1589,6 +1651,7 @@ async function buildExecutiveDashboard(userId, options = {}) {
     topLeadsRaw,
     coldCallRemindersRaw,
     destinationWise,
+    packageTurnoverAgg,
   ] = await Promise.all([
     Lead.countDocuments(myLeadsScope),
     Lead.countDocuments(freshLeadScope),
@@ -1742,6 +1805,14 @@ async function buildExecutiveDashboard(userId, options = {}) {
       .limit(20)
       .lean(),
     buildDestinationWiseStats(leadScope, destinationPeriod, destinationRange),
+    // Package turnover = convert Total Package Cost (Payment.amount / budget) in period
+    sumConvertedPackageRevenue({
+      assigneeId: execId,
+      branchId,
+      start: revenueStart,
+      end: revenueEnd,
+      statuses: ['converted', 'booked'],
+    }),
   ]);
 
   // Cold Call Reminders is the one widget in this dashboard whose final response shape still
@@ -1753,6 +1824,7 @@ async function buildExecutiveDashboard(userId, options = {}) {
   const statusDist = buildExclusiveStatusDistribution(statusCounts);
   const enrichedRecent = recentLeadsRaw.map(enrichLead);
   const monthlyRevenue = monthlyRevenueAgg[0]?.total || 0;
+  const packageTurnover = Number(packageTurnoverAgg) || 0;
   const totalLeadValue = totalLeadValueAgg[0]?.total || 0;
   const lastMonthRevenue = prevRevenueAgg[0]?.total || 0;
   const totalAssigned = statusDist.summary.total;
@@ -1761,7 +1833,8 @@ async function buildExecutiveDashboard(userId, options = {}) {
     Number(monthlyTargets.totalSalesTarget) > 0
       ? Number(monthlyTargets.totalSalesTarget)
       : Number(monthlyTargets.revenueTarget) || 0;
-  const targetStats = buildTargetProgress(monthlyRevenue, primaryTarget);
+  // Achieved vs Total Sales target = converted package cost (not collection)
+  const targetStats = buildTargetProgress(packageTurnover, primaryTarget);
 
   const pipelineOverview = statusDist.items
     .filter((item) => item.value > 0)
@@ -1895,6 +1968,12 @@ async function buildExecutiveDashboard(userId, options = {}) {
     },
     target: {
       ...targetStats,
+      // Achieved = converted package cost; Remaining = target − achieved
+      revenueAchieved: packageTurnover,
+      packageTurnoverAchieved: packageTurnover,
+      remaining: Math.max(0, (Number(primaryTarget) || 0) - packageTurnover),
+      collectionAchieved: monthlyRevenue,
+      achievementBasis: 'package_cost',
       revenueTarget: Number(monthlyTargets.revenueTarget) || 0,
       packageTarget: Number(monthlyTargets.packageTarget) || 0,
       totalSalesTarget: Number(monthlyTargets.totalSalesTarget) || 0,

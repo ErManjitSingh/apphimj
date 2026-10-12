@@ -1,9 +1,9 @@
 const cacheService = require('./cacheService');
 
 /** Admin/role dashboards — longer TTL cuts Mongo stampedes under concurrent users */
-const DEFAULT_TTL_MS = 8 * 60 * 1000;
+const DEFAULT_TTL_MS = 10 * 60 * 1000;
 /** Align with frontend nav poll so Redis absorbs concurrent users */
-const NAV_COUNTS_TTL_MS = 4 * 60 * 1000;
+const NAV_COUNTS_TTL_MS = 5 * 60 * 1000;
 
 function wantsFreshData(req) {
   const value = req?.query?.fresh;

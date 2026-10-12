@@ -30,9 +30,19 @@ function travelDateScore(travelDate) {
 }
 
 function temperatureFromScore(smartScore, lead = {}) {
+  const status = String(lead.status || '').toLowerCase();
+  // Closed pipeline must stay N/A — never recompute into cold/warm/hot.
+  if (
+    ['lost', 'booked_from_another_company', 'booked', 'converted'].includes(status) ||
+    String(lead.temperature || '').toLowerCase() === 'na'
+  ) {
+    return 'na';
+  }
   if (lead.isVip) return 'vip';
   if (smartScore >= 75 || lead.isHot) return 'hot';
   if (smartScore >= 45) return 'warm';
+  // Fresh leads stay "No status" until an executive picks Warm/Hot/Cold on follow-up.
+  if (['new_lead', 'new'].includes(status)) return 'na';
   return 'cold';
 }
 
@@ -97,6 +107,7 @@ async function applyLeadMetrics(lead) {
   lead.agingBucket = metrics.agingBucket;
   lead.isVip = metrics.isVip;
   if (metrics.temperature === 'hot') lead.isHot = true;
+  else if (metrics.temperature === 'na') lead.isHot = false;
   applyBookingPotential(lead);
   return lead;
 }

@@ -329,8 +329,8 @@ function normalizeLeadUpdateInput(body = {}) {
 
   if (hasOwn(body, 'temperature')) {
     const tempKey = String(body.temperature || '').trim().toLowerCase();
-    // 'na' is a UI sentinel for booked/lost — never persist (enum is hot/warm/cold).
-    if (tempKey && tempKey !== 'na') {
+    if (tempKey) {
+      // Persist `na` for lost/booked so closed leads leave Hot/Warm/Cold buckets.
       normalized.temperature = normalizeTemperature(body.temperature);
       normalized.isHot = normalized.temperature === 'hot';
     }

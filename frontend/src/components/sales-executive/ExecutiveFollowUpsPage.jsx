@@ -149,10 +149,15 @@ export default function ExecutiveFollowUpsPage() {
     const isLostClose =
       skipFollowUp || ['lost', 'booked_from_another_company'].includes(statusUpdate?.status);
 
-    if (!isLostClose) {
+    // Resolve current lead status from list cache if present
+    const leadRow = followups.find((f) => String(f.lead?._id || f.lead) === String(leadId));
+    const leadStatus = leadRow?.lead?.status || leadRow?.leadStatus;
+    const alreadyBooked = leadStatus === 'booked' || leadStatus === 'converted';
+
+    if (!isLostClose && !alreadyBooked) {
       await createExecutiveFollowUp(buildFollowUpPayload(followUpData));
     }
-    if (statusUpdate && leadId) {
+    if (statusUpdate && leadId && !alreadyBooked) {
       try {
         await API.put(`/sales-executive/leads/${leadId}`, statusUpdate);
       } catch (err) {

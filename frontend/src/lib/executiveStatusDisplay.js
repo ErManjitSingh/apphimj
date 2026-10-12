@@ -106,6 +106,17 @@ export function getExecutiveSetStatusDisplay(lead) {
     };
   }
 
+  if (status === 'not_reachable') {
+    return {
+      label: optionLabel || 'Not Reachable',
+      detail: '',
+      pipelineLabel: pipelineLabel || 'Not Reachable',
+      title: optionLabel ? `${optionLabel} · Not Reachable` : 'Not Reachable',
+      bucket: 'new',
+      subLabel: '',
+    };
+  }
+
   if (optionLabel && bucket) {
     return {
       label: optionLabel,
@@ -170,15 +181,6 @@ export function getLeadListStatusDisplay(lead) {
   const reasonKey = resolveListReasonKey(lead);
   const optionLabel = findOptionLabel(reasonKey) || humanizeReasonKey(reasonKey);
 
-  let bucket = 'new';
-  if (isBookedStatus(status) || status === 'converted' || status === 'booked') {
-    bucket = 'converted';
-  } else if (status === 'lost' || status === 'booked_from_another_company') {
-    bucket = 'lost';
-  } else if (temp === 'hot' || temp === 'warm' || temp === 'cold') {
-    bucket = temp;
-  }
-
   const pipelineKey =
     status === 'converted' || status === 'booked'
       ? 'booked'
@@ -187,6 +189,21 @@ export function getLeadListStatusDisplay(lead) {
         : status === 'quotation_sent'
           ? 'package_sent'
           : status;
+
+  const freshPipeline = ['new_lead', 'new', 'not_reachable'].includes(pipelineKey);
+  const hasOutcome = Boolean(reasonKey);
+  let bucket = 'new';
+  if (isBookedStatus(status) || status === 'converted' || status === 'booked') {
+    bucket = 'converted';
+  } else if (status === 'lost' || status === 'booked_from_another_company') {
+    bucket = 'lost';
+  } else if (temp === 'na' || temp === 'n/a' || !temp) {
+    bucket = 'new';
+  } else if (temp === 'hot' || temp === 'warm') {
+    bucket = temp;
+  } else if (temp === 'cold') {
+    bucket = hasOutcome || !freshPipeline ? 'cold' : 'new';
+  }
 
   const PIPELINE_LABELS = {
     new_lead: 'New Lead',
@@ -207,8 +224,22 @@ export function getLeadListStatusDisplay(lead) {
     booked_from_another_company: 'Lost',
   };
 
-  const label = PIPELINE_LABELS[pipelineKey] || PIPELINE_LABELS[status] || 'New Lead';
-  const tempLabel = temp === 'hot' ? 'Hot' : temp === 'warm' ? 'Warm' : temp === 'cold' ? 'Cold' : '';
+  const pipelineLabel = PIPELINE_LABELS[pipelineKey] || PIPELINE_LABELS[status] || 'New Lead';
+  // Only brand-new leads with no call outcome show "No status".
+  // Not Reachable / Qualified / etc. must keep their pipeline label.
+  const isUntouchedNew =
+    (pipelineKey === 'new_lead' || pipelineKey === 'new') && !optionLabel;
+  const label = isUntouchedNew ? 'No status' : optionLabel || pipelineLabel;
+  const tempLabel =
+    isUntouchedNew || pipelineKey === 'not_reachable'
+      ? ''
+      : temp === 'hot'
+        ? 'Hot'
+        : temp === 'warm'
+          ? 'Warm'
+          : temp === 'cold'
+            ? 'Cold'
+            : '';
 
   return {
     bucket,
@@ -219,7 +250,7 @@ export function getLeadListStatusDisplay(lead) {
     categoryLabel: tempLabel || label,
     exactLabel: optionLabel || label,
     reasonLabel: optionLabel,
-    pipelineLabel: label,
+    pipelineLabel,
     detail: tempLabel,
     title: tempLabel ? `${label} · ${tempLabel}` : label,
     className: LIST_STATUS_STYLES[bucket] || LIST_STATUS_STYLES.new,

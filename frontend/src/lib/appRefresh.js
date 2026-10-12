@@ -2,6 +2,36 @@ import API from '../api/axios';
 
 const FRESH_PARAMS = { fresh: 1 };
 
+function resolveDashboardEndpoint(keyPart) {
+  if (typeof keyPart !== 'string' || !keyPart) return '/dashboard/stats';
+  if (keyPart.startsWith('/')) return keyPart;
+  // Insight cards historically used short keys like "destination-insight"
+  return `/dashboard/${keyPart}`;
+}
+
+function buildDashboardRefreshParams(queryKey) {
+  const params = { ...FRESH_PARAMS };
+  const slot = queryKey?.[2];
+
+  // Standard dashboard keys: ['dashboard', '/dashboard/stats', { dateFrom, dateTo, ... }]
+  if (slot && typeof slot === 'object' && !Array.isArray(slot)) {
+    if (slot.dateFrom) params.dateFrom = slot.dateFrom;
+    if (slot.dateTo) params.dateTo = slot.dateTo;
+    if (slot.source) params.source = slot.source;
+    if (slot.destinationPeriod) params.destinationPeriod = slot.destinationPeriod;
+    if (slot.period) params.period = slot.period;
+    return params;
+  }
+
+  // Insight card keys: ['dashboard', 'destination-insight', period, dateFrom, dateTo]
+  if (typeof slot === 'string') {
+    params.period = slot;
+    if (queryKey[3]) params.dateFrom = queryKey[3];
+    if (queryKey[4]) params.dateTo = queryKey[4];
+  }
+  return params;
+}
+
 async function refetchActiveDashboards(queryClient) {
   const queries = queryClient
     .getQueryCache()
@@ -9,15 +39,15 @@ async function refetchActiveDashboards(queryClient) {
 
   await Promise.all(
     queries.map((query) => {
-      const endpoint = query.queryKey[1] || '/dashboard/stats';
-      const filters =
-        query.queryKey[2] && typeof query.queryKey[2] === 'object' ? query.queryKey[2] : {};
+      const endpoint = resolveDashboardEndpoint(query.queryKey[1]);
+      const params = buildDashboardRefreshParams(query.queryKey);
       return queryClient.fetchQuery({
         queryKey: query.queryKey,
         queryFn: async () => {
           const { data } = await API.get(endpoint, {
-            params: { ...filters, ...FRESH_PARAMS },
+            params,
             skipSuccessToast: true,
+            skipErrorToast: true,
           });
           return data;
         },
@@ -48,18 +78,28 @@ async function refetchActiveNavCounts(queryClient) {
   );
 }
 
-/** Manual top-bar refresh — bypasses server cache once per active query family. */
+/** Manual top-bar refresh — only refresh shell + currently visible page queries. */
 export async function refreshAppData(queryClient) {
-  // Mark everything stale without triggering duplicate requests. The explicit
-  // fetches below can then bypass server caches for dashboard/count endpoints.
-  await queryClient.invalidateQueries({ refetchType: 'none' });
+  // Mark dashboards/nav stale without a global refetch stampede.
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'none' }),
+    queryClient.invalidateQueries({ queryKey: ['nav-counts'], refetchType: 'none' }),
+  ]);
+
+  const PRIMARY_ACTIVE = new Set(['leads', 'followups', 'quotations', 'operations', 'whatsapp', 'reports']);
 
   await Promise.all([
     refetchActiveDashboards(queryClient),
     refetchActiveNavCounts(queryClient),
     queryClient.refetchQueries({
       type: 'active',
-      predicate: (query) => !['dashboard', 'nav-counts'].includes(query.queryKey[0]),
+      predicate: (query) => {
+        const root = query.queryKey[0];
+        if (!PRIMARY_ACTIVE.has(root)) return false;
+        // KPI strip refreshes with leads lists; skip header ticker / noise keys
+        if (root === 'leads' && query.queryKey[1] === 'list-kpis') return true;
+        return true;
+      },
     }),
   ]);
 }

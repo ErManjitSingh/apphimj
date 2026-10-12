@@ -80,16 +80,14 @@ function hotelPrice(hotel) {
 }
 
 function roomMapRate(room, season = 'onSeason') {
-  const seasonal = room?.rates?.[season];
-  return Number(
-    seasonal?.map ||
-      seasonal?.cp ||
-      seasonal?.ep ||
-      room?.rates?.map ||
-      room?.rates?.cp ||
-      room?.baseRate ||
-      0
-  );
+  const seasonKey = season === 'offSeason' ? 'offSeason' : 'onSeason';
+  const seasonal = room?.rates?.[seasonKey];
+  const fromSeason = Number(seasonal?.map || seasonal?.cp || seasonal?.ep || 0) || 0;
+  if (fromSeason > 0) return fromSeason;
+  // Off-season must not fall back to on/flat rack — that made Hotel Control look "filled"
+  // when Off was never saved, and confused the quotation On/Off toggle.
+  if (seasonKey === 'offSeason') return 0;
+  return Number(room?.rates?.map || room?.rates?.cp || room?.baseRate || 0) || 0;
 }
 
 function hotelImage(hotel) {
@@ -282,7 +280,10 @@ function HotelListRow({ hotel, onEdit, onToggleStatus, onDelete, canEdit, canDel
                     On MAP {formatINR(roomMapRate(room, 'onSeason'))}
                   </span>
                   <span className="font-bold tabular-nums text-sky-700">
-                    Off MAP {formatINR(roomMapRate(room, 'offSeason'))}
+                    Off MAP{' '}
+                    {roomMapRate(room, 'offSeason') > 0
+                      ? formatINR(roomMapRate(room, 'offSeason'))
+                      : '—'}
                   </span>
                   {room.maxOccupancy ? (
                     <span className="text-slate-400">· {room.maxOccupancy} pax</span>
@@ -414,7 +415,10 @@ function HotelCard({ hotel, onEdit, onToggleStatus, onDelete, canEdit, canDelete
                     On MAP {formatINR(roomMapRate(room, 'onSeason'))}
                   </span>
                   <span className="font-bold tabular-nums text-sky-700">
-                    Off MAP {formatINR(roomMapRate(room, 'offSeason'))}
+                    Off MAP{' '}
+                    {roomMapRate(room, 'offSeason') > 0
+                      ? formatINR(roomMapRate(room, 'offSeason'))
+                      : '—'}
                   </span>
                   <span className="tabular-nums text-slate-500">
                     CP {formatINR(Number(room.rates?.onSeason?.cp || room.rates?.cp || 0))}

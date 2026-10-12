@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Trash2, Bell } from 'lucide-react';
+import { Plus, Trash2, Bell, Wallet, IndianRupee, Receipt } from 'lucide-react';
 import AppModal from '../ui/AppModal';
 import { Button } from '../ui/button';
 import API from '../../api/axios';
 import PaymentScreenshotField from './PaymentScreenshotField';
 import { toast } from '../../context/ToastContext';
+import { cn } from '../../lib/utils';
 
 function formatINR(n) {
   return `₹${Number(n || 0).toLocaleString('en-IN')}`;
@@ -27,6 +28,9 @@ function rowsFromDraft(draft) {
     status: row.status || 'pending',
   }));
 }
+
+const fieldClass =
+  'mt-1.5 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100';
 
 export default function PostConvertCommercialModal({ open, leadId, onClose, onSaved }) {
   const [loading, setLoading] = useState(false);
@@ -197,191 +201,249 @@ export default function PostConvertCommercialModal({ open, leadId, onClose, onSa
   };
 
   return (
-    <AppModal open={open} onClose={() => !saving && onClose?.()} size="lg">
-      <form onSubmit={handleSave} className="p-5 space-y-4 max-h-[85vh] overflow-y-auto">
-        <div>
-          <h3 className="text-lg font-bold text-content-primary">Post-conversion commercial form</h3>
-          <p className="text-sm text-content-muted">
-            {draft?.lead?.name || 'Customer'} — margin, costs, advance, installments & reminders
-          </p>
+    <AppModal open={open} onClose={() => !saving && onClose?.()} size="lg" className="p-0 overflow-hidden bg-[#f8fafc]">
+      <form onSubmit={handleSave} className="max-h-[88vh] overflow-y-auto">
+        <div className="sticky top-0 z-10 border-b border-slate-200/80 bg-[radial-gradient(800px_220px_at_0%_0%,rgba(45,212,191,0.35),transparent),linear-gradient(120deg,#020617,#0f172a_60%,#134e4a)] px-5 py-5 sm:px-6">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-teal-400 text-slate-950 shadow-lg shadow-teal-500/30">
+              <Wallet className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-teal-200">Commercial desk</p>
+              <h3 className="mt-1 text-xl font-black tracking-tight text-white">
+                {draft?.paymentId ? 'Edit advance & commercial' : 'Post-conversion commercial'}
+              </h3>
+              <p className="mt-1 text-[13px] text-slate-300 truncate">
+                {draft?.lead?.name || 'Customer'} — margin, costs, advance, installments & voucher
+              </p>
+            </div>
+          </div>
+
+          {draft && !loading ? (
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <div className="rounded-2xl bg-white/10 px-3 py-2.5 ring-1 ring-white/10 backdrop-blur-sm">
+                <p className="text-[9px] font-bold uppercase tracking-wide text-slate-300">Package</p>
+                <p className="mt-0.5 text-sm font-black text-white metric-tabular">{formatINR(totalAmount)}</p>
+              </div>
+              <div className="rounded-2xl bg-teal-400/20 px-3 py-2.5 ring-1 ring-teal-300/30 backdrop-blur-sm">
+                <p className="text-[9px] font-bold uppercase tracking-wide text-teal-100">Advance</p>
+                <p className="mt-0.5 text-sm font-black text-white metric-tabular">{formatINR(token)}</p>
+              </div>
+              <div className="rounded-2xl bg-orange-400/20 px-3 py-2.5 ring-1 ring-orange-300/30 backdrop-blur-sm">
+                <p className="text-[9px] font-bold uppercase tracking-wide text-orange-100">Balance</p>
+                <p className="mt-0.5 text-sm font-black text-white metric-tabular">{formatINR(remaining)}</p>
+              </div>
+            </div>
+          ) : null}
         </div>
 
-        {loading && <p className="text-sm text-content-muted">Loading…</p>}
-        {error && (
-          <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-        )}
+        <div className="space-y-5 p-5 sm:p-6">
+          {loading && <p className="text-sm text-slate-500">Loading…</p>}
+          {error && (
+            <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
+          )}
 
-        {draft && !loading && (
-          <>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="text-sm">
-                <span className="text-[11px] font-bold uppercase text-slate-500">Package margin %</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={packageMarginPercent}
-                  onChange={(e) => setPackageMarginPercent(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-subtle px-3 py-2.5 text-sm"
-                />
-              </label>
-              <label className="text-sm">
-                <span className="text-[11px] font-bold uppercase text-slate-500">Total cost</span>
-                <input
-                  type="number"
-                  value={totalCost}
-                  onChange={(e) => setTotalCost(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-subtle px-3 py-2.5 text-sm bg-slate-50"
-                />
-              </label>
-              <label className="text-sm">
-                <span className="text-[11px] font-bold uppercase text-slate-500">GST amount</span>
-                <input
-                  type="number"
-                  value={gstAmount}
-                  onChange={(e) => setGstAmount(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-subtle px-3 py-2.5 text-sm bg-slate-50"
-                />
-              </label>
-              <label className="text-sm">
-                <span className="text-[11px] font-bold uppercase text-slate-500">Amount received (token / advance)</span>
-                <input
-                  type="number"
-                  value={amountReceived}
-                  onChange={(e) => setAmountReceived(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-subtle px-3 py-2.5 text-sm"
-                  required
-                />
-              </label>
-              <label className="text-sm sm:col-span-2">
-                <span className="text-[11px] font-bold uppercase text-slate-500">Payment mode</span>
-                <select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-subtle px-3 py-2.5 text-sm"
-                >
-                  <option value="upi">UPI</option>
-                  <option value="cash">Cash</option>
-                  <option value="card">Card</option>
-                  <option value="bank_transfer">Bank Transfer</option>
-                  <option value="cheque">Cheque</option>
-                </select>
-              </label>
-            </div>
-
-            <PaymentScreenshotField
-              value={shotFiles}
-              existing={draft.paymentScreenshots || (draft.paymentScreenshotUrl
-                ? [{ url: draft.paymentScreenshotUrl, name: draft.paymentScreenshotName }]
-                : [])}
-              onChange={({ files, error: shotErr }) => {
-                if (shotErr) toast.error(shotErr);
-                setShotFiles(files || []);
-              }}
-            />
-
-            <div>
-              <p className="text-[11px] font-bold uppercase text-slate-500 mb-1.5">
-                Address proof (client document)
-              </p>
-              <input type="file" accept="image/*,.pdf" onChange={onFile} className="text-sm" />
-              {(proofName || draft.addressProofName) && (
-                <p className="mt-1 text-xs text-slate-600">
-                  {proofName || draft.addressProofName}
-                  {draft.addressProofUrl && !proofBase64 ? ' (already uploaded)' : ''}
-                </p>
-              )}
-            </div>
-
-            <div className="rounded-xl border border-subtle overflow-hidden">
-              <div className="bg-slate-50 px-3 py-2 flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wide text-slate-600">
-                    Installments after token
-                  </p>
-                  <p className="text-[11px] text-slate-500">
-                    Package {formatINR(totalAmount)} · Remaining {formatINR(remaining)} · Planned{' '}
-                    <span className={sumMismatch ? 'text-red-600 font-semibold' : ''}>
-                      {formatINR(installmentSum)}
-                    </span>
-                  </p>
+          {draft && !loading && (
+            <>
+              <div className="rounded-[24px] border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-2">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-slate-900 text-white">
+                    <IndianRupee className="h-4 w-4" />
+                  </span>
+                  <p className="text-[12px] font-bold uppercase tracking-[0.1em] text-slate-500">Money details</p>
                 </div>
-                <div className="flex gap-1.5">
-                  <Button type="button" size="sm" variant="ghost" onClick={applySuggestedSplit}>
-                    Suggest 50/30/20
-                  </Button>
-                  <Button type="button" size="sm" variant="ghost" onClick={addRow}>
-                    <Plus className="w-3.5 h-3.5 mr-1" />
-                    Add
-                  </Button>
-                </div>
-              </div>
-
-              <div className="divide-y divide-subtle">
-                {installments.map((row, index) => (
-                  <div key={row.key} className="grid gap-2 px-3 py-2.5 sm:grid-cols-[1.4fr_0.8fr_0.9fr_auto]">
-                    <input
-                      value={row.label}
-                      onChange={(e) => updateRow(index, { label: e.target.value })}
-                      className="rounded-lg border border-subtle px-2.5 py-2 text-sm"
-                      placeholder="Label"
-                    />
+                <div className="grid gap-3.5 sm:grid-cols-2">
+                  <label className="text-sm">
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Package margin %</span>
                     <input
                       type="number"
-                      value={row.amount}
-                      onChange={(e) => updateRow(index, { amount: e.target.value })}
-                      className="rounded-lg border border-subtle px-2.5 py-2 text-sm tabular-nums"
-                      placeholder="Amount"
-                      min="0"
+                      step="0.1"
+                      value={packageMarginPercent}
+                      onChange={(e) => setPackageMarginPercent(e.target.value)}
+                      className={fieldClass}
                     />
+                  </label>
+                  <label className="text-sm">
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Total cost</span>
                     <input
-                      type="date"
-                      value={row.dueDate}
-                      onChange={(e) => updateRow(index, { dueDate: e.target.value })}
-                      className="rounded-lg border border-subtle px-2.5 py-2 text-sm"
+                      type="number"
+                      value={totalCost}
+                      onChange={(e) => setTotalCost(e.target.value)}
+                      className={cn(fieldClass, 'bg-slate-50')}
                     />
-                    <button
-                      type="button"
-                      onClick={() => removeRow(index)}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-rose-500 hover:bg-rose-50"
-                      title="Remove"
+                  </label>
+                  <label className="text-sm">
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">GST amount</span>
+                    <input
+                      type="number"
+                      value={gstAmount}
+                      onChange={(e) => setGstAmount(e.target.value)}
+                      className={cn(fieldClass, 'bg-slate-50')}
+                    />
+                  </label>
+                  <label className="text-sm">
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-teal-700">Amount received (token)</span>
+                    <input
+                      type="number"
+                      value={amountReceived}
+                      onChange={(e) => setAmountReceived(e.target.value)}
+                      className={cn(fieldClass, 'border-teal-200 focus:border-teal-500 focus:ring-teal-100')}
+                      required
+                    />
+                  </label>
+                  <label className="text-sm sm:col-span-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Payment mode</span>
+                    <select
+                      value={paymentMethod}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      className={fieldClass}
                     >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-                {!installments.length && (
-                  <p className="px-3 py-3 text-xs text-slate-500">
-                    No installments — click Add, or Suggest 50/30/20. Leave empty if token covers full package.
-                  </p>
-                )}
+                      <option value="upi">UPI</option>
+                      <option value="cash">Cash</option>
+                      <option value="card">Card</option>
+                      <option value="bank_transfer">Bank Transfer</option>
+                      <option value="cheque">Cheque</option>
+                    </select>
+                  </label>
+                </div>
               </div>
-            </div>
 
-            <label className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2.5 text-sm">
-              <input
-                type="checkbox"
-                className="mt-1"
-                checked={createReminders}
-                onChange={(e) => setCreateReminders(e.target.checked)}
-              />
-              <span>
-                <span className="inline-flex items-center gap-1.5 font-semibold text-amber-900">
-                  <Bell className="w-3.5 h-3.5" />
-                  Set payment reminders
-                </span>
-                <span className="block text-xs text-amber-800/90 mt-0.5">
-                  Creates a reminder on each installment due date (shows in Reminders for the assigned executive).
-                </span>
-              </span>
-            </label>
-          </>
-        )}
+              <div className="rounded-[24px] border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-teal-600 text-white">
+                    <Receipt className="h-4 w-4" />
+                  </span>
+                  <p className="text-[12px] font-bold uppercase tracking-[0.1em] text-slate-500">Proofs</p>
+                </div>
+                <PaymentScreenshotField
+                  value={shotFiles}
+                  existing={draft.paymentScreenshots || (draft.paymentScreenshotUrl
+                    ? [{ url: draft.paymentScreenshotUrl, name: draft.paymentScreenshotName }]
+                    : [])}
+                  onChange={({ files, error: shotErr }) => {
+                    if (shotErr) toast.error(shotErr);
+                    setShotFiles(files || []);
+                  }}
+                />
+                <div className="mt-4">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1.5">
+                    Address proof (client document)
+                  </p>
+                  <input type="file" accept="image/*,.pdf" onChange={onFile} className="text-sm" />
+                  {(proofName || draft.addressProofName) && (
+                    <p className="mt-1 text-xs text-slate-600">
+                      {proofName || draft.addressProofName}
+                      {draft.addressProofUrl && !proofBase64 ? ' (already uploaded)' : ''}
+                    </p>
+                  )}
+                </div>
+              </div>
 
-        <div className="flex justify-end gap-2 pt-1">
-          <Button type="button" variant="ghost" disabled={saving} onClick={onClose}>
+              <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
+                <div className="bg-gradient-to-r from-slate-900 to-teal-900 px-4 py-3.5 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-teal-200">
+                      Installments after token
+                    </p>
+                    <p className="text-[12px] text-slate-300 mt-0.5">
+                      Package {formatINR(totalAmount)} · Remaining {formatINR(remaining)} · Planned{' '}
+                      <span className={sumMismatch ? 'text-rose-300 font-semibold' : 'text-white font-semibold'}>
+                        {formatINR(installmentSum)}
+                      </span>
+                    </p>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={applySuggestedSplit}
+                      className="rounded-xl h-8 bg-white/10 text-white hover:bg-white/20 border-0"
+                    >
+                      Suggest 50/30/20
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={addRow}
+                      className="rounded-xl h-8 bg-teal-400 text-slate-950 hover:bg-teal-300 border-0 font-bold"
+                    >
+                      <Plus className="w-3.5 h-3.5 mr-1" />
+                      Add
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="divide-y divide-slate-100">
+                  {installments.map((row, index) => (
+                    <div key={row.key} className="grid gap-2 px-4 py-3 sm:grid-cols-[1.4fr_0.8fr_0.9fr_auto]">
+                      <input
+                        value={row.label}
+                        onChange={(e) => updateRow(index, { label: e.target.value })}
+                        className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm"
+                        placeholder="Label"
+                      />
+                      <input
+                        type="number"
+                        value={row.amount}
+                        onChange={(e) => updateRow(index, { amount: e.target.value })}
+                        className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm tabular-nums"
+                        placeholder="Amount"
+                        min="0"
+                      />
+                      <input
+                        type="date"
+                        value={row.dueDate}
+                        onChange={(e) => updateRow(index, { dueDate: e.target.value })}
+                        className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeRow(index)}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-rose-500 hover:bg-rose-50"
+                        title="Remove"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                  {!installments.length && (
+                    <p className="px-4 py-4 text-xs text-slate-500">
+                      No installments — click Add, or Suggest 50/30/20. Leave empty if token covers full package.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <label className="flex items-start gap-3 rounded-[22px] border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-3.5 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4 accent-orange-500"
+                  checked={createReminders}
+                  onChange={(e) => setCreateReminders(e.target.checked)}
+                />
+                <span>
+                  <span className="inline-flex items-center gap-1.5 font-bold text-amber-950">
+                    <Bell className="w-3.5 h-3.5" />
+                    Set payment reminders
+                  </span>
+                  <span className="block text-xs text-amber-900/80 mt-0.5">
+                    Creates a reminder on each installment due date (shows in Reminders for the assigned executive).
+                  </span>
+                </span>
+              </label>
+            </>
+          )}
+        </div>
+
+        <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white/95 backdrop-blur-md px-5 py-4">
+          <Button type="button" variant="ghost" disabled={saving} onClick={onClose} className="rounded-2xl h-11">
             Later
           </Button>
-          <Button type="submit" variant="emerald" disabled={saving || loading || !draft || sumMismatch}>
+          <Button
+            type="submit"
+            disabled={saving || loading || !draft || sumMismatch}
+            className="rounded-2xl h-11 px-5 bg-teal-600 hover:bg-teal-500 text-white border-0 font-bold shadow-lg shadow-teal-700/25"
+          >
             {saving ? 'Saving…' : 'Save commercial details'}
           </Button>
         </div>
