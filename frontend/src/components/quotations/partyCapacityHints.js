@@ -1,6 +1,8 @@
 import {
   resolvePartyOccupancy,
   resolveCabCount,
+  resolveOverflowMattresses,
+  distributeMattressesAcrossRooms,
   BASE_ADULTS_PER_ROOM,
   MAX_EXTRA_MATTRESSES_PER_ROOM,
   clampExtraMattresses,
@@ -59,9 +61,16 @@ export function getHotelRoomHint(lead = {}, party = null, configuredRoomLines = 
   const defaultRequired = Math.max(1, Number(fromLead.rooms) || 1);
   const needsAction = adults > capacity;
 
+  const overflowNeeded = resolveOverflowMattresses(adults, configured);
   let message = '';
   if (needsAction) {
-    message = `${adults} adult${adults === 1 ? '' : 's'} · ${configured} room${configured === 1 ? '' : 's'} hold ${capacity} (2 per room${matsOnRooms ? ` + ${matsOnRooms} mattress` : ''}). Add extra mattress beside the room (3–6 pax) or add another room.`;
+    const canPack =
+      adults <= configured * (BASE_ADULTS_PER_ROOM + MAX_EXTRA_MATTRESSES_PER_ROOM);
+    if (canPack && overflowNeeded > matsOnRooms) {
+      message = `${adults} adult${adults === 1 ? '' : 's'} in ${configured} room${configured === 1 ? '' : 's'} need ${overflowNeeded} extra mattress${overflowNeeded === 1 ? '' : 'es'} (2 per room + mattress). Add mattress beside the room, or add another room.`;
+    } else {
+      message = `${adults} adult${adults === 1 ? '' : 's'} · ${configured} room${configured === 1 ? '' : 's'} hold ${capacity} (2 per room${matsOnRooms ? ` + ${matsOnRooms} mattress` : ''}). Add extra mattress beside the room (3–6 pax) or add another room.`;
+    }
   } else if (matsOnRooms > 0) {
     message = `${adults} adult${adults === 1 ? '' : 's'} in ${configured} room${configured === 1 ? '' : 's'} with ${matsOnRooms} extra mattress${matsOnRooms === 1 ? '' : 'es'}.`;
   }
@@ -114,6 +123,77 @@ export function occupancyCapacityForDay(dayWiseHotels = [], dayNum = 1) {
     mattresses,
     capacity: rooms * BASE_ADULTS_PER_ROOM + mattresses,
   };
+}
+
+/**
+ * Apply an exact mattress count onto day room lines (from lead), not from adult math.
+ */
+export function applyMattressesToDayLines(dayLines = [], mattresses = 0) {
+  const lines = Array.isArray(dayLines) ? dayLines : [];
+  if (!lines.length) return lines;
+  const perRoom = distributeMattressesAcrossRooms(lines.length, Math.max(0, Number(mattresses) || 0));
+  return lines.map((line, i) => ({
+    ...line,
+    extraMattresses: clampExtraMattresses(perRoom[i] ?? 0),
+  }));
+}
+
+/** @deprecated Use applyMattressesToDayLines with lead mattress count. */
+export function applySuggestedMattressesToDayLines(dayLines = [], adultsOrMats = 1) {
+  return applyMattressesToDayLines(dayLines, adultsOrMats);
+}
+
+/**
+ * Expand each overnight day's hotel lines to match lead room + mattress counts exactly.
+ * Lead detail is the source of truth — no adult-based auto rooms/mattresses.
+ */
+export function expandDayWiseHotelsForParty(dayWiseHotels = [], lead = {}, itinerary = []) {
+  const occ = resolvePartyOccupancy(lead || {});
+  const targetRooms = Math.max(1, Number(occ.rooms) || 1);
+  const targetMats = Math.max(0, Number(occ.mattresses) || 0);
+  let lines = Array.isArray(dayWiseHotels) ? [...dayWiseHotels] : [];
+  if (!lines.length) return lines;
+
+  const days = Array.isArray(itinerary) ? itinerary : [];
+  const overnightDayNums = (() => {
+    if (days.length > 1) {
+      return days.slice(0, -1).map((d, i) => Number(d.day) || i + 1);
+    }
+    if (days.length === 1) return [Number(days[0].day) || 1];
+    return [...new Set(lines.map((h) => Number(h.day) || 0).filter((d) => d > 0))].sort(
+      (a, b) => a - b
+    );
+  })();
+
+  overnightDayNums.forEach((dayNum) => {
+    const dayLines = getRoomLinesForDay(lines, dayNum);
+    if (!dayLines.length) return;
+    const primary = dayLines[0];
+    const next = [...dayLines];
+    while (next.length < targetRooms) {
+      const slot = next.length + 1;
+      next.push({
+        ...primary,
+        roomSlot: slot,
+        // Extra rooms are charged full rack (not package-included).
+        includedRate: 0,
+        perNight: Number(primary.absolutePerNight || primary.perNight || 0),
+        totalCost: Number(primary.absolutePerNight || primary.perNight || 0),
+        extraMattresses: 0,
+        fromPackage: Boolean(primary.fromPackage),
+        selectedFromPackage: false,
+      });
+    }
+    // Trim extra slots only when lead explicitly set a lower room count than current lines.
+    const trimmed =
+      Number(lead?.numberOfRooms) > 0 && next.length > targetRooms
+        ? next.slice(0, targetRooms)
+        : next;
+    const withMats = applyMattressesToDayLines(trimmed, targetMats);
+    lines = lines.filter((h) => Number(h.day) !== Number(dayNum)).concat(withMats);
+  });
+
+  return lines.sort((a, b) => a.day - b.day || (a.roomSlot || 1) - (b.roomSlot || 1));
 }
 
 /**
@@ -173,6 +253,9 @@ export function getPartyCapacityReadiness({
     });
   })();
 
+  const leadRooms = defaultRequiredRooms;
+  const leadMats = Math.max(0, Number(fromLead.mattresses) || 0);
+
   const roomGaps = overnightDays.map((dayNum) => {
     const stay = occupancyCapacityForDay(dayWiseHotels, dayNum);
     return {
@@ -180,33 +263,48 @@ export function getPartyCapacityReadiness({
       configured: stay.rooms,
       mattresses: stay.mattresses,
       capacity: stay.capacity,
+      missingRooms: Math.max(0, leadRooms - stay.rooms),
+      missingMattresses: Math.max(0, leadMats - stay.mattresses),
       missing: Math.max(0, adults - stay.capacity),
     };
   });
 
   const minConfigured =
     roomGaps.length > 0
-      ? roomGaps.reduce((minCfg, g) => Math.min(minCfg, g.configured), defaultRequiredRooms)
+      ? roomGaps.reduce((minCfg, g) => Math.min(minCfg, g.configured), leadRooms)
       : 1;
   const extraMats =
     roomGaps.length > 0
       ? Math.min(...roomGaps.map((g) => g.mattresses))
       : extraMattressesForDay(dayWiseHotels, 1);
-  const mattressStay = extraMats > 0;
+  const mattressStay = extraMats > 0 || leadMats > 0;
   if (mattressStay) {
-    requiredRooms = minConfigured;
+    requiredRooms = Math.min(minConfigured, leadRooms);
   }
 
+  // Ready when quotation stay matches lead rooms + mattresses (not adult auto-fit).
   const roomsReady =
     roomGaps.length === 0
       ? true
-      : roomGaps.every((g) => g.capacity >= adults);
+      : roomGaps.every((g) => g.configured >= leadRooms && g.mattresses >= leadMats);
 
   const missingParts = [];
   if (!roomsReady) {
-    missingParts.push(
-      `add extra mattress beside the room (after 2 pax) or add another room so ${adults} adults fit`
-    );
+    const needRooms = roomGaps.some((g) => g.missingRooms > 0);
+    const needMats = roomGaps.some((g) => g.missingMattresses > 0);
+    if (needRooms && needMats) {
+      missingParts.push(
+        `set ${leadRooms} room${leadRooms === 1 ? '' : 's'} and ${leadMats} mattress${leadMats === 1 ? '' : 'es'} (same as lead)`
+      );
+    } else if (needRooms) {
+      missingParts.push(
+        `add room so stay has ${leadRooms} room${leadRooms === 1 ? '' : 's'} (same as lead)`
+      );
+    } else {
+      missingParts.push(
+        `set ${leadMats} extra mattress${leadMats === 1 ? '' : 'es'} (same as lead)`
+      );
+    }
   }
   if (!cabReady) {
     missingParts.push(
@@ -215,6 +313,8 @@ export function getPartyCapacityReadiness({
   }
 
   const ready = roomsReady && cabReady;
+  const overrideRooms = Math.max(leadRooms, minConfigured);
+  const overrideMats = Math.max(leadMats, extraMats);
   return {
     ready,
     roomsReady,
@@ -225,13 +325,13 @@ export function getPartyCapacityReadiness({
     seats,
     travelers,
     adults,
-    mattresses: extraMats,
+    mattresses: overrideMats,
     stayWithMattress: mattressStay && roomsReady,
     occupancyOverride: roomsReady
       ? {
-          rooms: minConfigured,
-          mattresses: extraMats,
-          stayWithMattress: extraMats > 0,
+          rooms: overrideRooms,
+          mattresses: overrideMats,
+          stayWithMattress: overrideMats > 0,
         }
       : null,
     roomGaps,

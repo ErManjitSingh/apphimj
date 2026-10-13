@@ -680,10 +680,54 @@ export default function PackageBuilderWorkspace({
 
   const handleAddHotelRoom = (day, option) => {
     if (!day || !option) return;
-    const linesForDay = (dayWiseHotels || []).filter((h) => h.day === day.day);
-    const nextSlot = Math.max(1, linesForDay.length) + 1;
-    const { entry } = buildHotelStayEntry(day, option, nextSlot);
-    const nextHotels = [...(dayWiseHotels || []), entry].sort(
+    const overnight =
+      Array.isArray(itinerary) && itinerary.length > 1 ? itinerary.slice(0, -1) : [day];
+    const targetDays = overnight.length ? overnight : [day];
+    let lines = Array.isArray(dayWiseHotels) ? [...dayWiseHotels] : [];
+    const linesForClickDay = lines.filter((h) => Number(h.day) === Number(day.day));
+    const nextSlot = Math.max(1, linesForClickDay.length) + 1;
+
+    targetDays.forEach((d) => {
+      const already = lines.some(
+        (h) => Number(h.day) === Number(d.day) && Number(h.roomSlot || 1) === nextSlot
+      );
+      if (already) return;
+
+      if (Number(d.day) === Number(day.day)) {
+        const { entry } = buildHotelStayEntry(d, option, nextSlot);
+        lines.push(entry);
+        return;
+      }
+
+      // Mirror the added room onto other overnight nights at that day's hotel.
+      const primary = lines.find(
+        (h) => Number(h.day) === Number(d.day) && Number(h.roomSlot || 1) === 1
+      );
+      const dayOption = primary?.hotel
+        ? {
+            ...option,
+            id: primary.hotel.id || option.id,
+            hotelId: primary.hotel.id || option.hotelId,
+            name: primary.hotel.name || option.name,
+            image: primary.hotel.image || option.image,
+            images: primary.hotel.images || option.images,
+            starRating: primary.hotel.starRating || option.starRating,
+            location: primary.hotel.location || option.location,
+            city: primary.hotel.city || option.city,
+            slug: primary.hotel.slug || option.slug,
+            room: option.room || primary.room,
+            mealPlan: option.mealPlan || primary.mealPlan,
+            absolutePerNight: option.absolutePerNight ?? primary.absolutePerNight,
+            perNight: option.absolutePerNight ?? option.perNight ?? primary.absolutePerNight ?? 0,
+            includedRate: 0,
+            startingPrice: option.absolutePerNight ?? primary.absolutePerNight,
+          }
+        : option;
+      const { entry } = buildHotelStayEntry(d, dayOption, nextSlot);
+      lines.push(entry);
+    });
+
+    const nextHotels = lines.sort(
       (a, b) => a.day - b.day || (a.roomSlot || 1) - (b.roomSlot || 1)
     );
     onDayWiseHotelsChange?.(nextHotels);

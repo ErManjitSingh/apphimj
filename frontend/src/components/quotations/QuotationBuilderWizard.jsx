@@ -90,7 +90,7 @@ import { parsePackageNights } from './CatalogHotelSelector';
 import { WIZARD_STEPS } from './constants';
 import { applyAskDiscount, calculatePricing, bakeCompanyMarginIntoLineCosts, defaultItineraryDay, defaultWizardState, formatINR, hasExtraDiscountRequest, matchesResourceDestination } from './quotationUtils';
 import { buildWebsiteAlignedQuoteCosts } from './partyCosting';
-import { getPartyCapacityReadiness } from './partyCapacityHints';
+import { getPartyCapacityReadiness, expandDayWiseHotelsForParty } from './partyCapacityHints';
 import { buildSelectedHotelsSnapshot, toYmd } from './quotePdfHelpers';
 import { hydrateWizardFromQuote } from './quotationHydrate';
 import { unwrapList } from '../../utils/apiHelpers';
@@ -653,15 +653,25 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
     setCustomizeTab('itinerary');
 
     // Seed day-wise hotels — package MAP (same as website), not lead meal override
-    const seededHotels = seedDayWiseHotelsFromItinerary(
-      itinerary,
-      'map',
-      normalized._apiRaw?.dayOptions?.stays || normalized.stays || []
+    const seededHotels = expandDayWiseHotelsForParty(
+      seedDayWiseHotelsFromItinerary(
+        itinerary,
+        'map',
+        normalized._apiRaw?.dayOptions?.stays || normalized.stays || []
+      ),
+      selectedLead,
+      itinerary
     );
     setDayWiseHotels(seededHotels);
     // Pull real on/off season racks from Hotel Control (package seed often lacks offSeason).
     enrichDayWiseHotelsFromCatalog(seededHotels).then((enriched) => {
-      setDayWiseHotels(applyHotelSeasonToSelections(enriched, hotelSeason));
+      setDayWiseHotels(
+        expandDayWiseHotelsForParty(
+          applyHotelSeasonToSelections(enriched, hotelSeason),
+          selectedLead,
+          itinerary
+        )
+      );
     });
     // Volvo packages: keep Alto (default) as primary + auto-attach Volvo bus as extra cab(s)
     const defaultCab = packageCabs.find((c) => c.isDefault) || packageCabs[0] || null;

@@ -43,8 +43,36 @@ export function canStayWithExtraMattress(lead = {}, configuredRooms = 1) {
 }
 
 /**
- * 2 adults share a room; odd adult gets an extra mattress (not a full extra room).
- * Prefers lead.numberOfRooms / roomsWithMattress when set.
+ * Extra adults beyond twin-share that need mattresses for the given room count.
+ * e.g. 10 adults in 4 rooms → 2 mattresses (4×2 + 2).
+ */
+export function resolveOverflowMattresses(adults = 1, rooms = 1) {
+  const a = Math.max(1, Number(adults) || 1);
+  const r = Math.max(1, Number(rooms) || 1);
+  return Math.max(0, a - r * BASE_ADULTS_PER_ROOM);
+}
+
+/**
+ * Spread mattresses across room slots (cap per room).
+ * Returns an array of length `rooms` with mattress counts.
+ */
+export function distributeMattressesAcrossRooms(rooms = 1, mattresses = 0) {
+  const count = Math.max(1, Number(rooms) || 1);
+  const total = Math.max(0, Math.floor(Number(mattresses) || 0));
+  const perRoom = Array.from({ length: count }, () => 0);
+  let left = total;
+  for (let i = 0; i < count && left > 0; i += 1) {
+    const take = Math.min(MAX_EXTRA_MATTRESSES_PER_ROOM, left);
+    perRoom[i] = take;
+    left -= take;
+  }
+  return perRoom;
+}
+
+/**
+ * Prefer lead.numberOfRooms / roomsWithMattress exactly as entered on lead detail.
+ * Do not invent rooms/mattresses from adult count when those lead fields are set.
+ * Twin-share fallback only when lead room count is missing.
  */
 export function resolvePartyOccupancy(lead = {}) {
   const adults = Math.max(1, Number(lead?.adults ?? lead?.travelers ?? 1) || 1);
@@ -53,24 +81,23 @@ export function resolvePartyOccupancy(lead = {}) {
 
   const roomsFromLead = Number(lead?.numberOfRooms);
   const mattressFromLead = Number(lead?.roomsWithMattress);
+  const leadRoomsSet = Number.isFinite(roomsFromLead) && roomsFromLead > 0;
+  const leadMatsSet = Number.isFinite(mattressFromLead) && mattressFromLead >= 0;
 
   let rooms;
   let mattresses;
 
-  if (Number.isFinite(roomsFromLead) && roomsFromLead > 0) {
+  if (leadRoomsSet) {
     rooms = Math.max(1, Math.floor(roomsFromLead));
-    mattresses =
-      Number.isFinite(mattressFromLead) && mattressFromLead >= 0
-        ? Math.floor(mattressFromLead)
-        : adults > 1
-          ? adults % 2
-          : 0;
+    mattresses = leadMatsSet
+      ? Math.min(rooms * MAX_EXTRA_MATTRESSES_PER_ROOM, Math.floor(mattressFromLead))
+      : 0;
   } else if (adults === 1) {
     rooms = 1;
-    mattresses = 0;
+    mattresses = leadMatsSet ? Math.floor(mattressFromLead) : 0;
   } else {
     rooms = Math.max(1, Math.floor(adults / 2));
-    mattresses = adults % 2;
+    mattresses = leadMatsSet ? Math.floor(mattressFromLead) : adults % 2;
   }
 
   return { adults, children, travelers, rooms, mattresses };
