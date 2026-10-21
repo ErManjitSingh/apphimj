@@ -8,9 +8,10 @@ const { enqueueEmailJob } = require('./emailQueueService');
 const { isEmailConfigured, normalizeRecipients } = require('./emailService');
 const { invalidateMailboxCache } = require('./emailMailboxCache');
 const company = require('../config/company');
+const { resolveAgentContact } = require('../utils/agentContact');
 
 /** Bump when HTML layout changes so stored receipts regenerate. */
-const RECEIPT_TEMPLATE_VERSION = 11;
+const RECEIPT_TEMPLATE_VERSION = 12;
 
 const COMPANY = {
   ...company,
@@ -92,7 +93,7 @@ function computeTokenGst(tokenAmount) {
   return { subTotal: grandTotal, cgst: 0, sgst: 0, grandTotal, gstInclusive: true };
 }
 
-function buildVoucherPayload({ lead, payment, booking, quotation }) {
+function buildVoucherPayload({ lead, payment, booking, quotation, agent }) {
   const total = Number(payment.amount) || 0;
   const advance = Number(payment.paidAmount) || 0;
   const balance = Math.max(0, total - advance);
@@ -136,7 +137,9 @@ function buildVoucherPayload({ lead, payment, booking, quotation }) {
     grandTotal: gst.grandTotal,
     cgstRate: COMPANY.cgstRate,
     sgstRate: COMPANY.sgstRate,
-    company: { ...COMPANY },
+    company: { ...COMPANY, phone: agent?.phone || COMPANY.phone },
+    agentName: agent?.name || '',
+    agentPhone: agent?.phone || '',
   };
 }
 
@@ -149,9 +152,11 @@ function buildPaymentReceiptHtml({
   booking,
   quotation,
   actor,
+  agent,
 }) {
-  const v = buildVoucherPayload({ lead, payment, booking, quotation });
-  const executive = actor?.name || booking?.executiveName || 'Him Journey Tours Sales';
+  const v = buildVoucherPayload({ lead, payment, booking, quotation, agent });
+  const executive = agent?.name || actor?.name || booking?.executiveName || 'Him Journey Tours Sales';
+  const agentPhone = agent?.phone || '';
   const quoteOrBooking = v.quoteNumber !== '—' ? v.quoteNumber : v.bookingNumber;
   const refLine = v.paymentRef ? `Ref: ${escapeHtml(v.paymentRef)}` : 'Confirmed';
 
@@ -247,7 +252,7 @@ function buildPaymentReceiptHtml({
         <p><strong>${escapeHtml(COMPANY.name)}</strong>${COMPANY.tagline ? ` · ${escapeHtml(COMPANY.tagline)}` : ''}</p>
         <p>${escapeHtml(COMPANY.address)}</p>
         ${COMPANY.gstin || COMPANY.pan ? `<p>${COMPANY.gstin ? `<strong>GSTIN:</strong> ${escapeHtml(COMPANY.gstin)}` : ''}${COMPANY.gstin && COMPANY.pan ? ' · ' : ''}${COMPANY.pan ? `<strong>PAN:</strong> ${escapeHtml(COMPANY.pan)}` : ''}</p>` : ''}
-        <p><strong>HSN:</strong> ${escapeHtml(COMPANY.hsn)} · Original for Recipient${COMPANY.phone ? ` · <strong>Phone:</strong> ${escapeHtml(COMPANY.phone)}` : ''}</p>
+        <p><strong>HSN:</strong> ${escapeHtml(COMPANY.hsn)} · Original for Recipient${v.company.phone ? ` · <strong>Phone:</strong> ${escapeHtml(v.company.phone)}` : ''}</p>
       </div>
       <div class="panel">
         <h3>Guest</h3>
@@ -339,7 +344,7 @@ function buildPaymentReceiptHtml({
     </div>
 
     <div class="foot">
-      <span>Prepared by ${escapeHtml(executive)}</span>
+      <span>Prepared by ${escapeHtml(executive)}${agentPhone ? ` · ${escapeHtml(agentPhone)}` : ''}</span>
       <span>${escapeHtml(COMPANY.email || '')}${COMPANY.website ? ` · ${escapeHtml(COMPANY.website)}` : ''}</span>
     </div>
   </div>
@@ -361,12 +366,14 @@ async function generateAndStoreReceipt({ lead, payment, booking, quotation, acto
     receiptNumber = await nextReceiptNumber();
   }
 
+  const agent = await resolveAgentContact({ lead, quotation, user: actor });
   const html = buildPaymentReceiptHtml({
     lead,
     payment: { ...payment.toObject?.() || payment, receiptNumber },
     booking,
     quotation,
     actor,
+    agent,
   });
 
   const updated = await Payment.findByIdAndUpdate(
@@ -781,7 +788,12 @@ async function getLeadPaymentReceipt(leadId, { branchId, extraFilter = {}, refre
   }
 
   const paymentObj = payment.toObject?.() || payment;
-  const voucher = buildVoucherPayload({ lead, payment: paymentObj, booking, quotation });
+  const agent = await resolveAgentContact({
+    lead,
+    quotation,
+    user: { name: booking?.executiveName || '' },
+  });
+  const voucher = buildVoucherPayload({ lead, payment: paymentObj, booking, quotation, agent });
 
   return {
     summary: summarizePayment(paymentObj, booking),

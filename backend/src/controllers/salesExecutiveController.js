@@ -28,6 +28,7 @@ const Payment = require('../models/Payment');
 const Booking = require('../models/Booking');
 const { invalidate: invalidateDashboardCache } = require('../services/dashboardCacheService');
 const { notifyQuotationCreated } = require('../services/notificationService');
+const { tripPlannerFromUser } = require('../utils/agentContact');
 const {
   loadLeadCore,
   loadLeadRelated,
@@ -929,6 +930,7 @@ const createQuotation = asyncHandler(async (req, res) => {
     branchId: req.branchId || req.user.branchId || null,
     teamLeader: teamLeader?._id,
     timeline,
+    tripPlanner: tripPlannerFromUser(req.user) || undefined,
     createdBy: req.user._id,
     discountHistory: [],
   });
@@ -1151,6 +1153,10 @@ const updateQuotation = asyncHandler(async (req, res) => {
       quotation.selectedActivities = payload.selectedActivities || [];
     }
     if (payload.customizations !== undefined) quotation.customizations = payload.customizations;
+    if (!quotation.tripPlanner?.phone) {
+      const planner = tripPlannerFromUser(req.user);
+      if (planner) quotation.tripPlanner = planner;
+    }
 
     const {
       snapshotCosting1,

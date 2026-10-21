@@ -17,15 +17,22 @@ export function resolveQuotePackage(quote) {
   const snap = quote?.packageSnapshot && typeof quote.packageSnapshot === 'object' ? quote.packageSnapshot : {};
   const pop = quote?.package && typeof quote.package === 'object' ? quote.package : {};
   const raw = { ...pop, ...snap };
-  const itinerary = (raw.itinerary || []).map((day, i) => ({
-    ...day,
-    id: day.id || day._id || `day-${i}`,
-    hotel: day.hotel || day.accommodation || '',
-    activities: day.activities || '',
-    transport: day.transport || '',
-    sightseeing: day.sightseeing || '',
-    activityNotes: day.activityNotes || '',
-  }));
+  const travelYmd = toYmd(raw.travelDate || snap.travelDate);
+  const itinerary = (raw.itinerary || []).map((day, i) => {
+    const dayNum = Number(day.day) || i + 1;
+    const stamped = toYmd(day.date) || (travelYmd ? shiftYmd(travelYmd, dayNum - 1) : '');
+    return {
+      ...day,
+      id: day.id || day._id || `day-${i}`,
+      day: dayNum,
+      date: stamped,
+      hotel: day.hotel || day.accommodation || '',
+      activities: day.activities || '',
+      transport: day.transport || '',
+      sightseeing: day.sightseeing || '',
+      activityNotes: day.activityNotes || '',
+    };
+  });
 
   // Prefer non-empty lists — empty [] on snapshot must not wipe package / catalog data
   const inclusions = pickInclusionExclusionList(
@@ -145,11 +152,22 @@ export function formatQuoteDate(value) {
 }
 
 export function formatQuoteDateShort(value) {
-  if (!value) return '—';
-  const d = new Date(value);
-  const day = d.getDate();
+  const ymd = toYmd(value);
+  if (!ymd) return '—';
+  const [y, m, d] = ymd.split('-').map(Number);
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${day}-${months[d.getMonth()]}-${String(d.getFullYear()).slice(-2)}`;
+  return `${d}-${months[m - 1]}-${String(y).slice(-2)}`;
+}
+
+export function isVolvoOrBusName(value) {
+  return /volvo|\bbus\b/i.test(String(value || ''));
+}
+
+export function volvoServiceLabel(name) {
+  const text = String(name || '');
+  if (/volvo/i.test(text)) return 'Volvo Cab';
+  if (/\bbus\b/i.test(text)) return 'Bus';
+  return 'Volvo Cab';
 }
 
 export function toYmd(value) {
@@ -512,47 +530,72 @@ export function resolveQuoteHotels(quote) {
 
 export function resolveQuoteVehicles(quote) {
   const pkg = resolveQuotePackage(quote);
-  if (pkg.vehicles?.length) return pkg.vehicles;
-
-  const cabs = Array.isArray(quote.selectedCabs) ? quote.selectedCabs.filter(Boolean) : [];
+  const selected = Array.isArray(quote.selectedCabs) ? quote.selectedCabs.filter(Boolean) : [];
+  const catalogVehicles = Array.isArray(pkg.vehicles) ? pkg.vehicles.filter(Boolean) : [];
+  const cabs = selected.length ? selected : catalogVehicles;
   const lead = resolveQuoteLead(quote);
-  const end = getDayDate(lead.travelDate, (pkg.duration || 1) - 1);
+  const tripEnd = getDayDate(lead.travelDate, Math.max(1, Number(pkg.duration) || 1) - 1);
+  const looksVolvo = (cab) => isVolvoOrBusName(
+    `${cab?.name || ''} ${cab?.vehicleType || ''} ${cab?.cabCategory || ''}`
+  );
+  const mixedVolvo = cabs.some(looksVolvo) && cabs.some((cab) => !looksVolvo(cab));
 
-  if (cabs.length) {
-    return cabs.map((cab, index) => {
-      const cabName = cab?.name || cab?.vehicleType || cab?.cabCategory || 'Private Cab';
-      const start = cab?.travelDate || lead.travelDate;
-      const routeLabel = [cab.pickupCity || cab.pickupLocation, cab.dropCity || cab.dropLocation]
-        .filter(Boolean)
-        .join(' → ');
-      const roleTag =
-        cab.role === 'companion' || index > 0
-          ? 'Companion transport'
-          : cab.isPackageCab
-            ? 'Package cab'
-            : '';
-      const cabLabel = roleTag
-        ? `${cabName} (${roleTag})`
-        : routeLabel
-          ? `${cabName} (${routeLabel})`
-          : cabName;
-      return {
-        name: cabLabel,
-        vehicleType: cab.vehicleType || cab.cabCategory || cabName,
+  if (!cabs.length) {
+    const start = lead.travelDate;
+    if (pkg.cabCategory) {
+      return [{
+        name: pkg.cabCategory,
+        serviceName: pkg.cabCategory,
         startDate: start,
-        endDate: end || start,
-        seatingCapacity: cab.seatingCapacity,
-        tripType: cab.tripType,
-      };
-    });
+        endDate: tripEnd || start,
+        isVolvo: isVolvoOrBusName(pkg.cabCategory),
+        mixedVolvo: false,
+      }];
+    }
+    return [];
   }
 
-  const start = lead.travelDate;
-  if (pkg.cabCategory) {
-    return [{ name: pkg.cabCategory, startDate: start, endDate: end || start }];
-  }
-
-  return [];
+  return cabs.map((cab, index) => {
+    const cabName = cab?.name || cab?.vehicleType || cab?.cabCategory || 'Private Cab';
+    const isVolvo = looksVolvo(cab);
+    const routeLabel = [cab.pickupCity || cab.pickupLocation, cab.dropCity || cab.dropLocation]
+      .filter(Boolean)
+      .join(' → ');
+    const roleTag =
+      cab.role === 'companion' || index > 0
+        ? 'Companion transport'
+        : cab.isPackageCab
+          ? 'Package cab'
+          : '';
+    const detailedName = roleTag
+      ? `${cabName} (${roleTag})`
+      : routeLabel
+        ? `${cabName} (${routeLabel})`
+        : cabName;
+    let start = cab?.travelDate || lead.travelDate;
+    let end = tripEnd || start;
+    if (mixedVolvo) {
+      if (isVolvo) {
+        start = cab?.travelDate || lead.travelDate;
+        end = start;
+      } else if (lead.travelDate) {
+        start = getDayDate(lead.travelDate, 2) || start;
+        end = tripEnd || start;
+      }
+    }
+    return {
+      name: isVolvo && mixedVolvo ? volvoServiceLabel(cabName) : detailedName,
+      detailName: detailedName,
+      serviceName: isVolvo ? volvoServiceLabel(cabName) : cabName,
+      vehicleType: cab.vehicleType || cab.cabCategory || cabName,
+      startDate: start,
+      endDate: end,
+      seatingCapacity: cab.seatingCapacity,
+      tripType: cab.tripType,
+      isVolvo,
+      mixedVolvo,
+    };
+  });
 }
 
 function formatExecPhone(raw) {

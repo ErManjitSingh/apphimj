@@ -166,8 +166,8 @@ function dayLabel(days = []) {
   return days.map((day) => `Day ${day}`).join(', ');
 }
 
-function refreshVoucherDocuments(vouchers, booking, hotels, transport) {
-  return vouchers.map((voucher) => {
+async function refreshVoucherDocuments(vouchers, booking, hotels, transport) {
+  return Promise.all(vouchers.map(async (voucher) => {
     let serviceBooking = { ...booking, hotels, transport };
     if (voucher.type === 'hotel') {
       const ids = new Set((voucher.details?.hotelAssignmentIds || []).map(String));
@@ -184,9 +184,9 @@ function refreshVoucherDocuments(vouchers, booking, hotels, transport) {
     }
     return {
       ...voucher,
-      pdfUrl: generateVoucherDocument(voucher, serviceBooking),
+      pdfUrl: await generateVoucherDocument(voucher, serviceBooking),
     };
-  });
+  }));
 }
 
 const getDashboard = asyncHandler(async (req, res) => {
@@ -223,7 +223,7 @@ const getBooking = asyncHandler(async (req, res) => {
     enrichHotelContacts(booking.hotels || []),
     enrichTransportContacts(booking.transport || []),
   ]);
-  const refreshedVouchers = refreshVoucherDocuments(vouchers, booking, hotels, transport);
+  const refreshedVouchers = await refreshVoucherDocuments(vouchers, booking, hotels, transport);
   res.json({
     ...booking,
     hotels,
@@ -433,7 +433,7 @@ const createVoucher = asyncHandler(async (req, res) => {
     details,
   };
 
-  const pdfUrl = generateVoucherDocument(voucherDoc, booking);
+  const pdfUrl = await generateVoucherDocument(voucherDoc, booking);
   voucherDoc.pdfUrl = pdfUrl;
 
   const voucher = await Voucher.create(voucherDoc);
@@ -501,7 +501,7 @@ const sendHotelVoucher = asyncHandler(async (req, res) => {
       recipientPhone: hotel.phone || '',
       details,
     };
-    voucherDoc.pdfUrl = generateVoucherDocument(voucherDoc, {
+    voucherDoc.pdfUrl = await generateVoucherDocument(voucherDoc, {
       ...booking.toObject(),
       hotels: groupedHotels.map((row) => row.toObject()),
     });
@@ -512,7 +512,7 @@ const sendHotelVoucher = asyncHandler(async (req, res) => {
     serviceDays,
     hotelAssignmentIds: groupedHotels.map((row) => row._id),
   };
-  voucher.pdfUrl = generateVoucherDocument(voucher.toObject(), {
+  voucher.pdfUrl = await generateVoucherDocument(voucher.toObject(), {
     ...booking.toObject(),
     hotels: groupedHotels.map((row) => row.toObject()),
   });
@@ -631,7 +631,7 @@ const sendTransportVoucher = asyncHandler(async (req, res) => {
     serviceDays,
     transportAssignmentIds: groupedTransport.map((row) => row._id),
   };
-  voucher.pdfUrl = generateVoucherDocument(voucher.toObject(), {
+  voucher.pdfUrl = await generateVoucherDocument(voucher.toObject(), {
     ...booking.toObject(),
     transport: groupedTransport.map((row) => row.toObject()),
   });

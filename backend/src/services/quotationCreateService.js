@@ -5,6 +5,7 @@ const { logActivity, getClientIp } = require('./activityService');
 const { logLeadActivity } = require('./leadActivityService');
 const { notifyQuotationCreated } = require('./notificationService');
 const { resolvePackageReference } = require('../utils/packageRef');
+const { tripPlannerFromUser } = require('../utils/agentContact');
 
 async function persistQuotation({
   req,
@@ -36,6 +37,7 @@ async function persistQuotation({
     branchId: req.branchId || lead.branchId || req.user.branchId || null,
     teamLeader: teamLeaderId || body.teamLeader,
     timeline,
+    tripPlanner: tripPlannerFromUser(req.user) || undefined,
     createdBy: req.user._id,
   });
 

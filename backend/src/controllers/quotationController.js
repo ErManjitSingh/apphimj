@@ -9,6 +9,7 @@ const { QUOTATION_POPULATE, generateQuoteNumber } = require('../utils/queryHelpe
 const { findQuotationsPaginated } = require('../repositories/quotationRepository');
 const { getQuotationStats } = require('../repositories/roleScopedRepository');
 const { calculateQuotationPricing } = require('../services/quotationCostingService');
+const { tripPlannerFromUser } = require('../utils/agentContact');
 
 function buildComputedPricingPayload({ body, packageSnapshot }) {
   const computed = calculateQuotationPricing({
@@ -90,6 +91,7 @@ const createQuotation = asyncHandler(async (req, res) => {
     timeline: req.body.timeline || [
       { type: 'created', date: new Date(), user: req.user.name, notes: 'Quote created' },
     ],
+    tripPlanner: tripPlannerFromUser(req.user) || undefined,
     createdBy: req.user._id,
   });
 
@@ -118,6 +120,10 @@ const updateQuotation = asyncHandler(async (req, res) => {
   });
 
   Object.assign(quotation, req.body, computedPayload);
+  if (!quotation.tripPlanner?.phone) {
+    const planner = tripPlannerFromUser(req.user);
+    if (planner) quotation.tripPlanner = planner;
+  }
   await quotation.save();
 
   const populated = await Quotation.findById(quotation._id).populate(QUOTATION_POPULATE).lean();

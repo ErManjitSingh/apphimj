@@ -10,6 +10,7 @@ import {
   formatQuoteDate,
   formatQuoteDateShort,
   getDayDate,
+  toYmd,
   resolveQuoteVehicles,
   resolveDayHotelForItinerary,
   resolveDayStaySummary,
@@ -22,6 +23,10 @@ import { shortMealPlanLabel } from '../../lib/mealPlanDefaults';
 import { absolutizeUrl } from './embedPrintImages';
 
 /** Split long text into short bullet lines — no dense paragraphs. */
+function isTransportDetailLine(line) {
+  return /volvo|\bbus\b|\bcab\b|transport|private transfer/i.test(String(line || ''));
+}
+
 function toBulletLines(text, { max = 6, maxLen = 110 } = {}) {
   const raw = String(text || '').trim();
   if (!raw) return [];
@@ -210,6 +215,9 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
     .split(/\n\n+/)
     .map((p) => p.trim())
     .filter(Boolean);
+  const mixedVolvo = vehicles.some((v) => v.mixedVolvo);
+  const volvoName = vehicles.find((v) => v.isVolvo)?.serviceName || 'Volvo Cab';
+  const contactPhone = planner.phone || COMPANY_INFO.phone;
 
   return (
     <div ref={ref} className="quote-ht-pdf">
@@ -271,7 +279,7 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
             <p key={para.slice(0, 40)}>{para}</p>
           ))}
           <p className="quote-ht-welcome-contact">
-            Need help anytime? <strong>{COMPANY_INFO.phone}</strong> · {COMPANY_INFO.email}
+            Need help anytime? <strong>{contactPhone}</strong> · {COMPANY_INFO.email}
           </p>
         </div>
       </PdfSection>
@@ -294,7 +302,7 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
                 pax.extraBeds ? ` · ${pax.extraBeds} Mattress${pax.extraBeds === 1 ? '' : 'es'}` : ''
               }`,
             ],
-            ['Cab', pkg.cabCategory || vehicles[0]?.name || '—'],
+            ['Cab', mixedVolvo ? volvoName : (pkg.cabCategory || vehicles[0]?.name || '—')],
             ...(lead.phone ? [['Contact', lead.phone]] : []),
             ...(lead.travelDate ? [['Travel date', formatQuoteDate(lead.travelDate)]] : []),
             ['Category', pkg.packageCategory],
@@ -318,7 +326,9 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
                   <div className="quote-ht-transport-meta">
                     {v.tripType ? v.tripType.replace(/_/g, ' ') : 'Private transfer'}
                     {v.startDate ? ` · ${formatQuoteDateShort(v.startDate)}` : ''}
-                    {v.endDate ? ` → ${formatQuoteDateShort(v.endDate)}` : ''}
+                    {v.endDate && toYmd(v.endDate) !== toYmd(v.startDate)
+                      ? ` → ${formatQuoteDateShort(v.endDate)}`
+                      : ''}
                   </div>
                 </div>
               </div>
@@ -332,7 +342,10 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
           <div className="quote-ht-timeline">
             {pkg.itinerary.map((day, index) => {
               const dayNum = Number(day.day) || index + 1;
-              const dayDate = day.date ? getDayDate(day.date, 1) : getDayDate(lead.travelDate, dayNum);
+              const dayDate =
+                getDayDate(day.date, 1) ||
+                getDayDate(lead.travelDate, dayNum) ||
+                getDayDate(pkg.travelDate, dayNum);
               const dayHotel = resolveDayHotelForItinerary(quote, dayNum);
               const stay = resolveDayStaySummary(quote, dayNum);
               const hasHotel = dayHotel?.name || day.hotel;
@@ -343,6 +356,17 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
               const activityPoints = toBulletLines(day.activities || day.activityNotes, {
                 max: 4,
               });
+              const visibleDayPoints = mixedVolvo
+                ? dayPoints.filter((line) => !isTransportDetailLine(line))
+                : dayPoints;
+              const visibleActivities = mixedVolvo
+                ? activityPoints.filter((line) => !isTransportDetailLine(line))
+                : activityPoints;
+              const showVolvoName = mixedVolvo && (
+                Boolean(day.transport)
+                || dayPoints.length !== visibleDayPoints.length
+                || activityPoints.length !== visibleActivities.length
+              );
 
               return (
                 <div
@@ -374,9 +398,13 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
                       )}
                     </div>
 
-                    {dayPoints.length > 0 && <BulletList items={dayPoints} className="quote-ht-day-points" />}
+                    {showVolvoName && (
+                      <div className="quote-ht-day-date">{volvoName}</div>
+                    )}
 
-                    {(sightPoints.length > 0 || activityPoints.length > 0) && (
+                    {visibleDayPoints.length > 0 && <BulletList items={visibleDayPoints} className="quote-ht-day-points" />}
+
+                    {(sightPoints.length > 0 || visibleActivities.length > 0) && (
                       <div className="quote-ht-day-extra">
                         {sightPoints.length > 0 && (
                           <div className="quote-ht-day-extra-block">
@@ -384,10 +412,10 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
                             <BulletList items={sightPoints} />
                           </div>
                         )}
-                        {activityPoints.length > 0 && (
+                        {visibleActivities.length > 0 && (
                           <div className="quote-ht-day-extra-block">
                             <strong>Activities</strong>
-                            <BulletList items={activityPoints} />
+                            <BulletList items={visibleActivities} />
                           </div>
                         )}
                       </div>
@@ -501,11 +529,11 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
           <div className="quote-ht-planner-box quote-ht-planner-box--accent">
             <h4>Trip Planner</h4>
             <div className="quote-ht-planner-name">{planner.name}</div>
-            <div className="quote-ht-contact-line">{planner.phone || COMPANY_INFO.phone}</div>
+            <div className="quote-ht-contact-line">{contactPhone}</div>
           </div>
           <div className="quote-ht-planner-box">
             <h4>{COMPANY_INFO.name}</h4>
-            <div className="quote-ht-contact-line">{COMPANY_INFO.phone}</div>
+            <div className="quote-ht-contact-line">{contactPhone}</div>
             <div className="quote-ht-contact-line">{COMPANY_INFO.email}</div>
             <div>Address: {COMPANY_INFO.address}</div>
             <div className="quote-ht-contact-line">{COMPANY_INFO.website}</div>
@@ -532,7 +560,7 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
           <p className="quote-ht-footer-brand">{COMPANY_INFO.brand}</p>
           <p>{COMPANY_INFO.tagline}</p>
           <p>
-            {COMPANY_INFO.phone} · {COMPANY_INFO.email}
+            {contactPhone} · {COMPANY_INFO.email}
           </p>
           <p>
             {COMPANY_INFO.website} · Instagram · Facebook

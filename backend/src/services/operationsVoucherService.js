@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const company = require('../config/company');
+const { resolveAgentContact } = require('../utils/agentContact');
 
 const UPLOADS_ROOT = path.join(__dirname, '../../uploads');
 const VOUCHER_DIR = path.join(UPLOADS_ROOT, 'vouchers');
@@ -58,7 +59,7 @@ const BASE_STYLES = `
   @media print { body { background: #fff; padding: 0; } .page { border: none; border-radius: 0; } }
 `;
 
-function buildVoucherHtml(voucher, booking) {
+function buildVoucherHtml(voucher, booking, agent) {
   const type = voucher.type || 'hotel';
   const typeLabel = { hotel: 'Hotel Voucher', transport: 'Cab / Transport Voucher', activity: 'Activity Voucher', master: 'Master Travel Voucher' }[type] || 'Travel Voucher';
   const details = voucher.details || {};
@@ -263,6 +264,7 @@ function buildVoucherHtml(voucher, booking) {
     <div class="summary-item"><span>Guests</span><strong>${esc(pax)}</strong></div>
     <div class="summary-item"><span>Destination</span><strong>${esc(booking.destination)}</strong></div>
     <div class="summary-item"><span>Travel period</span><strong>${fmtDate(booking.travelDate)}<br/>${fmtDate(booking.returnDate)}</strong></div>
+    ${agent?.phone ? `<div class="summary-item"><span>Agent</span><strong>${esc(agent.name || 'Travel expert')}<br/>${esc(agent.phone)}</strong></div>` : ''}
   </section>
   <section class="content">
     <div class="section-title"><h2>Confirmed service details</h2><span>${serviceDays}</span></div>
@@ -336,8 +338,12 @@ function writeHtmlFile(dir, fileName, html) {
   return `/uploads/${sub}/${fileName}`;
 }
 
-function generateVoucherDocument(voucher, booking) {
-  const html = buildVoucherHtml(voucher, booking);
+async function generateVoucherDocument(voucher, booking) {
+  const agent = await resolveAgentContact({
+    lead: { assignedTo: booking?.assignedTo },
+    quotation: booking?.quotation,
+  });
+  const html = buildVoucherHtml(voucher, booking, agent?.phone ? agent : null);
   const safeName = `${voucher.voucherNumber.replace(/[^a-zA-Z0-9-_]/g, '_')}.html`;
   return writeHtmlFile(VOUCHER_DIR, safeName, html);
 }

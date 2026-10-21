@@ -1256,6 +1256,14 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
       travelers: state.pricing?.party?.travelers,
       extraCabs,
     }),
+    tripPlanner: {
+      name: selectedLead.assignedTo?.name || user?.name || '',
+      phone: selectedLead.assignedTo?.phone || user?.phone || '',
+      email: selectedLead.assignedTo?.email || user?.email || '',
+    },
+    createdBy: user
+      ? { name: user.name, phone: user.phone, email: user.email }
+      : undefined,
   } : null;
 
   const inBuilder = step >= 3 && Boolean(activePkg);

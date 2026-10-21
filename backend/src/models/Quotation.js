@@ -101,6 +101,12 @@ const quotationSchema = new mongoose.Schema(
     customizations: { type: String, default: '' },
     /** Required when executive re-submits a 2nd+ quotation for TL/Manager approval */
     resubmissionReason: { type: String, trim: true, maxlength: 1000, default: '' },
+    /** Sales agent shown on the quotation PDF (name + phone of the agent who owns the quote). */
+    tripPlanner: {
+      name: { type: String, default: '' },
+      phone: { type: String, default: '' },
+      email: { type: String, default: '' },
+    },
     createdByExecutive: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     teamLeader: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
