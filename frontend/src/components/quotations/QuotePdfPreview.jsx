@@ -12,6 +12,7 @@ import {
   getDayDate,
   resolveQuoteVehicles,
   resolveDayHotelForItinerary,
+  resolveDayStaySummary,
   resolveTripPlanner,
   resolvePolicies,
   resolveBankAccounts,
@@ -121,7 +122,7 @@ function BulletList({ items, className = '' }) {
   );
 }
 
-function HotelStayCard({ dayHotel, dayMeals, dayNumber }) {
+function HotelStayCard({ dayHotel, dayMeals, dayNumber, roomCount = 0, mattresses = 0 }) {
   if (!dayHotel?.name) return null;
 
   const hotelPhoto = absolutizeUrl(
@@ -138,6 +139,8 @@ function HotelStayCard({ dayHotel, dayMeals, dayNumber }) {
     ? shortMealPlanLabel(dayHotel.mealPlanKey, dayHotel.meals, dayMeals, dayHotel.mealPlan)
     : dayHotel.meals || dayMeals || '—';
   const roomType = dayHotel.roomType || 'Deluxe';
+  const roomsLabel = `${Math.max(1, Number(roomCount) || 1)} Room${Number(roomCount) === 1 ? '' : 's'}`;
+  const mattressLabel = `${Math.max(0, Number(mattresses) || 0)} Mattress${Number(mattresses) === 1 ? '' : 'es'}`;
   const rating = Number(dayHotel.rating || dayHotel.starCategory || 0);
 
   return (
@@ -160,12 +163,18 @@ function HotelStayCard({ dayHotel, dayMeals, dayNumber }) {
           </div>
         )}
         <div className="quote-ht-stay-meta">
-          {!isDayOne && (
-            <div className="quote-ht-stay-meta-item">
-              <span className="quote-ht-stay-meta-label">Room</span>
-              <span className="quote-ht-stay-meta-value">{roomType}</span>
-            </div>
-          )}
+          <div className="quote-ht-stay-meta-item">
+            <span className="quote-ht-stay-meta-label">Room</span>
+            <span className="quote-ht-stay-meta-value">{roomType}</span>
+          </div>
+          <div className="quote-ht-stay-meta-item">
+            <span className="quote-ht-stay-meta-label">Rooms</span>
+            <span className="quote-ht-stay-meta-value">{roomsLabel}</span>
+          </div>
+          <div className="quote-ht-stay-meta-item">
+            <span className="quote-ht-stay-meta-label">Mattresses</span>
+            <span className="quote-ht-stay-meta-value">{mattressLabel}</span>
+          </div>
           <div className="quote-ht-stay-meta-item">
             <span className="quote-ht-stay-meta-label">Meal Plan</span>
             <span className="quote-ht-stay-meta-value">{mealPlan}</span>
@@ -281,7 +290,9 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
             ],
             [
               'Rooms',
-              `${pax.rooms}${pax.extraBeds ? ` + ${pax.extraBeds} extra bed` : ''}`,
+              `${pax.rooms} Room${pax.rooms === 1 ? '' : 's'}${
+                pax.extraBeds ? ` · ${pax.extraBeds} Mattress${pax.extraBeds === 1 ? '' : 'es'}` : ''
+              }`,
             ],
             ['Cab', pkg.cabCategory || vehicles[0]?.name || '—'],
             ...(lead.phone ? [['Contact', lead.phone]] : []),
@@ -320,8 +331,10 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
         <PdfSection title="Day-wise Itinerary" eyebrow="Your journey" spaced flush>
           <div className="quote-ht-timeline">
             {pkg.itinerary.map((day, index) => {
-              const dayDate = getDayDate(lead.travelDate, day.day);
-              const dayHotel = resolveDayHotelForItinerary(quote, day.day);
+              const dayNum = Number(day.day) || index + 1;
+              const dayDate = day.date ? getDayDate(day.date, 1) : getDayDate(lead.travelDate, dayNum);
+              const dayHotel = resolveDayHotelForItinerary(quote, dayNum);
+              const stay = resolveDayStaySummary(quote, dayNum);
               const hasHotel = dayHotel?.name || day.hotel;
               const isLast = index === pkg.itinerary.length - 1;
               const dayPhoto = destImages[index % Math.max(1, destImages.length)];
@@ -338,7 +351,7 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
                 >
                   <div className="quote-ht-timeline-rail">
                     <span className="quote-ht-timeline-dot">
-                      {String(day.day).padStart(2, '0')}
+                      {String(dayNum).padStart(2, '0')}
                     </span>
                     {!isLast && <span className="quote-ht-timeline-line" />}
                   </div>
@@ -347,7 +360,7 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
                       <div className="quote-ht-day-head-main">
                         <h3 className="quote-ht-day-title">{day.title}</h3>
                         <div className="quote-ht-day-date">
-                          {dayDate ? formatQuoteDate(dayDate) : `Day ${day.day}`}
+                          {dayDate ? formatQuoteDate(dayDate) : `Day ${dayNum}`}
                         </div>
                       </div>
                       {dayPhoto?.url && (
@@ -382,12 +395,14 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
 
                     {hasHotel && (
                       <HotelStayCard
-                        dayNumber={day.day}
+                        dayNumber={dayNum}
                         dayMeals={day.meals}
+                        roomCount={stay.roomCount || pax.rooms}
+                        mattresses={stay.mattresses > 0 ? stay.mattresses : pax.extraBeds}
                         dayHotel={
                           dayHotel || {
                             name: day.hotel,
-                            roomType: '',
+                            roomType: stay.roomType || '',
                             meals: day.meals,
                             city: pkg.destination?.split(/[,·|/]/)[0]?.trim(),
                           }

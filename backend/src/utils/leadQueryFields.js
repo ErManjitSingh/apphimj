@@ -21,6 +21,9 @@ const LEAD_LIST_SELECT = [
   'adults',
   'children',
   'infants',
+  // Quotation builder needs these from list payload (exact lead stay → quote hotels).
+  'numberOfRooms',
+  'roomsWithMattress',
   'assignedTo',
   'assignedAt',
   'assigneeRole',

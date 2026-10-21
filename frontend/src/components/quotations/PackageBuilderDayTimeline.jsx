@@ -195,9 +195,25 @@ function HotelCard({
     'map';
   const rateNight = resolveHotelNightDisplayRate(hotelSel, meta, mealKey, seasonKey);
   const mattressRate = resolveExtraBedNightRate(hotelSel || meta, mealKey);
-  const rawTotal = isIncluded
-    ? rateNight * nights
-    : rateNight * nights * Math.max(1, Number(rooms) || 1);
+  // Full rack for all rooms on this night + mattresses (matches sidebar hotelCost).
+  const multiLine = Array.isArray(extraRoomLines) && extraRoomLines.length > 0;
+  const primaryRooms = multiLine ? 1 : Math.max(1, Number(rooms) || 1);
+  const primaryMattresses = clampExtraMattresses(primaryExtraMattresses);
+  let roomTotal = rateNight * nights * primaryRooms;
+  let mattressTotal = mattressRate * nights * primaryMattresses;
+  if (multiLine) {
+    extraRoomLines.forEach((line) => {
+      const lineNights = Math.max(1, Number(line?.nights) || nights);
+      const lineMeal =
+        line?.mealPlan?.key || line?.mealPlanKey || line?.meals || mealKey;
+      const lineRate = resolveHotelNightDisplayRate(line, null, lineMeal, seasonKey);
+      const lineMatRate = resolveExtraBedNightRate(line, lineMeal);
+      const lineMats = extraMattressesOnLine(line);
+      roomTotal += Number(lineRate || 0) * lineNights;
+      mattressTotal += Number(lineMatRate || 0) * lineNights * lineMats;
+    });
+  }
+  const rawTotal = roomTotal + mattressTotal;
   const displayTotal = Math.round(rawTotal * 100) / 100;
   const hasStay = Boolean(meta?.name || hotelSel?.hotel?.name);
   const hasDedicatedOff =

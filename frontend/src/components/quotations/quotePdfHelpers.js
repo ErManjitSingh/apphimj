@@ -6,7 +6,11 @@ import {
   QUOTE_DEFAULT_INCLUSIONS,
   QUOTE_DEFAULT_EXCLUSIONS,
 } from './quoteTemplateDefaults';
-import { resolveExtraBedNightRate, shortMealPlanLabel } from '../../lib/mealPlanDefaults';
+import {
+  resolveExtraBedNightRate,
+  resolveHotelNightDisplayRate,
+  shortMealPlanLabel,
+} from '../../lib/mealPlanDefaults';
 import { pickInclusionExclusionList } from '../../lib/inclusionExclusionLines';
 
 export function resolveQuotePackage(quote) {
@@ -107,17 +111,37 @@ export function resolveQuoteLead(quote) {
     phone: firstNonEmpty(lead.phone, lead.mobile, lead.whatsapp, quote?.leadPhone, snap.guestPhone),
     email: firstNonEmpty(lead.email, quote?.leadEmail, snap.guestEmail),
     destination: firstNonEmpty(lead.destination, quote?.destination, snap.destination, pkg.destination),
-    travelDate: lead.travelDate || quote?.travelDate || snap.travelDate || pkg.travelDate || '',
-    adults: lead.adults ?? quote?.adults ?? snap.adults,
-    children: lead.children ?? quote?.children ?? snap.children,
-    travelers: lead.travelers ?? quote?.travelers,
-    numberOfRooms: lead.numberOfRooms ?? lead.rooms ?? snap.rooms,
+    travelDate:
+      lead.travelDate ||
+      quote?.travelDate ||
+      snap.travelDate ||
+      pkg.travelDate ||
+      '',
+    adults: lead.adults ?? quote?.adults ?? snap.adults ?? quote?.pricing?.party?.adults,
+    children: lead.children ?? quote?.children ?? snap.children ?? quote?.pricing?.party?.children,
+    travelers: lead.travelers ?? quote?.travelers ?? quote?.pricing?.party?.travelers,
+    numberOfRooms:
+      lead.numberOfRooms ??
+      lead.rooms ??
+      snap.numberOfRooms ??
+      snap.rooms ??
+      quote?.pricing?.party?.rooms,
+    roomsWithMattress:
+      lead.roomsWithMattress ??
+      snap.roomsWithMattress ??
+      snap.mattresses ??
+      snap.extraBeds ??
+      quote?.pricing?.party?.mattresses,
   };
 }
 
 export function formatQuoteDate(value) {
-  if (!value) return '—';
-  return new Date(value).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+  const ymd = toYmd(value);
+  if (!ymd) return '—';
+  const [y, m, d] = ymd.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  if (Number.isNaN(dt.getTime())) return '—';
+  return dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 export function formatQuoteDateShort(value) {
@@ -150,10 +174,13 @@ export function shiftYmd(ymd, days) {
 }
 
 export function getDayDate(travelDate, dayNumber) {
-  if (!travelDate || !dayNumber) return null;
-  const d = new Date(travelDate);
-  d.setDate(d.getDate() + (dayNumber - 1));
-  return d;
+  const ymd = toYmd(travelDate);
+  const day = Number(dayNumber);
+  if (!ymd || !Number.isFinite(day) || day < 1) return null;
+  const shifted = shiftYmd(ymd, day - 1);
+  if (!shifted) return null;
+  const [y, m, d] = shifted.split('-').map(Number);
+  return new Date(y, m - 1, d);
 }
 
 export function getQuoteTypeLabel(quote) {
@@ -180,21 +207,25 @@ export function buildSelectedHotelsSnapshot(dayWiseHotels, { rooms = 1, mattress
   return list
     .filter((entry) => entry?.hotel)
     .map((entry) => {
-      const nights = entry.nights || 1;
-      const unitPerNight = Number(entry.perNight || 0);
-      const unitTotal = Number(entry.totalCost ?? entry.perNight ?? 0);
-      const absolute = Number(entry.absolutePerNight || 0);
+      const nights = Math.max(1, Number(entry.nights) || 1);
+      const mealKey = entry.mealPlan?.key || entry.mealPlanKey || entry.meals || 'map';
+      const seasonKey = entry.hotelSeason === 'offSeason' ? 'offSeason' : 'onSeason';
+      // Full rack rate (same as sidebar hotelCost) — not upgrade perNight (often 0 on package room).
+      const absolute =
+        Number(
+          resolveHotelNightDisplayRate(entry, null, mealKey, seasonKey) ||
+            entry.absolutePerNight ||
+            0
+        ) || 0;
       const extraMats = Math.max(0, Number(entry.extraMattresses) || 0);
       const extraBedRates = entry.extraBedRates || entry.room?.extraBedRates || null;
-      const extraBedPerNight = resolveExtraBedNightRate(entry, entry.mealPlan?.key || 'map');
+      const extraBedPerNight = resolveExtraBedNightRate(entry, mealKey);
+      const dayLines = list.filter((x) => Number(x.day) === Number(entry.day)).length;
       const lineRooms =
-        Number(entry.roomSlot) > 1
-          ? 1
-          : list.filter((x) => x.day === entry.day).length > 1
-            ? 1
-            : roomCount;
-      const total =
-        Math.round((unitTotal * lineRooms + extraBedPerNight * nights * extraMats) * 100) / 100;
+        Number(entry.roomSlot) > 1 || dayLines > 1 ? 1 : roomCount;
+      const roomTotal = absolute * nights * lineRooms;
+      const mattressTotal = extraBedPerNight * nights * extraMats;
+      const total = Math.round((roomTotal + mattressTotal) * 100) / 100;
       return {
         day: entry.day,
         roomSlot: entry.roomSlot || 1,
@@ -230,10 +261,10 @@ export function buildSelectedHotelsSnapshot(dayWiseHotels, { rooms = 1, mattress
         extraMattresses: extraMats,
         extraBedPerNight,
         extraBedRates,
-        price: Math.round(unitPerNight * lineRooms * 100) / 100,
+        price: Math.round(absolute * lineRooms * 100) / 100,
         total,
         absolutePerNight: absolute,
-        priceDelta: unitPerNight,
+        priceDelta: Number(entry.perNight || 0),
         externalSource: entry.hotel.externalSource || 'catalog',
       };
     });
@@ -324,7 +355,34 @@ export function resolveDayHotelMap(quote) {
 
 export function resolveDayHotelForItinerary(quote, dayNum) {
   const { map } = resolveDayHotelMap(quote);
-  return map.get(dayNum) || null;
+  return map.get(dayNum) || map.get(Number(dayNum)) || null;
+}
+
+/** Room lines + mattress total for one itinerary night (from saved hotel selections). */
+export function resolveDayStaySummary(quote, dayNum) {
+  const day = Number(dayNum);
+  const lines = (Array.isArray(quote?.selectedHotels) ? quote.selectedHotels : []).filter(
+    (h) => Number(h.day) === day && (h.name || h.hotel?.name)
+  );
+  const hotel = resolveDayHotelForItinerary(quote, day);
+  if (!lines.length) {
+    return {
+      hotel,
+      roomCount: hotel ? Math.max(1, Number(hotel.rooms) || 1) : 0,
+      mattresses: Math.max(0, Number(hotel?.extraMattresses ?? hotel?.mattresses) || 0),
+      roomType: hotel?.roomType || hotel?.room?.name || '',
+    };
+  }
+  const roomCount = lines.reduce((sum, line) => sum + Math.max(1, Number(line.rooms) || 1), 0);
+  const mattresses = lines.reduce(
+    (sum, line) => sum + Math.max(0, Number(line.extraMattresses ?? line.mattresses) || 0),
+    0
+  );
+  const roomType =
+    lines.map((line) => line.room?.name || line.roomType).filter(Boolean)[0] ||
+    hotel?.roomType ||
+    '';
+  return { hotel, roomCount, mattresses, roomType };
 }
 
 export function resolveQuoteHotels(quote) {
@@ -538,11 +596,18 @@ export function resolveBankAccounts(quote) {
 export function resolveTravelerCounts(quote) {
   const lead = resolveQuoteLead(quote);
   const pkg = resolveQuotePackage(quote);
-  const total = Number(lead.travelers) || 2;
+  const party = quote?.pricing?.party || {};
+  const total = Number(lead.travelers || party.travelers) || 2;
+  const rooms = Number(
+    party.rooms ?? lead.numberOfRooms ?? pkg.numberOfRooms ?? pkg.rooms
+  );
+  const mattresses = Number(
+    party.mattresses ?? lead.roomsWithMattress ?? pkg.roomsWithMattress ?? pkg.extraBeds
+  );
   return {
-    adults: pkg.adults ?? Math.max(1, total - (pkg.kids || 0)),
-    kids: pkg.kids ?? 0,
-    rooms: pkg.rooms ?? Math.ceil(total / 2),
-    extraBeds: pkg.extraBeds ?? 0,
+    adults: Number(party.adults ?? pkg.adults ?? lead.adults) || Math.max(1, total - (pkg.kids || 0)),
+    kids: Number(pkg.kids ?? lead.children ?? party.children) || 0,
+    rooms: Number.isFinite(rooms) && rooms > 0 ? Math.floor(rooms) : Math.max(1, Math.ceil(total / 2)),
+    extraBeds: Number.isFinite(mattresses) && mattresses >= 0 ? Math.floor(mattresses) : 0,
   };
 }

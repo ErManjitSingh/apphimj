@@ -145,12 +145,20 @@ export function applySuggestedMattressesToDayLines(dayLines = [], adultsOrMats =
 
 /**
  * Expand each overnight day's hotel lines to match lead room + mattress counts exactly.
- * Lead detail is the source of truth — no adult-based auto rooms/mattresses.
+ * Reads lead.numberOfRooms / lead.roomsWithMattress directly (no adult auto-math).
  */
 export function expandDayWiseHotelsForParty(dayWiseHotels = [], lead = {}, itinerary = []) {
+  const roomsRaw = Number(lead?.numberOfRooms);
+  const matsRaw = Number(lead?.roomsWithMattress);
   const occ = resolvePartyOccupancy(lead || {});
-  const targetRooms = Math.max(1, Number(occ.rooms) || 1);
-  const targetMats = Math.max(0, Number(occ.mattresses) || 0);
+  const targetRooms =
+    Number.isFinite(roomsRaw) && roomsRaw > 0
+      ? Math.max(1, Math.floor(roomsRaw))
+      : Math.max(1, Number(occ.rooms) || 1);
+  const targetMats =
+    Number.isFinite(matsRaw) && matsRaw >= 0
+      ? Math.max(0, Math.floor(matsRaw))
+      : Math.max(0, Number(occ.mattresses) || 0);
   let lines = Array.isArray(dayWiseHotels) ? [...dayWiseHotels] : [];
   if (!lines.length) return lines;
 
@@ -170,6 +178,9 @@ export function expandDayWiseHotelsForParty(dayWiseHotels = [], lead = {}, itine
     if (!dayLines.length) return;
     const primary = dayLines[0];
     const next = [...dayLines];
+    const primaryRate = Number(
+      primary.absolutePerNight || primary.mealPlan?.absolutePrice || primary.perNight || 0
+    );
     while (next.length < targetRooms) {
       const slot = next.length + 1;
       next.push({
@@ -177,8 +188,9 @@ export function expandDayWiseHotelsForParty(dayWiseHotels = [], lead = {}, itine
         roomSlot: slot,
         // Extra rooms are charged full rack (not package-included).
         includedRate: 0,
-        perNight: Number(primary.absolutePerNight || primary.perNight || 0),
-        totalCost: Number(primary.absolutePerNight || primary.perNight || 0),
+        absolutePerNight: primaryRate,
+        perNight: primaryRate,
+        totalCost: primaryRate,
         extraMattresses: 0,
         fromPackage: Boolean(primary.fromPackage),
         selectedFromPackage: false,

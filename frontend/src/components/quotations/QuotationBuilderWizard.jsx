@@ -91,7 +91,7 @@ import { WIZARD_STEPS } from './constants';
 import { applyAskDiscount, calculatePricing, bakeCompanyMarginIntoLineCosts, defaultItineraryDay, defaultWizardState, formatINR, hasExtraDiscountRequest, matchesResourceDestination } from './quotationUtils';
 import { buildWebsiteAlignedQuoteCosts } from './partyCosting';
 import { getPartyCapacityReadiness, expandDayWiseHotelsForParty } from './partyCapacityHints';
-import { buildSelectedHotelsSnapshot, toYmd } from './quotePdfHelpers';
+import { buildSelectedHotelsSnapshot, shiftYmd, toYmd } from './quotePdfHelpers';
 import { hydrateWizardFromQuote } from './quotationHydrate';
 import { unwrapList } from '../../utils/apiHelpers';
 import PackageBuilderWorkspace from './PackageBuilderWorkspace';
@@ -187,6 +187,31 @@ const CONFIG_BY_MODE = {
 function emailEndpointForMode(mode) {
   if (mode === 'executive') return '/sales-executive/leads';
   return '/leads';
+}
+
+function leadDetailPathForMode(mode, leadId, leadsPath = '') {
+  if (!leadId) return null;
+  if (String(leadsPath || '').startsWith('/sales-executive')) {
+    return `/sales-executive/leads/${leadId}`;
+  }
+  if (String(leadsPath || '').startsWith('/team-leader')) {
+    return `/team-leader/leads/${leadId}`;
+  }
+  if (String(leadsPath || '').startsWith('/sales-manager')) {
+    return `/sales-manager/leads/${leadId}`;
+  }
+  if (mode === 'executive') return `/sales-executive/leads/${leadId}`;
+  return `/leads/${leadId}`;
+}
+
+function upsertLeadRow(list = [], lead) {
+  if (!lead?._id) return Array.isArray(list) ? list : [];
+  const rows = Array.isArray(list) ? list : [];
+  const idx = rows.findIndex((l) => String(l._id) === String(lead._id));
+  if (idx < 0) return [lead, ...rows];
+  const next = rows.slice();
+  next[idx] = { ...rows[idx], ...lead };
+  return next;
 }
 
 export default function QuotationBuilderWizard({ mode = 'executive' }) {
@@ -407,17 +432,12 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
           `/sales-executive/leads/${initialLeadId}`,
         ].filter(Boolean);
 
-        const leadDetailPath = config.leadsPath?.startsWith('/sales-executive')
-          ? `/sales-executive/leads/${initialLeadId}`
-          : config.leadsPath?.startsWith('/team-leader')
-            ? `/team-leader/leads/${initialLeadId}`
-            : config.leadsPath?.startsWith('/sales-manager')
-              ? `/sales-manager/leads/${initialLeadId}`
-              : `/leads/${initialLeadId}`;
+        const leadDetailPath = leadDetailPathForMode(mode, initialLeadId, config.leadsPath);
         try {
           const { data } = await API.get(leadDetailPath, { skipErrorToast: true });
           if (!cancelled && data?._id) {
-            setLeads((prev) => (prev.some((l) => l._id === data._id) ? prev : [data, ...prev]));
+            // Always merge detail over list stub so rooms/mattresses are present.
+            setLeads((prev) => upsertLeadRow(prev, data));
             setState((s) => ({ ...s, leadId: data._id }));
             setStep(2);
             return;
@@ -441,9 +461,66 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
     return () => {
       cancelled = true;
     };
-  }, [initialLeadId, fetchLeads, config.leadsPath]);
+  }, [initialLeadId, fetchLeads, config.leadsPath, mode]);
 
   const selectedLead = leads.find((l) => String(l._id) === String(state.leadId));
+  const selectedLeadHasStayFields =
+    selectedLead &&
+    Number.isFinite(Number(selectedLead.numberOfRooms)) &&
+    Number.isFinite(Number(selectedLead.roomsWithMattress));
+
+  // Ensure selected lead has full stay fields (rooms / mattresses) from detail API.
+  useEffect(() => {
+    if (!state.leadId || isEditMode || selectedLeadHasStayFields) return undefined;
+
+    let cancelled = false;
+    const path = leadDetailPathForMode(mode, state.leadId, config.leadsPath);
+    (async () => {
+      try {
+        const { data } = await API.get(path, { skipErrorToast: true });
+        if (!cancelled && data?._id) {
+          setLeads((prev) => upsertLeadRow(prev, data));
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    state.leadId,
+    isEditMode,
+    mode,
+    config.leadsPath,
+    selectedLeadHasStayFields,
+  ]);
+
+  // When lead rooms/mattresses arrive (or change), keep quotation hotel lines in sync.
+  useEffect(() => {
+    if (step !== 3 || isEditMode || !selectedLeadHasStayFields) return;
+    setDayWiseHotels((prev) => {
+      if (!Array.isArray(prev) || !prev.length) return prev;
+      const next = expandDayWiseHotelsForParty(prev, selectedLead, customItinerary);
+      const same =
+        next.length === prev.length &&
+        next.every(
+          (row, i) =>
+            Number(row.day) === Number(prev[i].day) &&
+            Number(row.roomSlot || 1) === Number(prev[i].roomSlot || 1) &&
+            Number(row.extraMattresses || 0) === Number(prev[i].extraMattresses || 0)
+        );
+      return same ? prev : next;
+    });
+  }, [
+    step,
+    isEditMode,
+    selectedLeadHasStayFields,
+    selectedLead?._id,
+    selectedLead?.numberOfRooms,
+    selectedLead?.roomsWithMattress,
+    customItinerary,
+  ]);
 
   useEffect(() => {
     if (mode !== 'executive' || !state.leadId) {
@@ -568,23 +645,46 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
     );
   };
 
-  const buildPackageSnapshot = (pkg) => ({
-    ...pkg,
-    itinerary: customItinerary,
-    inclusions: cleanInclusionExclusionLines(customInclusions),
-    exclusions: cleanInclusionExclusionLines(customExclusions),
-    cabCategory: selectedPackageCab?.cabCategory || selectedPackageCab?.vehicleType || pkg?.cabCategory || '',
-    guestName: selectedLead?.name || selectedLead?.customerName || pkg?.guestName || '',
-    preparedFor: selectedLead?.name || selectedLead?.customerName || pkg?.preparedFor || '',
-    guestPhone: selectedLead?.phone || '',
-    guestEmail: selectedLead?.email || '',
-    travelDate: selectedLead?.travelDate || pkg?.travelDate || '',
-    adults: selectedLead?.adults,
-    children: selectedLead?.children,
-  });
+  const buildPackageSnapshot = (pkg) => {
+    const travelDate = toYmd(selectedLead?.travelDate) || toYmd(pkg?.travelDate) || '';
+    const rooms = Math.max(
+      1,
+      Number(selectedLead?.numberOfRooms ?? state.pricing?.party?.rooms) || 1
+    );
+    const mattresses = Math.max(
+      0,
+      Number(selectedLead?.roomsWithMattress ?? state.pricing?.party?.mattresses) || 0
+    );
+    return {
+      ...pkg,
+      itinerary: (customItinerary || []).map((day, index) => {
+        const dayNum = Number(day.day) || index + 1;
+        return {
+          ...day,
+          day: dayNum,
+          date: travelDate ? shiftYmd(travelDate, dayNum - 1) : day.date || '',
+        };
+      }),
+      inclusions: cleanInclusionExclusionLines(customInclusions),
+      exclusions: cleanInclusionExclusionLines(customExclusions),
+      cabCategory: selectedPackageCab?.cabCategory || selectedPackageCab?.vehicleType || pkg?.cabCategory || '',
+      guestName: selectedLead?.name || selectedLead?.customerName || pkg?.guestName || '',
+      preparedFor: selectedLead?.name || selectedLead?.customerName || pkg?.preparedFor || '',
+      guestPhone: selectedLead?.phone || '',
+      guestEmail: selectedLead?.email || '',
+      travelDate,
+      adults: selectedLead?.adults,
+      children: selectedLead?.children,
+      numberOfRooms: rooms,
+      rooms: rooms,
+      roomsWithMattress: mattresses,
+      extraBeds: mattresses,
+    };
+  };
 
-  const selectLead = (lead) => {
+  const selectLead = async (lead) => {
     setState({ ...defaultWizardState, leadId: lead._id });
+    setLeads((prev) => upsertLeadRow(prev, lead));
     setSelectedPkgDetail(null);
     setCustomItinerary([]);
     setCustomInclusions([]);
@@ -595,6 +695,14 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
     setExtraCabs([]);
     setStayWithMattress(false);
     setStep(2);
+    // Load full lead detail so quotation hotels get exact rooms + mattresses.
+    try {
+      const path = leadDetailPathForMode(mode, lead._id, config.leadsPath);
+      const { data } = await API.get(path, { skipErrorToast: true });
+      if (data?._id) setLeads((prev) => upsertLeadRow(prev, data));
+    } catch {
+      /* list fields may already include rooms after API fix */
+    }
   };
 
   const buildFallbackItinerary = (detail) => {
@@ -735,6 +843,8 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
           cabCount: party.cabCount,
           cabSeats: party.cabSeats,
           perPersonRate: party.perPersonRate,
+          hotelRackSum: party.hotelRackSum,
+          mattressCost: party.mattressCost,
           capacityPending: party.capacityPending,
           capacityReady: party.capacityReady,
           roomsReady: party.roomsReady,
@@ -939,6 +1049,8 @@ export default function QuotationBuilderWizard({ mode = 'executive' }) {
           cabCount: party.cabCount,
           cabSeats: party.cabSeats,
           perPersonRate: party.perPersonRate,
+          hotelRackSum: party.hotelRackSum,
+          mattressCost: party.mattressCost,
           capacityPending: party.capacityPending,
           capacityReady: party.capacityReady,
           roomsReady: party.roomsReady,

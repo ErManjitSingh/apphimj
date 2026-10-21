@@ -141,6 +141,7 @@ export function estimateMattressCost(dayWiseHotels = [], mattresses = 0) {
     return resolveExtraBedNightRate(item, mealKey) * nights;
   };
 
+  // Prefer per-room mattress counts written on day-wise lines (from lead sync).
   const hasPerLine = list.some((item) => Number(item?.extraMattresses) > 0);
   if (hasPerLine) {
     return round2(
@@ -153,9 +154,19 @@ export function estimateMattressCost(dayWiseHotels = [], mattresses = 0) {
   }
 
   const mats = Math.max(0, Number(mattresses) || 0);
-  if (!mats) return 0;
-  const perMattress = list.reduce((sum, item) => sum + nightRateFor(item), 0);
-  return round2(perMattress * mats);
+  if (!mats || !list.length) return 0;
+
+  // Fallback: charge mats once per overnight day (not × every room line).
+  const byDay = list.reduce((acc, item) => {
+    const d = Number(item.day) || 1;
+    if (!acc[d]) acc[d] = item;
+    return acc;
+  }, {});
+  const perNightAcrossDays = Object.values(byDay).reduce(
+    (sum, item) => sum + nightRateFor(item),
+    0
+  );
+  return round2(perNightAcrossDays * mats);
 }
 
 /**

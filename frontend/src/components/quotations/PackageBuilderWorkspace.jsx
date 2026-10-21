@@ -383,7 +383,26 @@ export default function PackageBuilderWorkspace({
         ...(lead && typeof lead === 'object' ? lead : {}),
         name: guestName,
         phone: lead?.phone || draftQuote.lead?.phone || '',
+        travelDate:
+          lead?.travelDate ||
+          draftQuote.lead?.travelDate ||
+          draftQuote.packageSnapshot?.travelDate ||
+          draftQuote.package?.travelDate ||
+          '',
+        numberOfRooms:
+          lead?.numberOfRooms ??
+          draftQuote.lead?.numberOfRooms ??
+          draftQuote.packageSnapshot?.numberOfRooms,
+        roomsWithMattress:
+          lead?.roomsWithMattress ??
+          draftQuote.lead?.roomsWithMattress ??
+          draftQuote.packageSnapshot?.roomsWithMattress,
       },
+      travelDate:
+        lead?.travelDate ||
+        draftQuote.travelDate ||
+        draftQuote.packageSnapshot?.travelDate ||
+        '',
       leadName: guestName,
       packageSnapshot: {
         ...(draftQuote.packageSnapshot || draftQuote.package || {}),

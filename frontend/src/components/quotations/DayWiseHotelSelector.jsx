@@ -48,10 +48,16 @@ export function sumDayWiseHotelIncluded(selections = []) {
   }, 0);
 }
 
-/** Sum hotel nightly rates (same as day cards, no admin margin). */
+/**
+ * Sum hotel nightly rack rates for all room lines.
+ * - Multiple lines on a day → each line is one room (×1).
+ * - Single line on a day → scale by party room count.
+ * Uses display/season rates (not upgrade perNight deltas).
+ */
 export function sumDayWiseHotelRackTotal(selections = [], rooms = 1, season = 'onSeason') {
   const list = Array.isArray(selections) ? selections : [];
   const seasonKey = season === 'offSeason' ? 'offSeason' : 'onSeason';
+  const partyRooms = Math.max(1, Number(rooms) || 1);
   const linesByDay = list.reduce((acc, item) => {
     const d = Number(item.day) || 1;
     acc[d] = (acc[d] || 0) + 1;
@@ -63,12 +69,14 @@ export function sumDayWiseHotelRackTotal(selections = [], rooms = 1, season = 'o
       const nights = Math.max(1, Number(item.nights) || 1);
       const mealKey =
         item?.mealPlan?.key || item?.mealPlanKey || item?.meals || 'map';
-      const rate = resolveHotelNightDisplayRate(item, null, mealKey, seasonKey);
+      const rate = Number(
+        resolveHotelNightDisplayRate(item, null, mealKey, seasonKey) ||
+          item?.absolutePerNight ||
+          0
+      );
       const dayLines = linesByDay[Number(item.day) || 1] || 1;
-      // Multiple room lines per day = each line is one room; else scale single line by party rooms.
-      const roomMultiplier = dayLines > 1 ? 1 : Math.max(1, Number(rooms) || 1);
-      const nightTotal = rate * nights * roomMultiplier;
-      return sum + nightTotal;
+      const roomMultiplier = dayLines > 1 ? 1 : partyRooms;
+      return sum + rate * nights * roomMultiplier;
     }, 0)
   );
 }
