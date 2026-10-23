@@ -17,6 +17,16 @@ const {
   enrichBookingWithQuotation,
   syncBookingFromQuotation,
 } = require('../services/operationsQuotationSyncService');
+const { normalizeBookingAssignments } = require('../services/operationsStayService');
+const {
+  sendHotelConfirmation,
+  sendCabConfirmation,
+  generateCompanyVoucher,
+  completeBookingTasks,
+  syncCompletedTask,
+  bookingReadiness,
+  packageRouting,
+} = require('../services/operationsConfirmationService');
 
 function escapeHtml(value) {
   return String(value || '')
@@ -168,6 +178,7 @@ function dayLabel(days = []) {
 
 async function refreshVoucherDocuments(vouchers, booking, hotels, transport) {
   return Promise.all(vouchers.map(async (voucher) => {
+    if (voucher.type === 'company') return voucher;
     let serviceBooking = { ...booking, hotels, transport };
     if (voucher.type === 'hotel') {
       const ids = new Set((voucher.details?.hotelAssignmentIds || []).map(String));
@@ -210,6 +221,18 @@ const getBooking = asyncHandler(async (req, res) => {
   let booking = await Booking.findById(req.params.id).lean();
   if (!booking) throw new ApiError(404, 'Booking not found');
   booking = await enrichBookingWithQuotation(booking);
+  const normalized = normalizeBookingAssignments(booking);
+  if (normalized.hotelsChanged || normalized.transportChanged) {
+    const stayPatch = {};
+    if (normalized.hotelsChanged) stayPatch.hotels = normalized.hotels;
+    if (normalized.transportChanged) stayPatch.transport = normalized.transport;
+    const saved = await Booking.findByIdAndUpdate(booking._id, { $set: stayPatch }, { new: true }).lean();
+    booking = {
+      ...booking,
+      hotels: normalized.hotelsChanged ? saved.hotels : booking.hotels,
+      transport: normalized.transportChanged ? saved.transport : booking.transport,
+    };
+  }
   const [tasks, documents, payments, vouchers, hotels, transport] = await Promise.all([
     ops.listTasks({ bookingId: req.params.id }),
     ops.listDocuments(req.params.id),
@@ -233,6 +256,7 @@ const getBooking = asyncHandler(async (req, res) => {
     payments,
     paymentLedger: paymentLedger(payments),
     vouchers: refreshedVouchers,
+    packageRouting: packageRouting(booking),
   });
 });
 
@@ -273,7 +297,11 @@ const confirmHotel = asyncHandler(async (req, res) => {
     patch.status = 'confirmed';
   }
   const booking = await ops.updateBooking(req.params.id, patch, req.user);
-  res.json(booking);
+  await completeBookingTasks(req.params.id, 'hotel_confirmation');
+  const readiness = await bookingReadiness(req.params.id);
+  if (readiness.ready) await generateCompanyVoucher(req.params.id, req.user).catch(() => {});
+  const fresh = await Booking.findById(req.params.id).lean();
+  res.json(fresh || booking);
 });
 
 const confirmCab = asyncHandler(async (req, res) => {
@@ -288,7 +316,11 @@ const confirmCab = asyncHandler(async (req, res) => {
     patch.status = 'confirmed';
   }
   const booking = await ops.updateBooking(req.params.id, patch, req.user);
-  res.json(booking);
+  await completeBookingTasks(req.params.id, 'cab_confirmation');
+  const readiness = await bookingReadiness(req.params.id);
+  if (readiness.ready) await generateCompanyVoucher(req.params.id, req.user).catch(() => {});
+  const fresh = await Booking.findById(req.params.id).lean();
+  res.json(fresh || booking);
 });
 
 const listHotels = asyncHandler(async (req, res) => {
@@ -747,6 +779,7 @@ const createTask = asyncHandler(async (req, res) => {
 const updateTask = asyncHandler(async (req, res) => {
   const task = await ops.updateTask(req.params.id, req.body);
   if (!task) throw new ApiError(404, 'Task not found');
+  if (task.status === 'completed') await syncCompletedTask(task);
   res.json(task);
 });
 
@@ -780,6 +813,38 @@ const getProfile = asyncHandler(async (req, res) => {
     },
     stats: { bookingsManaged: await Booking.countDocuments() },
   });
+});
+
+const sendHotelConfirmationRequest = asyncHandler(async (req, res) => {
+  const result = await sendHotelConfirmation(req.params.id, req.params.hotelAssignmentId, req.body || {});
+  await cacheService.invalidate('ops:');
+  res.json({
+    hotel: result.hotel,
+    warnings: result.warnings,
+    results: result.results,
+    text: result.text,
+  });
+});
+
+const sendCabConfirmationRequest = asyncHandler(async (req, res) => {
+  const result = await sendCabConfirmation(req.params.id, req.params.transportAssignmentId, req.body || {});
+  await cacheService.invalidate('ops:');
+  res.json({
+    transport: result.transport,
+    warnings: result.warnings,
+    results: result.results,
+    text: result.text,
+    routing: result.routing,
+  });
+});
+
+const createCompanyVoucher = asyncHandler(async (req, res) => {
+  const result = await generateCompanyVoucher(req.params.id, req.user, {
+    complimentary: req.body?.complimentary,
+    specialNotes: req.body?.specialNotes,
+  });
+  await cacheService.invalidate('ops:');
+  res.json({ pdfUrl: result.pdfUrl, voucher: result.voucher, companyVoucherUrl: result.pdfUrl });
 });
 
 const getCalendar = asyncHandler(async (req, res) => {
@@ -825,6 +890,9 @@ module.exports = {
   updateVoucher,
   sendHotelVoucher,
   sendTransportVoucher,
+  sendHotelConfirmationRequest,
+  sendCabConfirmationRequest,
+  createCompanyVoucher,
   listTickets,
   createTicket,
   updateTicket,

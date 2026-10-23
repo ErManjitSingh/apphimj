@@ -103,7 +103,7 @@ export default function TasksPage() {
           )}
           {t.status === 'in_progress' && (
             <Button variant="teal" size="sm" className="h-8 rounded-xl" disabled={updating === t._id} onClick={() => updateStatus(t._id, 'completed')}>
-              Complete
+              Done 👍
             </Button>
           )}
         </div>

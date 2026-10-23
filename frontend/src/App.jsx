@@ -341,6 +341,8 @@ function App() {
                   <Route path="trip-tracker" element={<TripTrackerPage />} />
                   <Route path="tasks" element={<OperationsTasksPage />} />
                   <Route path="hotels" element={<OperationsHotelsPage />} />
+                  <Route path="hotels/new" element={<HotelEditPage />} />
+                  <Route path="hotels/:id/edit" element={<HotelEditPage />} />
                   <Route
                     path="transport"
                     element={<OperationsTransportPage />}
@@ -914,7 +916,7 @@ function App() {
                   <Route
                     path="hotel-control"
                     element={
-                      <RoleRoute roles={["admin", "sales_manager"]}>
+                      <RoleRoute roles={["admin", "sales_manager", "operations_manager"]}>
                         <HotelControlPage />
                       </RoleRoute>
                     }
@@ -922,7 +924,7 @@ function App() {
                   <Route
                     path="hotel-control/new"
                     element={
-                      <RoleRoute roles={["admin", "sales_manager"]}>
+                      <RoleRoute roles={["admin", "sales_manager", "operations_manager"]}>
                         <HotelEditPage />
                       </RoleRoute>
                     }
@@ -930,7 +932,7 @@ function App() {
                   <Route
                     path="hotel-control/:id/edit"
                     element={
-                      <RoleRoute roles={["admin", "sales_manager"]}>
+                      <RoleRoute roles={["admin", "sales_manager", "operations_manager"]}>
                         <HotelEditPage />
                       </RoleRoute>
                     }

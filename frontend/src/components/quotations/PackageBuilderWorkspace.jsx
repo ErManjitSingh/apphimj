@@ -73,6 +73,42 @@ function parseDestinationStops(pkg, lead) {
   }));
 }
 
+function hotelIdentityKey(hotelLike) {
+  if (!hotelLike) return '';
+  const id = hotelLike.id || hotelLike.hotelId || hotelLike._id || '';
+  const slug = String(hotelLike.slug || '').trim().toLowerCase();
+  const name = String(hotelLike.name || '').trim().toLowerCase();
+  if (id) return `id:${String(id)}`;
+  if (slug) return `slug:${slug}`;
+  if (name) return `name:${name}`;
+  return '';
+}
+
+function isSameHotel(a, b) {
+  const ka = hotelIdentityKey(a);
+  const kb = hotelIdentityKey(b);
+  if (!ka || !kb) return false;
+  return ka === kb;
+}
+
+/** Extra rooms must stay on the day's selected hotel — keep room/meal from pick, hotel from primary. */
+function bindOptionToHotel(option, hotel) {
+  if (!option || !hotel) return option;
+  if (isSameHotel(option, hotel)) return option;
+  return {
+    ...option,
+    id: hotel.id || hotel.hotelId || option.id,
+    hotelId: hotel.hotelId || hotel.id || option.hotelId,
+    name: hotel.name || option.name,
+    slug: hotel.slug || option.slug,
+    image: hotel.image || option.image,
+    images: hotel.images || option.images,
+    starRating: hotel.starRating || hotel.starCategory || option.starRating,
+    location: hotel.location || option.location,
+    city: hotel.city || option.city,
+  };
+}
+
 /** Resolve current day hotel so Add room opens that hotel's room list directly. */
 function resolveDayHotelForAddRoom(day, dayWiseHotels = []) {
   if (!day) return null;
@@ -699,6 +735,8 @@ export default function PackageBuilderWorkspace({
 
   const handleAddHotelRoom = (day, option) => {
     if (!day || !option) return;
+    const lockedHotel = resolveDayHotelForAddRoom(day, dayWiseHotels);
+    const lockedOption = bindOptionToHotel(option, lockedHotel) || option;
     const overnight =
       Array.isArray(itinerary) && itinerary.length > 1 ? itinerary.slice(0, -1) : [day];
     const targetDays = overnight.length ? overnight : [day];
@@ -713,7 +751,7 @@ export default function PackageBuilderWorkspace({
       if (already) return;
 
       if (Number(d.day) === Number(day.day)) {
-        const { entry } = buildHotelStayEntry(d, option, nextSlot);
+        const { entry } = buildHotelStayEntry(d, lockedOption, nextSlot);
         lines.push(entry);
         return;
       }
@@ -722,26 +760,32 @@ export default function PackageBuilderWorkspace({
       const primary = lines.find(
         (h) => Number(h.day) === Number(d.day) && Number(h.roomSlot || 1) === 1
       );
-      const dayOption = primary?.hotel
+      const dayHotel = primary?.hotel
         ? {
-            ...option,
-            id: primary.hotel.id || option.id,
-            hotelId: primary.hotel.id || option.hotelId,
-            name: primary.hotel.name || option.name,
-            image: primary.hotel.image || option.image,
-            images: primary.hotel.images || option.images,
-            starRating: primary.hotel.starRating || option.starRating,
-            location: primary.hotel.location || option.location,
-            city: primary.hotel.city || option.city,
-            slug: primary.hotel.slug || option.slug,
-            room: option.room || primary.room,
-            mealPlan: option.mealPlan || primary.mealPlan,
-            absolutePerNight: option.absolutePerNight ?? primary.absolutePerNight,
-            perNight: option.absolutePerNight ?? option.perNight ?? primary.absolutePerNight ?? 0,
-            includedRate: 0,
-            startingPrice: option.absolutePerNight ?? primary.absolutePerNight,
+            id: primary.hotel.id,
+            hotelId: primary.hotel.id || primary.hotel.hotelId,
+            name: primary.hotel.name,
+            image: primary.hotel.image,
+            images: primary.hotel.images,
+            starRating: primary.hotel.starRating,
+            location: primary.hotel.location,
+            city: primary.hotel.city,
+            slug: primary.hotel.slug,
           }
-        : option;
+        : lockedHotel;
+      const dayOption = {
+        ...bindOptionToHotel(lockedOption, dayHotel),
+        room: lockedOption.room || primary?.room,
+        mealPlan: lockedOption.mealPlan || primary?.mealPlan,
+        absolutePerNight: lockedOption.absolutePerNight ?? primary?.absolutePerNight,
+        perNight:
+          lockedOption.absolutePerNight ??
+          lockedOption.perNight ??
+          primary?.absolutePerNight ??
+          0,
+        includedRate: 0,
+        startingPrice: lockedOption.absolutePerNight ?? primary?.absolutePerNight,
+      };
       const { entry } = buildHotelStayEntry(d, dayOption, nextSlot);
       lines.push(entry);
     });
@@ -756,7 +800,9 @@ export default function PackageBuilderWorkspace({
   const handleReplaceExtraRoom = (day, option, roomSlot) => {
     if (!day || !option) return;
     const slot = Math.max(2, Number(roomSlot) || 2);
-    const { entry } = buildHotelStayEntry(day, option, slot);
+    const lockedHotel = resolveDayHotelForAddRoom(day, dayWiseHotels);
+    const lockedOption = bindOptionToHotel(option, lockedHotel) || option;
+    const { entry } = buildHotelStayEntry(day, lockedOption, slot);
     const nextHotels = (dayWiseHotels || [])
       .filter((h) => !(h.day === day.day && Number(h.roomSlot || 1) === slot))
       .concat(entry)
@@ -861,22 +907,31 @@ export default function PackageBuilderWorkspace({
   const openAddRoomPicker = (day) => {
     const lines = (dayWiseHotels || []).filter((h) => h.day === day.day).length;
     const initialHotel = resolveDayHotelForAddRoom(day, dayWiseHotels);
+    if (!initialHotel) {
+      // No hotel yet — select the hotel first, then add rooms.
+      openDayHotelPicker(day);
+      return;
+    }
     openDayHotelPicker(day, {
       addRoom: true,
       roomSlot: lines + 1,
       initialHotel,
-      lockHotel: Boolean(initialHotel),
+      lockHotel: true,
     });
   };
 
   const openChangeExtraRoomPicker = (day, roomSlot) => {
     const slot = Math.max(2, Number(roomSlot) || 2);
     const initialHotel = resolveDayHotelForAddRoom(day, dayWiseHotels);
+    if (!initialHotel) {
+      openDayHotelPicker(day);
+      return;
+    }
     openDayHotelPicker(day, {
       replaceRoomSlot: slot,
       roomSlot: slot,
       initialHotel,
-      lockHotel: Boolean(initialHotel),
+      lockHotel: true,
     });
   };
 
@@ -1370,9 +1425,7 @@ export default function PackageBuilderWorkspace({
           picker?.addRoom || picker?.replaceRoomSlot ? picker.initialHotel || null : null
         }
         lockHotel={Boolean(
-          (picker?.addRoom || picker?.replaceRoomSlot) &&
-            picker?.lockHotel &&
-            picker?.initialHotel
+          (picker?.addRoom || picker?.replaceRoomSlot) && picker?.initialHotel
         )}
         defaultMealPlanKey={
           normalizeMealPlanKey(lead?.mealPlan || lead?.mealPreference) ||

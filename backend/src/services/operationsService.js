@@ -15,6 +15,7 @@ const Lead = require('../models/Lead');
 const User = require('../models/User');
 const { withBranch } = require('../utils/branchScope');
 const { parsePagination, paginatedResponse } = require('../utils/pagination');
+const { normalizeBookingAssignments } = require('./operationsStayService');
 const { createOperationsTasksForBooking } = require('./operationsAutomationService');
 const {
   mapQuoteItinerary,
@@ -979,6 +980,7 @@ async function updateBooking(id, payload, actor) {
     'hotelConfirmation', 'cabConfirmation', 'activityConfirmation', 'voucherStatus',
     'totalAmount', 'advanceReceived', 'assignedTo', 'travelDate', 'returnDate',
     'packageName', 'destination', 'quotationReference', 'executiveName',
+    'complimentary', 'specialNotes', 'companyVoucherUrl',
   ];
   const patch = Object.fromEntries(
     Object.entries(payload || {}).filter(([key]) => allowed.includes(key))
@@ -988,6 +990,19 @@ async function updateBooking(id, payload, actor) {
     const total = Number(patch.totalAmount ?? prev.totalAmount ?? 0);
     const advance = Number(patch.advanceReceived ?? prev.advanceReceived ?? 0);
     patch.pendingAmount = Math.max(0, total - advance);
+  }
+
+  if (patch.itinerary || patch.hotels || patch.transport) {
+    const normalized = normalizeBookingAssignments({
+      ...prev,
+      ...patch,
+      itinerary: patch.itinerary || prev.itinerary,
+      hotels: patch.hotels || prev.hotels,
+      transport: patch.transport || prev.transport,
+      travelDate: patch.travelDate || prev.travelDate,
+    });
+    if (patch.itinerary || patch.hotels) patch.hotels = normalized.hotels;
+    if (patch.transport || patch.itinerary) patch.transport = normalized.transport;
   }
 
   const booking = await Booking.findByIdAndUpdate(id, patch, { new: true, runValidators: true });

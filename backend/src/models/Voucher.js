@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const VOUCHER_TYPES = ['hotel', 'transport', 'activity', 'master'];
+const VOUCHER_TYPES = ['hotel', 'transport', 'activity', 'master', 'company'];
 const VOUCHER_STATUSES = ['draft', 'issued', 'sent', 'redeemed'];
 
 const voucherSchema = new mongoose.Schema(

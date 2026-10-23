@@ -19,7 +19,7 @@ router.get('/', listHotels);
 router.get('/:id', getHotel);
 
 // Hotel Control write: admin + sales manager only
-const hotelManagers = authorize('admin', 'sales_manager');
+const hotelManagers = authorize('admin', 'sales_manager', 'operations_manager');
 router.post('/', hotelManagers, createHotel);
 router.post('/sync-rooms', hotelManagers, syncHotelsRooms);
 router.post('/upload-image', hotelManagers, uploadHotelImage);

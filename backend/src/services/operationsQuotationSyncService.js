@@ -1,3 +1,4 @@
+const { collapseHotelStays, collapseTransport, mergeHotelOps, mergeTransportOps } = require('./operationsStayService');
 const Quotation = require('../models/Quotation');
 const Lead = require('../models/Lead');
 const Booking = require('../models/Booking');
@@ -94,7 +95,7 @@ function mapQuoteItinerary(quotation, travelDate, executiveName = '') {
 function mapQuoteHotels(quotation, travelDate) {
   const selected = quotation?.selectedHotels || [];
   if (selected.length) {
-    return selected.map((h) => {
+    return collapseHotelStays(selected.map((h) => {
       const checkIn = travelDate && h.day ? addDays(travelDate, Number(h.day) - 1) : h.checkIn || null;
       const nights = Number(h.nights) || 1;
       const checkOut = checkIn ? addDays(checkIn, nights) : h.checkOut || null;
@@ -118,12 +119,12 @@ function mapQuoteHotels(quotation, travelDate) {
         notes: h.externalSource ? `Source: ${h.externalSource}` : '',
         status: 'pending',
       };
-    });
+    }));
   }
 
   const snap = quotation?.packageSnapshot || {};
   if ((snap.hotels || []).length) {
-    return (snap.hotels || []).map((h) => ({
+    return collapseHotelStays((snap.hotels || []).map((h) => ({
       hotelName: h.name || h.hotelName || '',
       externalHotelId: textValue(h.hotelId || h.id || h.uuid),
       destination: h.location || h.destination || '',
@@ -136,7 +137,7 @@ function mapQuoteHotels(quotation, travelDate) {
       email: h.email || h.contact?.email || '',
       rooms: Number(h.rooms) || 1,
       status: 'pending',
-    }));
+    })));
   }
 
   // Derive stay list from package day plan (e.g. "Man Ko Chalo" style itinerary).
@@ -165,13 +166,13 @@ function mapQuoteHotels(quotation, travelDate) {
       status: 'pending',
     });
   }
-  return stays;
+  return collapseHotelStays(stays);
 }
 
 function mapQuoteTransport(quotation) {
   const selected = quotation?.selectedCabs || [];
   if (selected.length) {
-    return selected.map((t) => ({
+    return collapseTransport(selected.map((t) => ({
       vendorName: t.vendorName || t.vendor || '',
       day: Number(t.day) || undefined,
       days: Array.isArray(t.days) ? t.days.map(Number).filter(Boolean) : [],
@@ -185,13 +186,13 @@ function mapQuoteTransport(quotation) {
       email: t.email || t.contact?.email || '',
       vehicleNumber: t.vehicleNumber || '',
       status: 'pending',
-    }));
+    })));
   }
 
   const snap = quotation?.packageSnapshot || {};
   const snapCabs = snap.cabs || snap.transport || [];
   if (Array.isArray(snapCabs) && snapCabs.length && typeof snapCabs[0] === 'object') {
-    return snapCabs.map((t) => ({
+    return collapseTransport(snapCabs.map((t) => ({
       vendorName: t.vendorName || t.vendor || '',
       day: Number(t.day) || undefined,
       days: Array.isArray(t.days) ? t.days.map(Number).filter(Boolean) : [],
@@ -205,7 +206,7 @@ function mapQuoteTransport(quotation) {
       email: t.email || '',
       vehicleNumber: t.vehicleNumber || '',
       status: 'pending',
-    }));
+    })));
   }
 
   // One cab row per unique vehicle mentioned on itinerary days.
@@ -229,7 +230,7 @@ function mapQuoteTransport(quotation) {
       status: 'pending',
     });
   }
-  return rows;
+  return collapseTransport(rows);
 }
 
 function mapQuoteActivities(quotation) {
@@ -307,10 +308,14 @@ async function syncBookingFromQuotation(bookingId, { force = false } = {}) {
     if (extracted.itinerary.length) patch.itinerary = extracted.itinerary;
   }
   if (force || !booking.hotels?.length) {
-    if (extracted.hotels.length) patch.hotels = extracted.hotels;
+    if (extracted.hotels.length) {
+      patch.hotels = mergeHotelOps(collapseHotelStays(extracted.hotels), booking.hotels || []);
+    }
   }
   if (force || !booking.transport?.length) {
-    if (extracted.transport.length) patch.transport = extracted.transport;
+    if (extracted.transport.length) {
+      patch.transport = mergeTransportOps(collapseTransport(extracted.transport), booking.transport || []);
+    }
   }
   if (force || !booking.activities?.length) {
     if (extracted.activities.length) patch.activities = extracted.activities;

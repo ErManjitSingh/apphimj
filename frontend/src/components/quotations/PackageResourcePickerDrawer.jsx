@@ -48,6 +48,17 @@ const HOTEL_STEPS = [
   { key: 'meal', label: 'Meal Plan', hint: 'Package meal default — change if needed' },
 ];
 
+function hotelIdentityKey(hotelLike) {
+  if (!hotelLike) return '';
+  const id = hotelLike.id || hotelLike.hotelId || hotelLike._id || '';
+  const slug = String(hotelLike.slug || '').trim().toLowerCase();
+  const name = String(hotelLike.name || '').trim().toLowerCase();
+  if (id) return `id:${String(id)}`;
+  if (slug) return `slug:${slug}`;
+  if (name) return `name:${name}`;
+  return '';
+}
+
 const BADGE_STYLES = [
   { key: 'best', label: 'BEST SELLER', className: 'bg-rose-500 text-white' },
   { key: 'popular', label: 'POPULAR', className: 'bg-violet-600 text-white' },
@@ -803,6 +814,15 @@ export default function PackageResourcePickerDrawer({
   const locationLabel = resolveCity(options[0], destination) || destination || 'Destination';
   const hotelLocked = Boolean(lockHotel && initialHotel);
 
+  const goToStep = (next) => {
+    // Extra rooms stay on the selected hotel — never reopen the hotel list.
+    if (hotelLocked && next === 'hotel') {
+      setStep('room');
+      return;
+    }
+    setStep(next);
+  };
+
   useEffect(() => {
     if (!open) {
       setQuery('');
@@ -817,13 +837,17 @@ export default function PackageResourcePickerDrawer({
       setLocalCatalogOptions([]);
       return;
     }
-    if (initialHotel && !isCab) {
+    if ((hotelLocked || initialHotel) && !isCab) {
       setStep('room');
     }
-  }, [open, isCab, initialHotel?.id, initialHotel?.hotelId, initialHotel?.name]);
+  }, [open, isCab, hotelLocked, initialHotel?.id, initialHotel?.hotelId, initialHotel?.name]);
 
   useEffect(() => {
-    if (!open || isCab) return undefined;
+    // Add-room / change-extra-room: only need this hotel's rooms, not the full catalog.
+    if (!open || isCab || hotelLocked) {
+      if (hotelLocked) setLoadingCatalog(false);
+      return undefined;
+    }
     let cancelled = false;
     setLoadingCatalog(true);
     const cityHint = String(destination || '')
@@ -861,7 +885,7 @@ export default function PackageResourcePickerDrawer({
     return () => {
       cancelled = true;
     };
-  }, [open, isCab, destination]);
+  }, [open, isCab, destination, hotelLocked]);
 
   const catalogOptions = localCatalogOptions.length ? localCatalogOptions : options;
 
@@ -923,7 +947,7 @@ export default function PackageResourcePickerDrawer({
 
   const resetClose = () => {
     setQuery('');
-    setStep('hotel');
+    setStep(hotelLocked ? 'room' : 'hotel');
     setPackageHotel(null);
     setHotelDetail(null);
     setSelectedRoom(null);
@@ -933,6 +957,17 @@ export default function PackageResourcePickerDrawer({
   };
 
   const selectHotelOption = async (option, { record = true } = {}) => {
+    // When adding another room, ignore picks from any other hotel.
+    if (
+      hotelLocked &&
+      initialHotel &&
+      option &&
+      hotelIdentityKey(option) &&
+      hotelIdentityKey(initialHotel) &&
+      hotelIdentityKey(option) !== hotelIdentityKey(initialHotel)
+    ) {
+      return;
+    }
     if (record) {
       recordHotelSelection(option);
       setSelectionTick((n) => n + 1);
@@ -943,7 +978,7 @@ export default function PackageResourcePickerDrawer({
     setHotelDetail(null);
     setDetailError('');
     setLoadingDetail(true);
-    setStep('room');
+    goToStep('room');
     try {
       const detail = await fetchHotelDetailForOption(option, destination, {
         checkIn,
@@ -1286,7 +1321,7 @@ export default function PackageResourcePickerDrawer({
                   {!hotelLocked && (
                     <button
                       type="button"
-                      onClick={() => setStep('hotel')}
+                      onClick={() => goToStep('hotel')}
                       className="inline-flex items-center gap-1.5 text-xs font-bold text-violet-600"
                     >
                       <ArrowLeft className="w-3.5 h-3.5" /> Back to hotels

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft,
@@ -91,7 +91,8 @@ function emptyRoomRow() {
   };
 }
 
-function hotelBasePath() {
+function hotelBasePath(pathname = '') {
+  if (String(pathname).includes('/operations-manager/')) return '/operations-manager/hotels';
   return '/hotel-control';
 }
 
@@ -193,9 +194,10 @@ export default function HotelEditPage() {
   const { id } = useParams();
   const isNew = !id || id === 'new';
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const { user } = useAuth();
-  const base = hotelBasePath();
-  const canSave = user?.role === 'admin' || user?.role === 'sales_manager';
+  const base = hotelBasePath(pathname);
+  const canSave = user?.role === 'admin' || user?.role === 'sales_manager' || user?.role === 'operations_manager';
 
   const [form, setForm] = useState(EMPTY_FORM);
   const [loading, setLoading] = useState(!isNew);
@@ -425,7 +427,7 @@ export default function HotelEditPage() {
           </Link>
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-orange-500">
-              Hotel Control
+              {base.startsWith('/operations-manager') ? 'Hotel Inventory' : 'Hotel Control'}
             </p>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
               {isNew ? 'Add Hotel' : 'Edit Hotel'}

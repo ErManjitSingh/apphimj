@@ -508,6 +508,7 @@ export function BookingTransportEditor({
   vouchers = [],
   onSendVoucher,
   sendingVoucher,
+  packageRouting = '',
 }) {
   const update = (i, field, value) => {
     onChange(transport.map((t, idx) => (idx === i ? { ...t, [field]: value } : t)));
@@ -536,7 +537,7 @@ export function BookingTransportEditor({
       gradient="from-violet-500 to-purple-600"
       icon={Car}
       title="Transport & Cabs"
-      subtitle="Vehicle, driver & route from quotation — fully editable"
+      subtitle="Vehicle, driver and the final cab cost. This cost stays inside operations."
       actions={(
         <>
           <Button variant="outline" size="sm" className="rounded-xl gap-1" onClick={addRow}>
@@ -550,6 +551,11 @@ export function BookingTransportEditor({
       )}
     >
       <div className="space-y-4">
+        {packageRouting && (
+          <pre className="whitespace-pre-wrap rounded-2xl border border-violet-200 bg-violet-50/70 p-3 font-sans text-xs leading-5 text-slate-700">
+            {packageRouting}
+          </pre>
+        )}
         {(transport.length ? transport : [{ vehicleType: 'suv', status: 'pending' }]).map((t, i) => {
           const voucher = t.voucherId
             ? vouchers.find((item) => String(item._id) === String(t.voucherId))
@@ -580,6 +586,14 @@ export function BookingTransportEditor({
               <select value={t.vehicleType || 'suv'} onChange={(e) => update(i, 'vehicleType', e.target.value)} className="input-premium h-10 rounded-xl text-sm">
                 {VEHICLE_TYPES.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
               </select>
+              <input
+                type="number"
+                min="0"
+                value={t.finalCost ?? ''}
+                onChange={(e) => update(i, 'finalCost', e.target.value === '' ? 0 : Number(e.target.value))}
+                placeholder="Final cab cost (internal)"
+                className="input-premium h-10 rounded-xl text-sm font-semibold"
+              />
               <input value={t.driverName || ''} onChange={(e) => update(i, 'driverName', e.target.value)} placeholder="Driver name" className="input-premium h-10 rounded-xl text-sm" />
               <input value={t.driverPhone || ''} onChange={(e) => update(i, 'driverPhone', e.target.value)} placeholder="Driver phone" className="input-premium h-10 rounded-xl text-sm" />
               <input value={t.vehicleNumber || ''} onChange={(e) => update(i, 'vehicleNumber', e.target.value)} placeholder="Vehicle number" className="input-premium h-10 rounded-xl text-sm" />
@@ -599,10 +613,12 @@ export function BookingTransportEditor({
               <div className="min-w-0">
                 <p className="flex items-center gap-1.5 text-xs font-bold text-content-primary">
                   <Ticket className="h-3.5 w-3.5 text-sky-600" />
-                  {t.voucherSentAt ? 'Cab voucher sent' : t.voucherId ? 'Cab voucher generated' : 'Day-wise cab voucher'}
+                  {t.voucherSentAt ? 'Cab confirmation sent' : 'Cab confirmation for vendor'}
                 </p>
                 <p className="mt-0.5 truncate text-[10px] text-content-muted">
-                  {(t.days || []).length ? `Days ${(t.days || []).join(', ')} · ` : ''}{t.email || 'Add vendor email to send'}
+                  {(t.days || []).length ? `Days ${(t.days || []).join(', ')} · ` : ''}
+                  {t.finalCost ? `Final cost ₹${Number(t.finalCost).toLocaleString('en-IN')} · ` : ''}
+                  {t.email || t.phone || t.driverPhone || 'Add vendor email or WhatsApp'}
                 </p>
               </div>
               <div className="flex shrink-0 gap-2">
@@ -621,11 +637,11 @@ export function BookingTransportEditor({
                   variant="outline"
                   size="sm"
                   className="rounded-xl gap-1.5 border-sky-500/30"
-                  disabled={!t._id || !t.email || saving || sendingVoucher === t._id}
+                  disabled={!t._id || (!(t.email) && !(t.phone || t.driverPhone)) || saving || sendingVoucher === t._id}
                   onClick={() => onSendVoucher?.(t, i)}
                 >
                   {sendingVoucher === t._id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                  {t.voucherSentAt ? 'Resend Voucher' : 'Send Cab Voucher'}
+                  {t.voucherSentAt ? 'Resend Confirmation' : 'Send for Confirmation'}
                 </Button>
               </div>
             </div>

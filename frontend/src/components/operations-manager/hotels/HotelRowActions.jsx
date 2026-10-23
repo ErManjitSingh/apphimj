@@ -10,13 +10,14 @@ import {
 export default function HotelRowActions({ hotelId }) {
   return (
     <div className="flex items-center justify-end gap-1">
-      <button
-        type="button"
+      <Link
+        to={`/operations-manager/hotels/${hotelId}/edit`}
+        onClick={(e) => e.stopPropagation()}
         className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-subtle bg-white text-content-muted hover:text-blue-600 hover:border-blue-200 transition-colors"
         aria-label="Edit hotel"
       >
         <Pencil className="w-3.5 h-3.5" />
-      </button>
+      </Link>
       <DropdownMenuRoot>
         <DropdownMenuTrigger asChild>
           <button
@@ -30,8 +31,8 @@ export default function HotelRowActions({ hotelId }) {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
           <DropdownMenuItem asChild>
-            <Link to={`/operations-manager/hotels?hotel=${hotelId}`} className="gap-2 cursor-pointer">
-              View Details
+            <Link to={`/operations-manager/hotels/${hotelId}/edit`} className="gap-2 cursor-pointer">
+              Edit hotel
             </Link>
           </DropdownMenuItem>
         </DropdownMenuContent>

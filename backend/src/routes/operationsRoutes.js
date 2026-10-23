@@ -33,6 +33,9 @@ const {
   updateVoucher,
   sendHotelVoucher,
   sendTransportVoucher,
+  sendHotelConfirmationRequest,
+  sendCabConfirmationRequest,
+  createCompanyVoucher,
   listTickets,
   createTicket,
   updateTicket,
@@ -65,9 +68,24 @@ router.post(
   sendHotelVoucher
 );
 router.post(
+  '/bookings/:id/hotels/:hotelAssignmentId/confirmation',
+  requirePermission('operations', 'edit'),
+  sendHotelConfirmationRequest
+);
+router.post(
   '/bookings/:id/transport/:transportAssignmentId/voucher/send',
   requirePermission('operations', 'edit'),
   sendTransportVoucher
+);
+router.post(
+  '/bookings/:id/transport/:transportAssignmentId/confirmation',
+  requirePermission('operations', 'edit'),
+  sendCabConfirmationRequest
+);
+router.post(
+  '/bookings/:id/company-voucher',
+  requirePermission('operations', 'generate_voucher'),
+  createCompanyVoucher
 );
 router.get('/bookings/:id/documents', requirePermission('operations', 'view'), listDocuments);
 router.post('/bookings/:id/documents', requirePermission('operations', 'edit'), addDocument);

@@ -17,6 +17,8 @@ import {
   BookingTransportEditor,
 } from './BookingFulfillmentSections';
 import OperationsItineraryBuilder from './OperationsItineraryBuilder';
+import HotelBookingSection from './HotelBookingSection';
+import CompanyBookingVoucher from './CompanyBookingVoucher';
 
 const DOC_TYPES = [
   { value: 'customer_id', label: 'Customer ID' },
@@ -136,45 +138,50 @@ function applyBookingState(data, setters) {
 }
 
 function hotelsFromItinerary(days = [], currentHotels = []) {
+  const used = new Set();
   const stays = [];
   [...days]
     .sort((a, b) => Number(a.day) - Number(b.day))
     .forEach((day) => {
       const selected = day.dayHotel;
-      if (!selected?.hotelName) return;
+      const hotelName = selected?.hotelName || day.accommodation || '';
+      if (!hotelName) return;
       const dayNumber = Number(day.day) || stays.length + 1;
       const previous = stays[stays.length - 1];
       const sameAsPrevious =
         previous &&
-        String(previous.hotelName).toLowerCase() === String(selected.hotelName).toLowerCase() &&
-        previous.day + previous.nights === dayNumber;
+        String(previous.hotelName).toLowerCase() === String(hotelName).toLowerCase() &&
+        Number(previous.day) + Number(previous.nights || 1) === dayNumber;
       if (sameAsPrevious) {
         previous.nights += 1;
-        if (day.date) {
-          const checkout = new Date(day.date);
-          checkout.setDate(checkout.getDate() + 1);
+        if (previous.checkIn) {
+          const checkout = new Date(previous.checkIn);
+          checkout.setDate(checkout.getDate() + previous.nights);
           previous.checkOut = checkout.toISOString();
         }
         return;
       }
 
-      const existing = currentHotels.find((hotel) => (
-        String(hotel.hotelId || '') === String(selected.hotelId || '') ||
-        String(hotel.hotelName || '').toLowerCase() === String(selected.hotelName).toLowerCase()
-      ));
+      const existing = currentHotels.find((hotel) => {
+        if (hotel._id && used.has(String(hotel._id))) return false;
+        return String(hotel.hotelName || '').toLowerCase() === String(hotelName).toLowerCase();
+      });
+      if (existing?._id) used.add(String(existing._id));
       const checkIn = day.date || existing?.checkIn;
-      const checkOut = checkIn ? new Date(new Date(checkIn).setDate(new Date(checkIn).getDate() + 1)).toISOString() : existing?.checkOut;
+      const checkout = checkIn ? new Date(checkIn) : null;
+      if (checkout) checkout.setDate(checkout.getDate() + 1);
       stays.push({
-        ...existing,
-        hotelId: selected.hotelId,
-        hotelName: selected.hotelName,
-        destination: selected.destination || selected.location || '',
-        roomType: selected.roomType || '',
-        mealPlan: selected.mealPlan || '',
+        ...(existing || {}),
+        hotelId: selected?.hotelId || existing?.hotelId,
+        hotelName,
+        destination: selected?.destination || selected?.location || existing?.destination || '',
+        roomType: selected?.roomType || existing?.roomType || '',
+        mealPlan: selected?.mealPlan || existing?.mealPlan || '',
         day: dayNumber,
         nights: 1,
+        rooms: existing?.rooms || 1,
         checkIn,
-        checkOut,
+        checkOut: checkout ? checkout.toISOString() : existing?.checkOut,
         status: existing?.status || 'pending',
       });
     });
@@ -198,7 +205,6 @@ export default function BookingDetailPage() {
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [catalogHotels, setCatalogHotels] = useState([]);
   const [catalogCabs, setCatalogCabs] = useState([]);
-  const [sendingVoucher, setSendingVoucher] = useState(null);
   const [sendingTransportVoucher, setSendingTransportVoucher] = useState(null);
 
   const setters = { setBooking, setItinerary, setHotels, setTransport };
@@ -301,32 +307,26 @@ export default function BookingDetailPage() {
     }
   };
 
-  const sendHotelVoucher = async (hotel) => {
-    if (!hotel?._id || !hotel.email) return;
-    setSendingVoucher(hotel._id);
-    try {
-      await API.put(`/operations-manager/bookings/${id}`, { hotels });
-      await API.post(`/operations-manager/bookings/${id}/hotels/${hotel._id}/voucher/send`, {
-        email: hotel.email,
-        phone: hotel.phone,
-        contactPerson: hotel.contactPerson,
-        confirmationNumber: hotel.confirmationNumber,
-      });
-      fetchBooking();
-    } finally {
-      setSendingVoucher(null);
-    }
-  };
-
   const sendTransportVoucher = async (transportRow) => {
-    if (!transportRow?._id || !transportRow.email) return;
+    if (!transportRow?._id) return;
+    const channels = [
+      transportRow.email ? 'email' : null,
+      (transportRow.phone || transportRow.driverPhone) ? 'whatsapp' : null,
+    ].filter(Boolean);
+    if (!channels.length) return;
     setSendingTransportVoucher(transportRow._id);
     try {
       await API.put(`/operations-manager/bookings/${id}`, { transport });
-      await API.post(`/operations-manager/bookings/${id}/transport/${transportRow._id}/voucher/send`, {
+      await API.post(`/operations-manager/bookings/${id}/transport/${transportRow._id}/confirmation`, {
         email: transportRow.email,
-        phone: transportRow.phone,
+        phone: transportRow.phone || transportRow.driverPhone,
         contactPerson: transportRow.contactPerson,
+        finalCost: Number(transportRow.finalCost) || 0,
+        pickupLocation: transportRow.pickupLocation,
+        dropLocation: transportRow.dropLocation,
+        vehicleNumber: transportRow.vehicleNumber,
+        driverName: transportRow.driverName,
+        channels,
       });
       fetchBooking();
     } finally {
@@ -415,12 +415,15 @@ export default function BookingDetailPage() {
             catalogHotels={catalogHotels}
             quotationHotels={quoteMeta?.selectedHotels || []}
             catalogCabs={catalogCabs}
-            hotels={hotels}
-            vouchers={booking.vouchers || []}
-            onHotelsChange={setHotels}
-            onSendHotelVoucher={sendHotelVoucher}
-            sendingHotelVoucher={sendingVoucher}
             destination={booking.destination}
+          />
+
+          <HotelBookingSection
+            bookingId={id}
+            booking={booking}
+            hotels={hotels}
+            onChange={setHotels}
+            onSaved={fetchBooking}
           />
 
           <BookingTransportEditor
@@ -432,7 +435,10 @@ export default function BookingDetailPage() {
             vouchers={booking.vouchers || []}
             onSendVoucher={sendTransportVoucher}
             sendingVoucher={sendingTransportVoucher}
+            packageRouting={booking.packageRouting || ''}
           />
+
+          <CompanyBookingVoucher booking={booking} onSaved={fetchBooking} />
 
           {booking.activities?.length > 0 && (
             <motion.div
@@ -590,7 +596,7 @@ export default function BookingDetailPage() {
                     <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-md capitalize', TASK_STATUS[t.status])}>{t.status?.replace(/_/g, ' ')}</span>
                     {t.status !== 'completed' && (
                       <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => updateTaskStatus(t._id, t.status === 'pending' ? 'in_progress' : 'completed')}>
-                        {t.status === 'pending' ? 'Start' : 'Done'}
+                        {t.status === 'pending' ? 'Start' : 'Done 👍'}
                       </Button>
                     )}
                   </div>
