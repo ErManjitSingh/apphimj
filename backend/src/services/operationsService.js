@@ -7,6 +7,7 @@ const SupportTicket = require('../models/SupportTicket');
 const Hotel = require('../models/Hotel');
 const Cab = require('../models/Cab');
 const Flight = require('../models/Flight');
+const Package = require('../models/Package');
 const TripTask = require('../models/TripTask');
 const TripDocument = require('../models/TripDocument');
 const Payment = require('../models/Payment');
@@ -862,14 +863,88 @@ async function listFlights(query = {}, { branchId, summary } = {}) {
   };
 }
 
+function extractPackageCabLists(pkg = {}) {
+  return [
+    pkg.packageCabs,
+    pkg.package_cabs,
+    pkg.fullData?.packageCabs,
+    pkg.fullData?.package_cabs,
+    pkg.fullData?._apiRaw?.dayOptions?.cabs,
+    pkg.rawUno?.dayOptions?.cabs,
+    pkg.cabs,
+  ].filter((list) => Array.isArray(list) && list.length);
+}
+
+async function collectPackageCatalogCabs() {
+  const pkgs = await Package.find({ sourceType: { $ne: 'uno_catalog' } })
+    .select('name destination packageCabs fullData rawUno cabs')
+    .lean();
+  const byKey = new Map();
+
+  for (const pkg of pkgs) {
+    for (const list of extractPackageCabLists(pkg)) {
+      for (const cab of list) {
+        if ((cab?.is_active ?? cab?.isActive) === false) continue;
+        const name = String(cab.name || cab.vehicleType || cab.type || cab.vehicleName || '').trim();
+        if (!name) continue;
+        const key = name.toLowerCase();
+        if (byKey.has(key)) continue;
+        const seats = cab.seats ?? cab.seatingCapacity ?? cab.capacity ?? 4;
+        const fare = Number(
+          cab.absoluteFare ?? cab.price_delta ?? cab.totalAmount ?? cab.cost ?? cab.price ?? 0
+        ) || 0;
+        byKey.set(key, {
+          _id: cab._id || cab.id || `pkg-cab-${key.replace(/[^a-z0-9]+/g, '-')}`,
+          id: cab.id || cab._id || `pkg-cab-${key.replace(/[^a-z0-9]+/g, '-')}`,
+          packageCabId: cab.id || cab._id || null,
+          vehicleType: name,
+          vehicleName: name,
+          name,
+          capacity: seats,
+          seatingCapacity: seats,
+          pickupLocation: cab.pickupLocation || cab.pickup_city || cab.pickupCity || '',
+          dropLocation: cab.dropLocation || cab.drop_city || cab.dropCity || '',
+          cost: fare,
+          price: fare,
+          status: 'available',
+          isPackageCab: true,
+          externalSource: 'catalog_package',
+          featuredImage: cab.image_url || cab.featuredImage || '',
+          isDefault: Boolean(cab.is_default ?? cab.isDefault),
+          isPopular: Boolean(cab.is_popular ?? cab.isPopular),
+          sourcePackage: pkg.name || '',
+        });
+      }
+    }
+  }
+
+  return [...byKey.values()].sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
+function mergeCabCatalog(inventory = [], packageCabs = []) {
+  const byKey = new Map();
+  for (const cab of [...packageCabs, ...inventory]) {
+    const key = String(cab.vehicleType || cab.vehicleName || cab.name || cab._id || '')
+      .trim()
+      .toLowerCase();
+    if (!key) continue;
+    if (!byKey.has(key)) byKey.set(key, cab);
+  }
+  return [...byKey.values()];
+}
+
 async function listTransport(query = {}, { branchId } = {}) {
   if (query.catalog === 'true' || query.catalog === true) {
-    const [cabs, flights] = await Promise.all([
+    const [cabs, flights, packageCabs] = await Promise.all([
       Cab.find(withBranch({}, branchId)).sort({ createdAt: -1 }).lean(),
       Flight.find(withBranch({}, branchId)).sort({ createdAt: -1 }).lean(),
+      collectPackageCatalogCabs(),
     ]);
+    const inventory = cabs.map(mapCabRow);
     return {
-      cabs: cabs.map(mapCabRow),
+      cabs: mergeCabCatalog(inventory, packageCabs),
+      inventoryCabs: inventory,
+      packageCabs,
       flights: flights.map(mapFlightRow),
     };
   }

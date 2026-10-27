@@ -530,6 +530,7 @@
   margin: 0;
   padding: 0 0 0 18px;
   list-style: disc;
+  overflow: visible;
 }
 
 .quote-ht-bullets li {
@@ -539,6 +540,10 @@
   font-weight: 600;
   color: var(--quote-ink);
   line-height: 1.45;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .quote-ht-bullets li::marker {
@@ -554,6 +559,10 @@
   font-size: 16px;
   line-height: 1.55;
   color: var(--quote-ink);
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* Snapshot grid */
@@ -694,6 +703,8 @@
   padding: 16px 18px;
   margin-bottom: 16px;
   box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+  overflow: visible;
+  min-width: 0;
 }
 
 .quote-ht-timeline-item.is-last .quote-ht-timeline-card {

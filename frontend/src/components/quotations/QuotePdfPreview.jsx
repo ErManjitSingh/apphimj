@@ -22,12 +22,29 @@ import {
 import { shortMealPlanLabel } from '../../lib/mealPlanDefaults';
 import { absolutizeUrl } from './embedPrintImages';
 
-/** Split long text into short bullet lines — no dense paragraphs. */
+/** Split text into bullet lines without dropping leftover words. */
 function isTransportDetailLine(line) {
   return /volvo|\bbus\b|\bcab\b|transport|private transfer/i.test(String(line || ''));
 }
 
-function toBulletLines(text, { max = 6, maxLen = 110 } = {}) {
+function wrapLongChunk(chunk, maxLen) {
+  const text = String(chunk || '').trim();
+  if (!text) return [];
+  if (text.length <= maxLen) return [text];
+
+  const parts = [];
+  let rest = text;
+  while (rest.length > maxLen) {
+    let cut = rest.lastIndexOf(' ', maxLen);
+    if (cut < Math.floor(maxLen * 0.45)) cut = maxLen;
+    parts.push(rest.slice(0, cut).trim());
+    rest = rest.slice(cut).trim();
+  }
+  if (rest) parts.push(rest);
+  return parts;
+}
+
+function toBulletLines(text, { max = 10, maxLen = 160 } = {}) {
   const raw = String(text || '').trim();
   if (!raw) return [];
 
@@ -38,16 +55,13 @@ function toBulletLines(text, { max = 6, maxLen = 110 } = {}) {
 
   const lines = [];
   for (const chunk of chunks) {
-    if (lines.length >= max) break;
-    if (chunk.length <= maxLen) {
-      lines.push(chunk);
-      continue;
+    for (const part of wrapLongChunk(chunk, maxLen)) {
+      if (lines.length >= max) break;
+      lines.push(part);
     }
-    // Prefer natural break near maxLen
-    const cut = chunk.lastIndexOf(' ', maxLen);
-    lines.push((cut > 40 ? chunk.slice(0, cut) : chunk.slice(0, maxLen)).trim());
+    if (lines.length >= max) break;
   }
-  return lines.length ? lines : [raw.slice(0, maxLen)];
+  return lines.length ? lines : wrapLongChunk(raw, maxLen).slice(0, max);
 }
 
 function PdfSection({ title, eyebrow, children, flush, spaced, className = '' }) {
@@ -351,10 +365,10 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
               const hasHotel = dayHotel?.name || day.hotel;
               const isLast = index === pkg.itinerary.length - 1;
               const dayPhoto = destImages[index % Math.max(1, destImages.length)];
-              const dayPoints = toBulletLines(day.description, { max: 5 });
-              const sightPoints = toBulletLines(day.sightseeing, { max: 4 });
+              const dayPoints = toBulletLines(day.description, { max: 10 });
+              const sightPoints = toBulletLines(day.sightseeing, { max: 8 });
               const activityPoints = toBulletLines(day.activities || day.activityNotes, {
-                max: 4,
+                max: 8,
               });
               const visibleDayPoints = mixedVolvo
                 ? dayPoints.filter((line) => !isTransportDetailLine(line))

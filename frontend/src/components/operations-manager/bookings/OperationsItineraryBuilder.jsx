@@ -80,17 +80,32 @@ function hotelOption(hotel) {
 }
 
 function cabOption(cab) {
+  const id = cab._id || cab.id || cab.packageCabId;
+  const name =
+    textValue(cab.name) ||
+    textValue(cab.vehicleName) ||
+    textValue(cab.displayName) ||
+    textValue(cab.vehicleType) ||
+    'Private Cab';
   return {
-    id: cab._id,
-    packageCabId: cab._id,
-    name: textValue(cab.vehicleType) || 'Private Cab',
+    id,
+    packageCabId: cab.packageCabId || id,
+    name,
+    vehicleType: cab.vehicleType || name,
     seatingCapacity: cab.capacity || cab.seatingCapacity,
-    pickupLocation: cab.pickupLocation || '',
-    dropLocation: cab.dropLocation || '',
+    pickupLocation: cab.pickupLocation || cab.displayPickup || '',
+    dropLocation: cab.dropLocation || cab.displayDrop || '',
     driverName: cab.driverName || '',
     driverPhone: cab.driverPhone || '',
-    vehicleNumber: cab.vehicleNumber || '',
-    priceDelta: cab.price || cab.cost || 0,
+    vehicleNumber: cab.vehicleNumber || cab.displayRegistration || '',
+    priceDelta: cab.price || cab.cost || cab.displayCost || 0,
+    totalAmount: cab.totalAmount || cab.price || cab.cost || 0,
+    cost: cab.cost || cab.price || 0,
+    featuredImage: cab.featuredImage || '',
+    isPackageCab: Boolean(cab.isPackageCab),
+    isDefault: Boolean(cab.isDefault),
+    isPopular: Boolean(cab.isPopular),
+    sourcePackage: cab.sourcePackage || '',
   };
 }
 
@@ -142,7 +157,16 @@ export default function OperationsItineraryBuilder({
       return true;
     });
   }, [catalogHotels, quotationHotels]);
-  const cabOptions = useMemo(() => catalogCabs.map(cabOption), [catalogCabs]);
+  const cabOptions = useMemo(() => {
+    const mapped = catalogCabs.map(cabOption).filter((cab) => cab.name);
+    const seen = new Set();
+    return mapped.filter((cab) => {
+      const key = String(cab.name).trim().toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [catalogCabs]);
   const hotelsById = useMemo(
     () => new Map(hotelOptions.flatMap((hotel) => [
       [String(hotel.id), hotel],
@@ -205,6 +229,7 @@ export default function OperationsItineraryBuilder({
 
   const selectCab = (option) => {
     const targetId = packageCabDay?.id || timelineDays[0]?.id;
+    const vehicleType = textValue(option.vehicleType || option.name).toLowerCase().replace(/\s+/g, '_');
     emitChange(timelineDays.map((day) => (
       day.id === targetId
         ? {
@@ -213,8 +238,8 @@ export default function OperationsItineraryBuilder({
               ? `${option.pickupLocation} → ${option.dropLocation}`
               : ''].filter(Boolean).join(' · '),
             dayCab: {
-              cabId: option.id,
-              vehicleType: textValue(option.name).toLowerCase().replace(/\s+/g, '_'),
+              cabId: option.id || option.packageCabId,
+              vehicleType,
               pickupLocation: option.pickupLocation || '',
               dropLocation: option.dropLocation || '',
               driverName: option.driverName || '',
@@ -286,10 +311,13 @@ export default function OperationsItineraryBuilder({
         onClose={() => setPicker(null)}
         mode="cab"
         title="Change cab"
-        subtitle="Choose the vehicle for this itinerary"
+        subtitle="All inventory and package cabs already in CRM"
         options={cabOptions}
         selectedId={packageCab?.id}
         onSelect={selectCab}
+        lead={{ destination }}
+        pkg={{ destination }}
+        alwaysShowCabCatalog
       />
     </div>
   );

@@ -516,13 +516,30 @@ export function BookingTransportEditor({
 
   const applyCatalogCabToRow = (i, cabId) => {
     if (!cabId) return;
-    const cab = catalogCabs.find((c) => String(c._id) === String(cabId));
+    const cab = catalogCabs.find((c) => (
+      String(c._id) === String(cabId) || String(c.id) === String(cabId)
+    ));
     if (!cab) return;
+    const rawType = cab.vehicleType || cab.vehicleName || cab.name || 'suv';
+    const normalized = String(rawType).toLowerCase().replace(/\s+/g, '_');
+    const allowed = ['sedan', 'suv', 'innova', 'tempo_traveller', 'bus', 'other'];
     onChange(transport.map((t, idx) => (idx === i ? {
       ...t,
-      vehicleType: (cab.vehicleType || 'suv').toLowerCase().replace(/\s+/g, '_'),
-      pickupLocation: cab.pickupLocation || '',
-      dropLocation: cab.dropLocation || '',
+      vehicleType: allowed.includes(normalized)
+        ? normalized
+        : (normalized.includes('innova')
+          ? 'innova'
+          : normalized.includes('tempo')
+            ? 'tempo_traveller'
+            : normalized.includes('sedan')
+              ? 'sedan'
+              : normalized.includes('bus')
+                ? 'bus'
+                : 'suv'),
+      vendorName: cab.sourcePackage || t.vendorName || '',
+      pickupLocation: cab.pickupLocation || t.pickupLocation || '',
+      dropLocation: cab.dropLocation || t.dropLocation || '',
+      finalCost: Number(cab.cost || cab.price || t.finalCost) || 0,
     } : t)));
   };
 
@@ -576,9 +593,16 @@ export function BookingTransportEditor({
                 onChange={(e) => applyCatalogCabToRow(i, e.target.value)}
                 className="input-premium h-10 w-full rounded-xl text-sm"
               >
-                <option value="">— Pick from cab fleet —</option>
+                <option value="">— Pick from all CRM cabs —</option>
                 {catalogCabs.map((c) => (
-                  <option key={c._id} value={c._id}>{c.vehicleType} · {c.pickupLocation} → {c.dropLocation}</option>
+                  <option key={c._id || c.id || c.name} value={c._id || c.id}>
+                    {c.vehicleName || c.name || c.vehicleType}
+                    {c.pickupLocation || c.dropLocation
+                      ? ` · ${c.pickupLocation || '—'} → ${c.dropLocation || '—'}`
+                      : c.sourcePackage
+                        ? ` · ${c.sourcePackage}`
+                        : ''}
+                  </option>
                 ))}
               </select>
             )}

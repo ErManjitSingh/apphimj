@@ -795,6 +795,8 @@ export default function PackageResourcePickerDrawer({
   lockHotel = false,
   lead = null,
   pkg = null,
+  /** Ops / booking: keep full cab list and still allow catalog search below. */
+  alwaysShowCabCatalog = false,
 }) {
   const seasonKey = hotelSeason === 'offSeason' ? 'offSeason' : 'onSeason';
   const [query, setQuery] = useState('');
@@ -1179,23 +1181,38 @@ export default function PackageResourcePickerDrawer({
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3 bg-slate-50">
             {filtered.length > 0 ? (
-              filtered.map((cab) => {
-                const id = cab.id || cab.packageCabId || cab.name;
-                return (
-                  <CabOptionCard
-                    key={id}
-                    cab={cab}
-                    selected={selectedId != null && selectedId === id}
-                    onSelect={onSelect}
-                    basePrice={basePrice}
-                  />
-                );
-              })
+              <>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  {filtered.length} cab{filtered.length === 1 ? '' : 's'} available
+                </p>
+                {filtered.map((cab) => {
+                  const id = cab.id || cab.packageCabId || cab.name;
+                  return (
+                    <CabOptionCard
+                      key={id}
+                      cab={cab}
+                      selected={selectedId != null && selectedId === id}
+                      onSelect={onSelect}
+                      basePrice={basePrice}
+                    />
+                  );
+                })}
+              </>
             ) : (
               <div className="rounded-2xl border border-emerald-100 bg-white p-4">
-                <p className="text-sm font-semibold text-slate-800 mb-1">No package cabs attached</p>
-                <p className="text-xs text-slate-500 mb-3">
+                <p className="text-sm font-semibold text-slate-800 mb-1">No cabs in list yet</p>
+                <p className="text-xs text-slate-500">
                   Search catalog cabs below, or add cabs when creating the package.
+                </p>
+              </div>
+            )}
+            {(alwaysShowCabCatalog || filtered.length === 0) && (
+              <div className="rounded-2xl border border-emerald-100 bg-white p-4">
+                <p className="text-sm font-semibold text-slate-800 mb-1">
+                  {filtered.length ? 'Need another cab?' : 'Search catalog cabs'}
+                </p>
+                <p className="text-xs text-slate-500 mb-3">
+                  Pick from existing catalog / route cabs already in CRM.
                 </p>
                 <CatalogCabSelector
                   lead={lead}

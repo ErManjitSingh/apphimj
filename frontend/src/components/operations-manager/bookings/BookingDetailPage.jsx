@@ -224,7 +224,21 @@ export default function BookingDetailPage() {
       API.get('/operations-manager/transport', { params: { catalog: true }, skipSuccessToast: true }),
     ]).then(([hotelsRes, transportRes]) => {
       setCatalogHotels(hotelsRes.data?.data ?? hotelsRes.data ?? []);
-      setCatalogCabs(transportRes.data?.cabs || []);
+      const transport = transportRes.data || {};
+      const merged = [
+        ...(transport.cabs || []),
+        ...(transport.packageCabs || []),
+        ...(transport.inventoryCabs || []),
+      ];
+      const seen = new Set();
+      setCatalogCabs(merged.filter((cab) => {
+        const key = String(cab.vehicleType || cab.vehicleName || cab.name || cab._id || '')
+          .trim()
+          .toLowerCase();
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }));
     }).catch(() => {});
   }, []);
 
