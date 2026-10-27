@@ -49,6 +49,8 @@ function collapseHotelStays(rows = []) {
       if (previous.checkIn) previous.checkOut = addDays(previous.checkIn, previous.nights);
       previous.rooms = Math.max(Number(previous.rooms) || 1, Number(row.rooms) || 1);
       if (!Number(previous.internalPrice) && Number(row.internalPrice)) previous.internalPrice = row.internalPrice;
+      if (!Number(previous.advancePaid) && Number(row.advancePaid)) previous.advancePaid = row.advancePaid;
+      if (!Number(previous.kids) && Number(row.kids)) previous.kids = row.kids;
       previous.specialArrangements = [...new Set([
         ...(previous.specialArrangements || []),
         ...(row.specialArrangements || []),
@@ -56,7 +58,7 @@ function collapseHotelStays(rows = []) {
       fillBlank(previous, row, [
         'hotelId', 'externalHotelId', 'destination', 'category', 'roomType', 'mealPlan',
         'address', 'contactPerson', 'phone', 'email', 'confirmationNumber', 'companyName',
-        'specialArrangementNote', 'notes', 'persons',
+        'specialArrangementNote', 'extraMatters', 'notes', 'persons',
       ]);
       if (previous.status === 'pending' && row.status && row.status !== 'pending') previous.status = row.status;
       if (!previous.voucherId && row.voucherId) previous.voucherId = row.voucherId;
@@ -123,7 +125,8 @@ function staysOverlap(left, right) {
 }
 
 const HOTEL_OPS_FIELDS = [
-  'internalPrice', 'persons', 'companyName', 'specialArrangements', 'specialArrangementNote',
+  'internalPrice', 'advancePaid', 'persons', 'kids', 'companyName',
+  'specialArrangements', 'specialArrangementNote', 'extraMatters',
   'email', 'phone', 'contactPerson', 'address', 'confirmationNumber', 'status',
   'voucherId', 'voucherSentAt', 'whatsappSentAt', 'notes', 'rooms', 'category',
 ];

@@ -35,10 +35,15 @@ const hotelAssignmentSchema = new mongoose.Schema(
     email: { type: String, trim: true, lowercase: true, default: '' },
     confirmationNumber: { type: String, trim: true, default: '' },
     internalPrice: { type: Number, default: 0 },
+    /** Advance paid / to be paid to this hotel (ops manual). */
+    advancePaid: { type: Number, default: 0, min: 0 },
     persons: { type: Number, min: 0, default: 0 },
+    kids: { type: Number, min: 0, default: 0 },
     companyName: { type: String, trim: true, default: '' },
     specialArrangements: [{ type: String, trim: true }],
     specialArrangementNote: { type: String, trim: true, default: '' },
+    /** Free-text extra matters for hotel (ops notes / special requests). */
+    extraMatters: { type: String, trim: true, default: '' },
     whatsappSentAt: Date,
     status: {
       type: String,

@@ -82,9 +82,12 @@ function hotelConfirmationText(booking, hotel) {
     `* Number of Nights: ${hotel.nights || 1}`,
     `* Number of Rooms: ${hotel.rooms || 1}`,
     `* Number of Persons: ${personCount(booking, hotel) || '—'}`,
+    `* Number of Kids: ${Number(hotel.kids) || 0}`,
     `* Meal Plan: ${hotel.mealPlan || '—'}`,
     `* Any Special Arrangement: ${arrangementText(hotel)}`,
+    `* Extra Matters: ${hotel.extraMatters || 'None'}`,
     `* Total Price: ${inr(hotel.internalPrice)}`,
+    `* Advance to Hotel: ${inr(hotel.advancePaid)}`,
     '',
     `Booking: ${booking.bookingNumber}`,
     '',
@@ -185,7 +188,10 @@ function applyHotelConfirmation(hotel, body, booking) {
   if (body.rooms != null) hotel.rooms = Number(body.rooms) || 1;
   if (body.nights != null) hotel.nights = Number(body.nights) || 1;
   if (body.persons != null) hotel.persons = Number(body.persons) || 0;
+  if (body.kids != null) hotel.kids = Number(body.kids) || 0;
   if (body.internalPrice != null) hotel.internalPrice = Number(body.internalPrice) || 0;
+  if (body.advancePaid != null) hotel.advancePaid = Number(body.advancePaid) || 0;
+  if (body.extraMatters != null) hotel.extraMatters = String(body.extraMatters).trim();
   if (body.checkIn) hotel.checkIn = body.checkIn;
   if (body.checkOut) hotel.checkOut = body.checkOut;
   if (Array.isArray(body.specialArrangements)) {

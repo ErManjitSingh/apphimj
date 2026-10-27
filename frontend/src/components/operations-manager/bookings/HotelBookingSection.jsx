@@ -3,6 +3,7 @@ import { Hotel, Loader2, Save, Send } from 'lucide-react';
 import API from '../../../api/axios';
 import { Button } from '../../ui/button';
 import { formatDate, formatINR } from '../operationsUtils';
+import { cn } from '../../../lib/utils';
 
 const ARRANGEMENTS = ['Candlelight Dinner', 'Cake', 'DJ', 'Bonfire', 'Flower Decoration', 'Honeymoon Setup'];
 
@@ -12,6 +13,17 @@ function dateInput(value) {
   if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
   return local.toISOString().slice(0, 10);
+}
+
+function Field({ label, children, className }) {
+  return (
+    <label className={cn('block min-w-0', className)}>
+      <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-content-muted">
+        {label}
+      </span>
+      {children}
+    </label>
+  );
 }
 
 function letterFor(booking, hotel) {
@@ -32,9 +44,12 @@ function letterFor(booking, hotel) {
     `* Number of Nights: ${hotel.nights || 1}`,
     `* Number of Rooms: ${hotel.rooms || 1}`,
     `* Number of Persons: ${persons || '—'}`,
+    `* Number of Kids: ${Number(hotel.kids) || 0}`,
     `* Meal Plan: ${hotel.mealPlan || '—'}`,
     `* Any Special Arrangement: ${arrangements.join(', ') || 'None'}`,
+    `* Extra Matters: ${hotel.extraMatters || 'None'}`,
     `* Total Price: ${formatINR(hotel.internalPrice || 0)}`,
+    `* Advance to Hotel: ${formatINR(hotel.advancePaid || 0)}`,
   ].join('\n');
 }
 
@@ -92,7 +107,10 @@ export default function HotelBookingSection({ bookingId, booking, hotels, onChan
           rooms: hotel.rooms || 1,
           nights: hotel.nights || 1,
           persons: Number(hotel.persons) || (Number(booking.adults || 0) + Number(booking.children || 0)),
+          kids: Number(hotel.kids) || 0,
           internalPrice: Number(hotel.internalPrice) || 0,
+          advancePaid: Number(hotel.advancePaid) || 0,
+          extraMatters: hotel.extraMatters || '',
           checkIn: hotel.checkIn,
           checkOut: hotel.checkOut,
           specialArrangements: hotel.specialArrangements || [],
@@ -117,8 +135,8 @@ export default function HotelBookingSection({ bookingId, booking, hotels, onChan
             <Hotel className="h-5 w-5 text-teal-600" /> Hotel booking
           </h2>
           <p className="mt-1 max-w-2xl text-xs text-content-muted">
-            One entry per hotel stay. The same hotel on continuous dates stays as a single request.
-            Internal price is for company profit only and does not change the agent quotation or customer itinerary.
+            One entry per hotel stay. Enter internal cost and the advance you are sending to the hotel.
+            Kids and Extra matters go on the confirmation letter.
           </p>
         </div>
         <Button variant="teal" size="sm" className="rounded-xl gap-1.5" disabled={saving || !hotels.length} onClick={save}>
@@ -138,92 +156,196 @@ export default function HotelBookingSection({ bookingId, booking, hotels, onChan
       )}
 
       <div className="space-y-4">
-        {hotels.map((hotel, index) => (
-          <article key={hotel._id || `${hotel.hotelName}-${index}`} className="rounded-2xl border border-subtle bg-slate-50/70 p-4 dark:bg-slate-950/40">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h3 className="text-base font-black text-content-primary">{hotel.hotelName || 'Hotel'}</h3>
-                <p className="text-xs text-content-muted">
-                  {formatDate(hotel.checkIn || booking.travelDate)} → {formatDate(hotel.checkOut || booking.returnDate)}
-                  {' · '}{hotel.nights || 1} night{(hotel.nights || 1) > 1 ? 's' : ''}
-                  {hotel.destination ? ` · ${hotel.destination}` : ''}
-                </p>
-              </div>
-              <span className="rounded-full bg-teal-500/10 px-2.5 py-1 text-[10px] font-bold uppercase text-teal-700">
-                {hotel.status || 'pending'}
-              </span>
-            </div>
+        {hotels.map((hotel, index) => {
+          const internal = Number(hotel.internalPrice) || 0;
+          const advance = Number(hotel.advancePaid) || 0;
+          const balance = Math.max(0, internal - advance);
+          const defaultPersons =
+            Number(hotel.persons) ||
+            Number(booking.adults || 0) + Number(booking.children || 0) ||
+            '';
 
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <input value={hotel.companyName || 'Him Journey Tours'} onChange={(e) => update(index, { companyName: e.target.value })} className="input-premium h-10 rounded-xl text-sm" placeholder="Company name" />
-              <input value={hotel.mealPlan || ''} onChange={(e) => update(index, { mealPlan: e.target.value })} className="input-premium h-10 rounded-xl text-sm" placeholder="Meal plan" />
-              <input type="number" min="1" value={hotel.rooms || 1} onChange={(e) => update(index, { rooms: Number(e.target.value) || 1 })} className="input-premium h-10 rounded-xl text-sm" placeholder="Rooms" />
-              <input type="number" min="1" value={hotel.persons || (Number(booking.adults || 0) + Number(booking.children || 0)) || ''} onChange={(e) => update(index, { persons: Number(e.target.value) || 0 })} className="input-premium h-10 rounded-xl text-sm" placeholder="Persons" />
-              <input type="date" value={dateInput(hotel.checkIn)} onChange={(e) => update(index, { checkIn: e.target.value })} className="input-premium h-10 rounded-xl text-sm" />
-              <input type="date" value={dateInput(hotel.checkOut)} onChange={(e) => update(index, { checkOut: e.target.value })} className="input-premium h-10 rounded-xl text-sm" />
-              <input value={hotel.email || ''} onChange={(e) => update(index, { email: e.target.value })} className="input-premium h-10 rounded-xl text-sm" placeholder="Hotel email" />
-              <input value={hotel.phone || ''} onChange={(e) => update(index, { phone: e.target.value })} className="input-premium h-10 rounded-xl text-sm" placeholder="Hotel WhatsApp" />
-              <label className="sm:col-span-2 text-xs font-semibold text-content-secondary">
-                Internal hotel cost
-                <input
-                  type="number"
-                  min="0"
-                  value={hotel.internalPrice ?? ''}
-                  onChange={(e) => update(index, { internalPrice: e.target.value === '' ? 0 : Number(e.target.value) })}
-                  className="input-premium mt-1 h-10 w-full rounded-xl text-sm font-bold"
-                  placeholder="Total price for this stay"
+          return (
+            <article key={hotel._id || `${hotel.hotelName}-${index}`} className="rounded-2xl border border-subtle bg-slate-50/70 p-4 dark:bg-slate-950/40">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-base font-black text-content-primary">{hotel.hotelName || 'Hotel'}</h3>
+                  <p className="text-xs text-content-muted">
+                    {formatDate(hotel.checkIn || booking.travelDate)} → {formatDate(hotel.checkOut || booking.returnDate)}
+                    {' · '}{hotel.nights || 1} night{(hotel.nights || 1) > 1 ? 's' : ''}
+                    {hotel.destination ? ` · ${hotel.destination}` : ''}
+                  </p>
+                </div>
+                <span className="rounded-full bg-teal-500/10 px-2.5 py-1 text-[10px] font-bold uppercase text-teal-700">
+                  {hotel.status || 'pending'}
+                </span>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <Field label="Company name" className="sm:col-span-2 lg:col-span-1">
+                  <input
+                    value={hotel.companyName || 'Him Journey Tours'}
+                    onChange={(e) => update(index, { companyName: e.target.value })}
+                    className="input-premium h-10 w-full rounded-xl text-sm"
+                  />
+                </Field>
+                <Field label="Meal plan">
+                  <input
+                    value={hotel.mealPlan || ''}
+                    onChange={(e) => update(index, { mealPlan: e.target.value })}
+                    className="input-premium h-10 w-full rounded-xl text-sm"
+                    placeholder="CP / MAP / AP"
+                  />
+                </Field>
+                <Field label="No. of rooms">
+                  <input
+                    type="number"
+                    min="1"
+                    value={hotel.rooms || 1}
+                    onChange={(e) => update(index, { rooms: Number(e.target.value) || 1 })}
+                    className="input-premium h-10 w-full rounded-xl text-sm"
+                  />
+                </Field>
+                <Field label="No. of persons">
+                  <input
+                    type="number"
+                    min="0"
+                    value={defaultPersons}
+                    onChange={(e) => update(index, { persons: Number(e.target.value) || 0 })}
+                    className="input-premium h-10 w-full rounded-xl text-sm"
+                  />
+                </Field>
+                <Field label="No. of kids">
+                  <input
+                    type="number"
+                    min="0"
+                    value={hotel.kids ?? 0}
+                    onChange={(e) => update(index, { kids: Number(e.target.value) || 0 })}
+                    className="input-premium h-10 w-full rounded-xl text-sm"
+                  />
+                </Field>
+                <Field label="Check-in date">
+                  <input
+                    type="date"
+                    value={dateInput(hotel.checkIn)}
+                    onChange={(e) => update(index, { checkIn: e.target.value })}
+                    className="input-premium h-10 w-full rounded-xl text-sm"
+                  />
+                </Field>
+                <Field label="Check-out date">
+                  <input
+                    type="date"
+                    value={dateInput(hotel.checkOut)}
+                    onChange={(e) => update(index, { checkOut: e.target.value })}
+                    className="input-premium h-10 w-full rounded-xl text-sm"
+                  />
+                </Field>
+                <Field label="Hotel email">
+                  <input
+                    value={hotel.email || ''}
+                    onChange={(e) => update(index, { email: e.target.value })}
+                    className="input-premium h-10 w-full rounded-xl text-sm"
+                    placeholder="hotel@email.com"
+                  />
+                </Field>
+                <Field label="Hotel WhatsApp">
+                  <input
+                    value={hotel.phone || ''}
+                    onChange={(e) => update(index, { phone: e.target.value })}
+                    className="input-premium h-10 w-full rounded-xl text-sm"
+                    placeholder="91XXXXXXXXXX"
+                  />
+                </Field>
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <Field label="Internal hotel cost (total)">
+                  <input
+                    type="number"
+                    min="0"
+                    value={hotel.internalPrice ?? ''}
+                    onChange={(e) => update(index, { internalPrice: e.target.value === '' ? 0 : Number(e.target.value) })}
+                    className="input-premium h-10 w-full rounded-xl text-sm font-bold"
+                    placeholder="Full stay cost"
+                  />
+                </Field>
+                <Field label="Advance to hotel">
+                  <input
+                    type="number"
+                    min="0"
+                    value={hotel.advancePaid ?? ''}
+                    onChange={(e) => update(index, { advancePaid: e.target.value === '' ? 0 : Number(e.target.value) })}
+                    className="input-premium h-10 w-full rounded-xl text-sm font-bold text-amber-800"
+                    placeholder="Manual advance amount"
+                  />
+                </Field>
+                <div className="rounded-xl border border-subtle bg-white px-3 py-2 dark:bg-slate-900/60">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-content-muted">Balance to hotel</p>
+                  <p className="mt-1 text-lg font-black tabular-nums text-content-primary">{formatINR(balance)}</p>
+                  <p className="text-[10px] text-content-muted">Total − advance</p>
+                </div>
+              </div>
+
+              <Field label="Extra matters" className="mt-3">
+                <textarea
+                  value={hotel.extraMatters || ''}
+                  onChange={(e) => update(index, { extraMatters: e.target.value })}
+                  className="input-premium min-h-[88px] w-full resize-y rounded-xl text-sm"
+                  placeholder="Any extra notes for the hotel (early check-in, view preference, etc.)"
                 />
-              </label>
-            </div>
+              </Field>
 
-            <div className="mt-3">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-content-muted">Special arrangements</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {ARRANGEMENTS.map((label) => {
-                  const active = (hotel.specialArrangements || []).includes(label);
-                  return (
-                    <button
-                      key={label}
-                      type="button"
-                      onClick={() => toggleArrangement(index, label)}
-                      className={`rounded-full border px-3 py-1 text-xs font-semibold ${active ? 'border-teal-500 bg-teal-500 text-white' : 'border-subtle bg-white text-content-secondary'}`}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
+              <div className="mt-3">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-content-muted">Special arrangements</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {ARRANGEMENTS.map((label) => {
+                    const active = (hotel.specialArrangements || []).includes(label);
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => toggleArrangement(index, label)}
+                        className={`rounded-full border px-3 py-1 text-xs font-semibold ${active ? 'border-teal-500 bg-teal-500 text-white' : 'border-subtle bg-white text-content-secondary'}`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <Field label="Other arrangement note" className="mt-2">
+                  <input
+                    value={hotel.specialArrangementNote || ''}
+                    onChange={(e) => update(index, { specialArrangementNote: e.target.value })}
+                    className="input-premium h-10 w-full rounded-xl text-sm"
+                    placeholder="Any other arrangement"
+                  />
+                </Field>
               </div>
-              <input
-                value={hotel.specialArrangementNote || ''}
-                onChange={(e) => update(index, { specialArrangementNote: e.target.value })}
-                className="input-premium mt-2 h-10 w-full rounded-xl text-sm"
-                placeholder="Any other arrangement"
-              />
-            </div>
 
-            <pre className="mt-3 whitespace-pre-wrap rounded-xl border border-amber-200 bg-amber-50/80 p-3 font-sans text-xs leading-5 text-slate-700">
-              {letterFor(booking, hotel)}
-            </pre>
+              <pre className="mt-3 whitespace-pre-wrap rounded-xl border border-amber-200 bg-amber-50/80 p-3 font-sans text-xs leading-5 text-slate-700">
+                {letterFor(booking, hotel)}
+              </pre>
 
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[11px] text-content-muted">
-                {hotel.voucherSentAt ? `Last sent ${formatDate(hotel.voucherSentAt)}` : 'Not sent yet'}
-                {hotel.whatsappSentAt ? ' · WhatsApp sent' : ''}
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="rounded-xl gap-1.5 border-amber-500/40"
-                disabled={sendingId === hotel._id}
-                onClick={() => send(hotel)}
-              >
-                {sendingId === hotel._id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                Send for Confirmation
-              </Button>
-            </div>
-          </article>
-        ))}
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] text-content-muted">
+                  {hotel.voucherSentAt ? `Last sent ${formatDate(hotel.voucherSentAt)}` : 'Not sent yet'}
+                  {hotel.whatsappSentAt ? ' · WhatsApp sent' : ''}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl gap-1.5 border-amber-500/40"
+                  disabled={sendingId === hotel._id}
+                  onClick={() => send(hotel)}
+                >
+                  {sendingId === hotel._id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                  Send for Confirmation
+                </Button>
+              </div>
+            </article>
+          );
+        })}
       </div>
     </section>
   );
