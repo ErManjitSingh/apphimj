@@ -152,9 +152,10 @@ async function buildDashboard(branchId) {
     ...base,
     $or: [{ cabConfirmation: 'pending' }, { 'transport.status': { $in: ['pending', 'requested'] } }],
   };
+  // Trips confirmed / handed over by sales executive, awaiting ops pickup.
   const pendingActivity = {
     ...base,
-    'activities.status': { $in: ['pending'] },
+    status: { $in: ['booking_received', 'pending_verification'] },
   };
   const pendingVoucher = { ...base, voucherStatus: 'pending' };
 
