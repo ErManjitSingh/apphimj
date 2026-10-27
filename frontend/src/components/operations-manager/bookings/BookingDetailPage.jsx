@@ -456,6 +456,9 @@ export default function BookingDetailPage() {
             onSendVoucher={sendTransportVoucher}
             sendingVoucher={sendingTransportVoucher}
             packageRouting={booking.packageRouting || ''}
+            bookingId={id}
+            cabInternalNotes={booking.cabInternalNotes || []}
+            onNotesSaved={fetchBooking}
           />
 
           <CompanyBookingVoucher booking={booking} onSaved={fetchBooking} />

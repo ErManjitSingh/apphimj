@@ -4,6 +4,7 @@ import API from '../../../api/axios';
 import { Button } from '../../ui/button';
 import { formatDate, formatINR } from '../operationsUtils';
 import { cn } from '../../../lib/utils';
+import OpsInternalNotesPanel from './OpsInternalNotesPanel';
 
 const ARRANGEMENTS = ['Candlelight Dinner', 'Cake', 'DJ', 'Bonfire', 'Flower Decoration', 'Honeymoon Setup'];
 
@@ -82,6 +83,7 @@ function letterFor(booking, hotel) {
 }
 
 export default function HotelBookingSection({ bookingId, booking, hotels, onChange, onSaved }) {
+  const hotelNotes = booking?.hotelInternalNotes || [];
   const [saving, setSaving] = useState(false);
   const [sendingId, setSendingId] = useState(null);
   const [notice, setNotice] = useState('');
@@ -385,6 +387,13 @@ export default function HotelBookingSection({ bookingId, booking, hotels, onChan
           );
         })}
       </div>
+
+      <OpsInternalNotesPanel
+        bookingId={bookingId}
+        scope="hotel"
+        notes={hotelNotes}
+        onSaved={onSaved}
+      />
     </section>
   );
 }

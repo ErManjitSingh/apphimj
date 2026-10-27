@@ -285,6 +285,34 @@ const updateBooking = asyncHandler(async (req, res) => {
   res.json(booking);
 });
 
+/** Ops: append internal note under Hotel Master or Cab booking (server stamps date/time). */
+const addBookingOpsNote = asyncHandler(async (req, res) => {
+  const scope = String(req.body.scope || '').toLowerCase() === 'cab' ? 'cab' : 'hotel';
+  const field = scope === 'cab' ? 'cabInternalNotes' : 'hotelInternalNotes';
+  const text = String(req.body.text || '').trim();
+  if (!text) throw new ApiError(400, 'Write a note before saving');
+  if (text.length > 4000) throw new ApiError(400, 'Note must be under 4000 characters');
+
+  const booking = await Booking.findById(req.params.id);
+  if (!booking) throw new ApiError(404, 'Booking not found');
+
+  const entry = {
+    text,
+    createdAt: new Date(),
+    createdBy: req.user._id,
+    createdByName: req.user.name || req.user.email || 'Operations',
+  };
+  booking[field].push(entry);
+  await booking.save();
+
+  const notes = booking[field] || [];
+  res.status(201).json({
+    scope,
+    note: notes[notes.length - 1],
+    notes,
+  });
+});
+
 /** Ops: record additional client payment (+ screenshot) against booking's lead payment. */
 const recordBookingPayment = asyncHandler(async (req, res) => {
   const booking = await Booking.findById(req.params.id).lean();
@@ -906,6 +934,7 @@ module.exports = {
   getBooking,
   syncBookingQuotation,
   updateBooking,
+  addBookingOpsNote,
   recordBookingPayment,
   confirmHotel,
   confirmCab,

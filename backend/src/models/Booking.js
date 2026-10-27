@@ -109,6 +109,17 @@ const activityAssignmentSchema = new mongoose.Schema(
   { _id: true }
 );
 
+/** Ops-only log entries under Hotel Master / Cab booking. */
+const opsInternalNoteSchema = new mongoose.Schema(
+  {
+    text: { type: String, trim: true, required: true },
+    createdAt: { type: Date, default: Date.now },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    createdByName: { type: String, trim: true, default: '' },
+  },
+  { _id: true }
+);
+
 const itineraryDayHotelSchema = new mongoose.Schema(
   {
     hotelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Hotel' },
@@ -193,6 +204,10 @@ const bookingSchema = new mongoose.Schema(
     complimentary: { type: String, trim: true, default: '' },
     specialNotes: { type: String, trim: true, default: '' },
     companyVoucherUrl: { type: String, trim: true, default: '' },
+    /** Internal ops notes under Hotel Master (with save timestamp). */
+    hotelInternalNotes: [opsInternalNoteSchema],
+    /** Internal ops notes under Cab / Transport (with save timestamp). */
+    cabInternalNotes: [opsInternalNoteSchema],
     totalAmount: { type: Number, default: 0 },
     advanceReceived: { type: Number, default: 0 },
     pendingAmount: { type: Number, default: 0 },

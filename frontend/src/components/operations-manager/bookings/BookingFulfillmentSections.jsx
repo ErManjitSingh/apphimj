@@ -7,6 +7,7 @@ import { Button } from '../../ui/button';
 import { formatDate } from '../operationsUtils';
 import { CONFIRMATION_CONFIG } from '../constants';
 import { cn } from '../../../lib/utils';
+import OpsInternalNotesPanel from './OpsInternalNotesPanel';
 
 const VEHICLE_TYPES = [
   { value: 'sedan', label: 'Sedan' },
@@ -509,6 +510,9 @@ export function BookingTransportEditor({
   onSendVoucher,
   sendingVoucher,
   packageRouting = '',
+  bookingId,
+  cabInternalNotes = [],
+  onNotesSaved,
 }) {
   const update = (i, field, value) => {
     onChange(transport.map((t, idx) => (idx === i ? { ...t, [field]: value } : t)));
@@ -673,6 +677,15 @@ export function BookingTransportEditor({
           );
         })}
       </div>
+
+      {bookingId ? (
+        <OpsInternalNotesPanel
+          bookingId={bookingId}
+          scope="cab"
+          notes={cabInternalNotes}
+          onSaved={onNotesSaved}
+        />
+      ) : null}
     </SectionShell>
   );
 }
