@@ -511,7 +511,6 @@ export function BookingTransportEditor({
   sendingVoucher,
   packageRouting = '',
   bookingId,
-  cabInternalNotes = [],
   onNotesSaved,
 }) {
   const update = (i, field, value) => {
@@ -673,19 +672,23 @@ export function BookingTransportEditor({
                 </Button>
               </div>
             </div>
+
+            {bookingId ? (
+              <OpsInternalNotesPanel
+                bookingId={bookingId}
+                scope="cab"
+                compact
+                transportAssignmentId={t._id}
+                title={`Vehicle #${i + 1} · internal notes`}
+                notes={t.internalNotes || []}
+                disabledReason={t._id ? '' : 'Pehle transport save karo, phir note add hoga'}
+                onSaved={onNotesSaved}
+              />
+            ) : null}
           </div>
           );
         })}
       </div>
-
-      {bookingId ? (
-        <OpsInternalNotesPanel
-          bookingId={bookingId}
-          scope="cab"
-          notes={cabInternalNotes}
-          onSaved={onNotesSaved}
-        />
-      ) : null}
     </SectionShell>
   );
 }

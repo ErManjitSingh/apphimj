@@ -126,7 +126,7 @@ function staysOverlap(left, right) {
 
 const HOTEL_OPS_FIELDS = [
   'internalPrice', 'advancePaid', 'persons', 'kids', 'companyName',
-  'specialArrangements', 'specialArrangementNote', 'extraMatters',
+  'specialArrangements', 'specialArrangementNote', 'extraMatters', 'internalNotes',
   'email', 'phone', 'contactPerson', 'address', 'confirmationNumber', 'status',
   'voucherId', 'voucherSentAt', 'whatsappSentAt', 'notes', 'rooms', 'category',
 ];
@@ -225,6 +225,9 @@ function mergeTransportOps(derived = [], existing = []) {
       voucherId: row.voucherId || previous.voucherId,
       voucherSentAt: row.voucherSentAt || previous.voucherSentAt,
       whatsappSentAt: row.whatsappSentAt || previous.whatsappSentAt,
+      internalNotes: (Array.isArray(row.internalNotes) && row.internalNotes.length)
+        ? row.internalNotes
+        : (previous.internalNotes || []),
     };
   });
 }

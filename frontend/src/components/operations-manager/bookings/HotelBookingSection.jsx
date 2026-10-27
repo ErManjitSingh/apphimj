@@ -83,7 +83,6 @@ function letterFor(booking, hotel) {
 }
 
 export default function HotelBookingSection({ bookingId, booking, hotels, onChange, onSaved }) {
-  const hotelNotes = booking?.hotelInternalNotes || [];
   const [saving, setSaving] = useState(false);
   const [sendingId, setSendingId] = useState(null);
   const [notice, setNotice] = useState('');
@@ -383,17 +382,21 @@ export default function HotelBookingSection({ bookingId, booking, hotels, onChan
                   Send for Confirmation
                 </Button>
               </div>
+
+              <OpsInternalNotesPanel
+                bookingId={bookingId}
+                scope="hotel"
+                compact
+                hotelAssignmentId={hotel._id}
+                title={`${hotel.hotelName || 'Hotel'} · internal notes`}
+                notes={hotel.internalNotes || []}
+                disabledReason={hotel._id ? '' : 'Pehle hotel save karo, phir note add hoga'}
+                onSaved={onSaved}
+              />
             </article>
           );
         })}
       </div>
-
-      <OpsInternalNotesPanel
-        bookingId={bookingId}
-        scope="hotel"
-        notes={hotelNotes}
-        onSaved={onSaved}
-      />
     </section>
   );
 }

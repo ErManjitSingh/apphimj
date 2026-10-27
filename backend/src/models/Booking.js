@@ -44,6 +44,15 @@ const hotelAssignmentSchema = new mongoose.Schema(
     specialArrangementNote: { type: String, trim: true, default: '' },
     /** Free-text extra matters for hotel (ops notes / special requests). */
     extraMatters: { type: String, trim: true, default: '' },
+    /** Per-hotel ops notes with date/time stamps. */
+    internalNotes: [
+      {
+        text: { type: String, trim: true, required: true },
+        createdAt: { type: Date, default: Date.now },
+        createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        createdByName: { type: String, trim: true, default: '' },
+      },
+    ],
     whatsappSentAt: Date,
     status: {
       type: String,
@@ -88,6 +97,15 @@ const transportAssignmentSchema = new mongoose.Schema(
     voucherId: { type: mongoose.Schema.Types.ObjectId, ref: 'Voucher' },
     voucherSentAt: Date,
     notes: String,
+    /** Per-cab ops notes with date/time stamps. */
+    internalNotes: [
+      {
+        text: { type: String, trim: true, required: true },
+        createdAt: { type: Date, default: Date.now },
+        createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        createdByName: { type: String, trim: true, default: '' },
+      },
+    ],
   },
   { _id: true }
 );

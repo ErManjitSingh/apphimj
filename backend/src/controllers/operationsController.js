@@ -285,10 +285,9 @@ const updateBooking = asyncHandler(async (req, res) => {
   res.json(booking);
 });
 
-/** Ops: append internal note under Hotel Master or Cab booking (server stamps date/time). */
+/** Ops: append internal note under a hotel stay / cab row / section (server stamps date/time). */
 const addBookingOpsNote = asyncHandler(async (req, res) => {
   const scope = String(req.body.scope || '').toLowerCase() === 'cab' ? 'cab' : 'hotel';
-  const field = scope === 'cab' ? 'cabInternalNotes' : 'hotelInternalNotes';
   const text = String(req.body.text || '').trim();
   if (!text) throw new ApiError(400, 'Write a note before saving');
   if (text.length > 4000) throw new ApiError(400, 'Note must be under 4000 characters');
@@ -302,13 +301,40 @@ const addBookingOpsNote = asyncHandler(async (req, res) => {
     createdBy: req.user._id,
     createdByName: req.user.name || req.user.email || 'Operations',
   };
-  booking[field].push(entry);
-  await booking.save();
 
-  const notes = booking[field] || [];
+  const hotelAssignmentId = req.body.hotelAssignmentId || req.body.assignmentId;
+  const transportAssignmentId = req.body.transportAssignmentId || req.body.assignmentId;
+
+  let notes = [];
+  let assignmentId = null;
+
+  if (scope === 'hotel' && hotelAssignmentId) {
+    const hotel = booking.hotels.id(hotelAssignmentId);
+    if (!hotel) throw new ApiError(404, 'Hotel stay not found — save hotel first');
+    if (!Array.isArray(hotel.internalNotes)) hotel.internalNotes = [];
+    hotel.internalNotes.push(entry);
+    assignmentId = String(hotel._id);
+    notes = hotel.internalNotes;
+  } else if (scope === 'cab' && transportAssignmentId) {
+    const row = booking.transport.id(transportAssignmentId);
+    if (!row) throw new ApiError(404, 'Cab row not found — save transport first');
+    if (!Array.isArray(row.internalNotes)) row.internalNotes = [];
+    row.internalNotes.push(entry);
+    assignmentId = String(row._id);
+    notes = row.internalNotes;
+  } else {
+    // Legacy booking-level notes (section footer)
+    const field = scope === 'cab' ? 'cabInternalNotes' : 'hotelInternalNotes';
+    booking[field].push(entry);
+    notes = booking[field];
+  }
+
+  await booking.save();
+  const saved = notes[notes.length - 1];
   res.status(201).json({
     scope,
-    note: notes[notes.length - 1],
+    assignmentId,
+    note: saved,
     notes,
   });
 });
