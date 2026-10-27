@@ -169,6 +169,10 @@ function mapQuoteHotels(quotation, travelDate) {
   return collapseHotelStays(stays);
 }
 
+function cabCostFrom(row = {}) {
+  return Number(row.finalCost || row.cost || row.price || row.amount || row.total || 0) || 0;
+}
+
 function mapQuoteTransport(quotation) {
   const selected = quotation?.selectedCabs || [];
   if (selected.length) {
@@ -185,12 +189,14 @@ function mapQuoteTransport(quotation) {
       phone: t.phone || t.contact?.phone || t.driverPhone || '',
       email: t.email || t.contact?.email || '',
       vehicleNumber: t.vehicleNumber || '',
+      finalCost: cabCostFrom(t),
+      source: 'package',
       status: 'pending',
     })));
   }
 
   const snap = quotation?.packageSnapshot || {};
-  const snapCabs = snap.cabs || snap.transport || [];
+  const snapCabs = snap.cabs || snap.transport || snap.packageCabs || [];
   if (Array.isArray(snapCabs) && snapCabs.length && typeof snapCabs[0] === 'object') {
     return collapseTransport(snapCabs.map((t) => ({
       vendorName: t.vendorName || t.vendor || '',
@@ -205,6 +211,8 @@ function mapQuoteTransport(quotation) {
       phone: t.phone || t.driverPhone || '',
       email: t.email || '',
       vehicleNumber: t.vehicleNumber || '',
+      finalCost: cabCostFrom(t),
+      source: 'package',
       status: 'pending',
     })));
   }
@@ -227,6 +235,8 @@ function mapQuoteTransport(quotation) {
       driverName: d.dayCab?.driverName || '',
       driverPhone: d.dayCab?.driverPhone || '',
       vehicleNumber: d.dayCab?.vehicleNumber || '',
+      finalCost: cabCostFrom(d.dayCab || {}),
+      source: 'package',
       status: 'pending',
     });
   }

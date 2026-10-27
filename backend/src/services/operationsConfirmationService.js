@@ -116,6 +116,7 @@ function cabConfirmationText(booking, transport) {
     `* Travel Dates: ${formatStayDate(booking.travelDate)} to ${formatStayDate(booking.returnDate)}`,
     `* Vehicle Details: ${vehicle || '—'}`,
     `* Total Price: ${inr(transport.finalCost)}`,
+    `* Advance to Cab: ${inr(transport.advancePaid)}`,
     '',
     '* Package routing:',
     routing || 'As per itinerary',
@@ -246,6 +247,7 @@ async function sendCabConfirmation(bookingId, transportAssignmentId, body = {}) 
   if (body.phone != null) transport.phone = String(body.phone).trim();
   if (body.contactPerson != null) transport.contactPerson = String(body.contactPerson).trim();
   if (body.finalCost != null) transport.finalCost = Number(body.finalCost) || 0;
+  if (body.advancePaid != null) transport.advancePaid = Number(body.advancePaid) || 0;
   if (body.pickupLocation != null) transport.pickupLocation = String(body.pickupLocation).trim();
   if (body.dropLocation != null) transport.dropLocation = String(body.dropLocation).trim();
   if (body.vehicleNumber != null) transport.vehicleNumber = String(body.vehicleNumber).trim();

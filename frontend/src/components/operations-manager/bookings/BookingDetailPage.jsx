@@ -355,8 +355,15 @@ export default function BookingDetailPage() {
 
   const saveTransport = async () => {
     setSavingTransport(true);
-    await API.put(`/operations-manager/bookings/${id}`, { transport });
-    fetchBooking();
+    const normalized = transport.map((row) => ({
+      ...row,
+      finalCost: Number(row.finalCost) || 0,
+      advancePaid: Number(row.advancePaid) || 0,
+      source: row.source || 'manual',
+    }));
+    setTransport(normalized);
+    await API.put(`/operations-manager/bookings/${id}`, { transport: normalized });
+    await fetchBooking({ silent: true });
     setSavingTransport(false);
   };
 
@@ -542,6 +549,7 @@ export default function BookingDetailPage() {
             onSave={saveTransport}
             saving={savingTransport}
             catalogCabs={catalogCabs}
+            packageCabs={quoteMeta?.selectedCabs || []}
             vouchers={booking.vouchers || []}
             onSendVoucher={sendTransportVoucher}
             sendingVoucher={sendingTransportVoucher}

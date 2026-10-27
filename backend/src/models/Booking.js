@@ -88,6 +88,14 @@ const transportAssignmentSchema = new mongoose.Schema(
     dropLocation: String,
     pickupDate: Date,
     finalCost: { type: Number, default: 0 },
+    /** Advance paid / to be paid to cab vendor (ops manual). */
+    advancePaid: { type: Number, default: 0, min: 0 },
+    /** Where this cab row came from: package quote, CRM catalog, or manual. */
+    source: {
+      type: String,
+      enum: ['package', 'catalog', 'manual'],
+      default: 'manual',
+    },
     whatsappSentAt: Date,
     status: {
       type: String,

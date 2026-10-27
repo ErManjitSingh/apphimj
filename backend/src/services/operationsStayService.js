@@ -176,9 +176,10 @@ function collapseTransport(rows = []) {
     if (previous) {
       previous.row.days = [...new Set([...(previous.row.days || []), ...days])].sort((a, b) => a - b);
       if (!Number(previous.row.finalCost) && Number(row.finalCost)) previous.row.finalCost = row.finalCost;
+      if (!Number(previous.row.advancePaid) && Number(row.advancePaid)) previous.row.advancePaid = row.advancePaid;
       fillBlank(previous.row, row, [
         'vendorId', 'vendorName', 'driverName', 'driverPhone', 'contactPerson', 'phone', 'email',
-        'vehicleNumber', 'pickupLocation', 'dropLocation', 'notes',
+        'vehicleNumber', 'pickupLocation', 'dropLocation', 'notes', 'source',
       ]);
       if (previous.row.status === 'pending' && row.status && row.status !== 'pending') previous.row.status = row.status;
       if (!previous.row.voucherId && row.voucherId) previous.row.voucherId = row.voucherId;
@@ -216,6 +217,8 @@ function mergeTransportOps(derived = [], existing = []) {
       ...row,
       _id: previous._id,
       finalCost: Number(row.finalCost) || Number(previous.finalCost) || 0,
+      advancePaid: Number(row.advancePaid) || Number(previous.advancePaid) || 0,
+      source: row.source || previous.source || 'manual',
       email: row.email || previous.email || '',
       phone: row.phone || previous.phone || '',
       contactPerson: row.contactPerson || previous.contactPerson || '',
