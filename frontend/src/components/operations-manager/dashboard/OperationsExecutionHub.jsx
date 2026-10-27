@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { BadgeCheck, MapPin, Plane, PlaneTakeoff } from 'lucide-react';
+import { BadgeCheck, MapPin, Plane } from 'lucide-react';
 
 const HUB_BG = '/login-himalaya-bg.png';
 
@@ -78,7 +78,7 @@ export default function OperationsExecutionHub({ kpis, hubStats }) {
             to="/operations-manager/bookings/active"
           />
           <HubPill
-            icon={PlaneTakeoff}
+            icon={Plane}
             iconWrap="bg-amber-50 text-amber-600"
             value={departures}
             label="Departures Today"

@@ -53,10 +53,10 @@ export default function OperationsDashboard() {
       <OperationsExecutionHub kpis={data?.kpis} hubStats={data?.hubStats} />
 
       <OperationsKpiCards
-        kpis={data?.kpis}
-        kpiTrends={data?.kpiTrends}
-        sparklines={data?.sparklines}
-        loading={isLoading}
+        kpis={data?.kpis || {}}
+        kpiTrends={data?.kpiTrends || {}}
+        sparklines={data?.sparklines || {}}
+        loading={isLoading && !data}
       />
 
       <OperationsCommandPanels data={data} />

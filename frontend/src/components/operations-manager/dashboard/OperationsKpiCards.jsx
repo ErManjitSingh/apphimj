@@ -24,7 +24,11 @@ const KPI_CONFIG = [
   { key: 'completedTrips', label: 'Completed', icon: CircleCheck, iconColor: 'bg-slate-500', sparkColor: '#64748B', to: '/operations-manager/bookings/completed' },
 ];
 
+const EMPTY_KPIS = Object.fromEntries(KPI_CONFIG.map((item) => [item.key, 0]));
+
 export default function OperationsKpiCards({ kpis, kpiTrends, sparklines, loading }) {
+  const values = kpis && typeof kpis === 'object' ? { ...EMPTY_KPIS, ...kpis } : EMPTY_KPIS;
+
   if (loading && !kpis) {
     return (
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5 md:gap-5">
@@ -35,21 +39,19 @@ export default function OperationsKpiCards({ kpis, kpiTrends, sparklines, loadin
     );
   }
 
-  if (!kpis) return null;
-
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5 md:gap-5">
       {KPI_CONFIG.map((item, i) => {
         const trend = kpiTrends?.[item.key] || { change: 'No change', changeType: 'neutral' };
         const sparkData = sparklines?.[item.key]?.length
           ? sparklines[item.key]
-          : buildSparkline(kpis[item.key]);
+          : buildSparkline(values[item.key]);
 
         return (
           <KpiCard
             key={item.key}
             label={item.label}
-            value={(kpis[item.key] ?? 0).toLocaleString('en-IN')}
+            value={Number(values[item.key] ?? 0).toLocaleString('en-IN')}
             change={trend.change}
             changeType={trend.changeType || 'neutral'}
             changeLabel=""
