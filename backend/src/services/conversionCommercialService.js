@@ -346,6 +346,29 @@ async function saveCommercialForm({ leadId, executiveId, branchId, body }) {
   payment.totalCost = totalCost;
   payment.gstAmount = gstAmount;
 
+  // Keep installment history complete so ops payment list shows every receipt.
+  payment.installments = payment.installments || [];
+  if (amountReceived > 0) {
+    const sum = payment.installments.reduce((s, row) => s + (Number(row.amount) || 0), 0);
+    if (!payment.installments.length) {
+      payment.installments.push({
+        amount: amountReceived,
+        receivedAt: payment.paidAt || new Date(),
+        method,
+        reference: '',
+        note: 'Advance / Token',
+        recordedBy: executiveId,
+      });
+    } else if (amountReceived > sum + 1) {
+      payment.installments[0].amount = Number(payment.installments[0].amount || 0) + (amountReceived - sum);
+      payment.installments[0].note = payment.installments[0].note || 'Advance / Token';
+    } else if (Math.abs(amountReceived - sum) > 1 && payment.installments.length === 1) {
+      payment.installments[0].amount = amountReceived;
+      payment.installments[0].method = method;
+      payment.installments[0].note = payment.installments[0].note || 'Advance / Token';
+    }
+  }
+
   const customSchedule = normalizeCustomInstallments(body.scheduledInstallments, {
     total: totalAmount,
     token: amountReceived,
@@ -517,6 +540,21 @@ async function recordAdditionalLeadPayment({
     packageTotal > 0 && nextPaid >= packageTotal ? 'paid' : nextPaid > 0 ? 'partial' : 'pending';
 
   payment.installments = payment.installments || [];
+  // If token was only on paidAmount (no installment rows), seed it so ledger shows every payment.
+  const installmentSum = (payment.installments || []).reduce(
+    (sum, row) => sum + (Number(row.amount) || 0),
+    0
+  );
+  if (previousPaid > installmentSum + 1) {
+    payment.installments.unshift({
+      amount: previousPaid - installmentSum,
+      receivedAt: payment.createdAt || payment.paidAt || new Date(),
+      method: payment.method || method,
+      reference: '',
+      note: 'Advance / Token',
+      recordedBy: userId,
+    });
+  }
   payment.installments.push({
     amount: addAmount,
     receivedAt: payment.paidAt,

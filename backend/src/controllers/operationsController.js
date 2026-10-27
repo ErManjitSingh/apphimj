@@ -98,42 +98,97 @@ async function enrichTransportContacts(rows = []) {
 
 function paymentLedger(payments = []) {
   const rows = payments.flatMap((payment) => {
-    if (payment.installments?.length) {
-      return payment.installments.map((item, index) => ({
+    const paidTotal = Number(payment.paidAmount) || 0;
+    const installmentRows = Array.isArray(payment.installments) ? payment.installments : [];
+    const installmentSum = installmentRows.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+
+    const received = [];
+    // Historical token may live only on paidAmount — surface it before installment rows.
+    if (paidTotal > installmentSum + 1) {
+      received.push({
+        _id: `${payment._id}-token`,
+        paymentId: payment._id,
+        invoiceNumber: payment.invoiceNumber,
+        receiptNumber: payment.receiptNumber,
+        installment: 1,
+        isAdvance: true,
+        status: 'received',
+        amount: paidTotal - installmentSum,
+        receivedAt: payment.createdAt || payment.paidAt || payment.updatedAt,
+        method: payment.method,
+        note: 'Advance / Token',
+        receiptHtml: payment.receiptHtml,
+      });
+    }
+
+    installmentRows.forEach((item) => {
+      received.push({
         _id: item._id,
         paymentId: payment._id,
         invoiceNumber: payment.invoiceNumber,
         receiptNumber: payment.receiptNumber,
-        installment: index + 1,
-        isAdvance: index === 0,
+        installment: received.length + 1,
+        isAdvance: false,
+        status: 'received',
         amount: item.amount,
         receivedAt: item.receivedAt,
         method: item.method,
         reference: item.reference,
         note: item.note,
         receiptHtml: payment.receiptHtml,
-      }));
-    }
-    if (Number(payment.paidAmount) > 0) {
-      return [{
+      });
+    });
+
+    if (!received.length && paidTotal > 0) {
+      received.push({
         _id: payment._id,
         paymentId: payment._id,
         invoiceNumber: payment.invoiceNumber,
         receiptNumber: payment.receiptNumber,
         installment: 1,
         isAdvance: true,
-        amount: payment.paidAmount,
+        status: 'received',
+        amount: paidTotal,
         receivedAt: payment.paidAt || payment.updatedAt || payment.createdAt,
         method: payment.method,
-        note: payment.notes,
+        note: payment.notes || 'Advance / Token',
         receiptHtml: payment.receiptHtml,
-      }];
+      });
     }
-    return [];
-  }).sort((a, b) => new Date(a.receivedAt) - new Date(b.receivedAt));
 
-  // Earliest payment = client token / advance; rest are additional collections.
-  return rows.map((row, index) => ({ ...row, isAdvance: index === 0 }));
+    const pending = (payment.scheduledInstallments || [])
+      .filter((row) => row && row.status !== 'paid' && row.status !== 'waived' && Number(row.amount) > 0)
+      .map((row, index) => ({
+        _id: `${payment._id}-due-${index}`,
+        paymentId: payment._id,
+        invoiceNumber: payment.invoiceNumber,
+        installment: null,
+        isAdvance: false,
+        status: 'pending',
+        amount: row.amount,
+        receivedAt: row.dueDate || null,
+        method: '',
+        note: row.label || `Pending installment ${index + 1}`,
+        label: row.label || `Pending installment ${index + 1}`,
+        receiptHtml: null,
+      }));
+
+    return [...received, ...pending];
+  });
+
+  const receivedSorted = rows
+    .filter((row) => row.status !== 'pending')
+    .sort((a, b) => new Date(a.receivedAt || 0) - new Date(b.receivedAt || 0))
+    .map((row, index) => ({
+      ...row,
+      installment: index + 1,
+      isAdvance: index === 0,
+    }));
+  const pendingSorted = rows
+    .filter((row) => row.status === 'pending')
+    .sort((a, b) => new Date(a.receivedAt || 0) - new Date(b.receivedAt || 0));
+
+  return [...receivedSorted, ...pendingSorted];
 }
 
 function serviceKey(value) {

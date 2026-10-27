@@ -45,11 +45,13 @@ function openReceipt(receiptHtml) {
 
 function PaymentLedgerList({ booking, canAddPayment, onAddPayment }) {
   const ledger = booking.paymentLedger || [];
-  const token = ledger.find((row) => row.isAdvance) || ledger[0] || null;
-  const rest = ledger.filter((row) => row !== token);
+  const received = ledger.filter((row) => row.status !== 'pending');
+  const pending = ledger.filter((row) => row.status === 'pending');
+  const token = received.find((row) => row.isAdvance) || received[0] || null;
+  const moreReceived = received.filter((row) => row !== token);
   const showSyntheticAdvance = !token && Number(booking.advanceReceived) > 0;
 
-  const renderRow = (payment, label, accent = false) => (
+  const renderRow = (payment, label, { accent = false, pending: isPending = false } = {}) => (
     <button
       key={payment._id || `${payment.paymentId}-${label}`}
       type="button"
@@ -59,12 +61,14 @@ function PaymentLedgerList({ booking, canAddPayment, onAddPayment }) {
         'flex w-full items-center gap-2 rounded-xl border p-2.5 text-left transition disabled:cursor-default',
         accent
           ? 'border-emerald-400/40 bg-emerald-500/10 hover:border-emerald-500/50'
-          : 'border-emerald-500/15 bg-white/50 hover:border-emerald-500/30 dark:bg-surface/50'
+          : isPending
+            ? 'border-amber-300/50 bg-amber-50/80 hover:border-amber-400/60'
+            : 'border-emerald-500/15 bg-white/50 hover:border-emerald-500/30 dark:bg-surface/50'
       )}
     >
       <div className={cn(
         'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
-        accent ? 'bg-emerald-500 text-white' : 'bg-emerald-500/10 text-emerald-600'
+        accent ? 'bg-emerald-500 text-white' : isPending ? 'bg-amber-500/15 text-amber-700' : 'bg-emerald-500/10 text-emerald-600'
       )}>
         <Wallet className="h-4 w-4" />
       </div>
@@ -73,12 +77,18 @@ function PaymentLedgerList({ booking, canAddPayment, onAddPayment }) {
           {label} · {formatINR(payment.amount)}
         </p>
         <p className="truncate text-[10px] text-content-muted">
-          {formatDate(payment.receivedAt)}
+          {isPending ? `Due ${formatDate(payment.receivedAt)}` : formatDate(payment.receivedAt)}
           {payment.method ? ` · ${String(payment.method).replace(/_/g, ' ')}` : ''}
           {payment.reference ? ` · ${payment.reference}` : ''}
+          {payment.note && isPending ? ` · ${payment.note}` : ''}
         </p>
       </div>
       {payment.receiptHtml ? <ExternalLink className="h-3.5 w-3.5 text-emerald-600" /> : null}
+      {isPending ? (
+        <span className="shrink-0 rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-800">
+          Pending
+        </span>
+      ) : null}
     </button>
   );
 
@@ -86,7 +96,7 @@ function PaymentLedgerList({ booking, canAddPayment, onAddPayment }) {
     <div className="mt-4 space-y-2">
       <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">Advance / Token</p>
       {token
-        ? renderRow(token, 'Advance / Token', true)
+        ? renderRow(token, 'Advance / Token', { accent: true })
         : showSyntheticAdvance
           ? renderRow(
             {
@@ -97,7 +107,7 @@ function PaymentLedgerList({ booking, canAddPayment, onAddPayment }) {
               receiptHtml: null,
             },
             'Advance / Token',
-            true
+            { accent: true }
           )
           : (
             <p className="rounded-xl border border-dashed border-subtle p-3 text-center text-xs text-content-muted">
@@ -105,15 +115,37 @@ function PaymentLedgerList({ booking, canAddPayment, onAddPayment }) {
             </p>
           )}
 
-      {rest.length > 0 ? (
+      {moreReceived.length > 0 ? (
         <>
           <p className="pt-2 text-[10px] font-bold uppercase tracking-wide text-content-muted">
-            More payments
+            All received payments
           </p>
-          {rest.map((payment, index) =>
-            renderRow(payment, `Payment ${index + 2}`)
+          {moreReceived.map((payment, index) =>
+            renderRow(
+              payment,
+              payment.note?.toLowerCase().includes('token') || payment.note?.toLowerCase().includes('advance')
+                ? (payment.note || `Payment ${index + 2}`)
+                : `Payment ${index + 2}`
+            )
           )}
         </>
+      ) : null}
+
+      {pending.length > 0 ? (
+        <>
+          <p className="pt-2 text-[10px] font-bold uppercase tracking-wide text-amber-700">
+            Pending dues
+          </p>
+          {pending.map((payment, index) =>
+            renderRow(payment, payment.label || payment.note || `Due ${index + 1}`, { pending: true })
+          )}
+        </>
+      ) : null}
+
+      {!moreReceived.length && !pending.length ? (
+        <p className="rounded-xl border border-dashed border-subtle p-3 text-center text-xs text-content-muted">
+          No more payments yet — Add Payment se next installment record karo
+        </p>
       ) : null}
 
       {canAddPayment ? (
