@@ -16,6 +16,7 @@ export default function KpiCard({
   sparkData = [],
   index = 0,
   compact = false,
+  dense = false,
   to,
 }) {
   const chartData = sparkData.map((v, i) => ({ i, v }));
@@ -88,18 +89,31 @@ export default function KpiCard({
     <Shell
       {...shellProps}
       className={cn(
-        'group relative flex min-h-[148px] flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-0.5',
+        'group relative flex flex-col justify-between border border-slate-200/80 bg-white shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-0.5',
+        dense
+          ? 'min-h-[74px] rounded-xl p-3'
+          : 'min-h-[148px] rounded-2xl p-5',
         to && 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400/40'
       )}
     >
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <div className={cn('rounded-full flex items-center justify-center shrink-0 shadow-sm w-10 h-10', iconColor)}>
-          <Icon className="text-white w-[18px] h-[18px]" strokeWidth={2} />
+      <div className={cn('flex items-start justify-between gap-2', dense ? 'mb-1' : 'mb-3')}>
+        <div
+          className={cn(
+            'rounded-full flex items-center justify-center shrink-0 shadow-sm',
+            dense ? 'w-7 h-7' : 'w-10 h-10',
+            iconColor
+          )}
+        >
+          <Icon
+            className={cn('text-white', dense ? 'w-3.5 h-3.5' : 'w-[18px] h-[18px]')}
+            strokeWidth={2}
+          />
         </div>
         {change !== undefined && (
           <span
             className={cn(
-              'inline-flex items-center gap-0.5 font-semibold shrink-0 text-[11px]',
+              'inline-flex items-center gap-0.5 font-semibold shrink-0',
+              dense ? 'text-[10px]' : 'text-[11px]',
               isNeutral ? 'text-content-muted' : isUp ? 'text-emerald-600' : 'text-red-500'
             )}
           >
@@ -109,18 +123,30 @@ export default function KpiCard({
         )}
       </div>
 
-      <p className="font-medium text-content-muted mb-0.5 text-xs">{label}</p>
-      <p className="font-bold text-content-primary metric-tabular tracking-tight leading-none text-2xl mb-1">
+      <p className={cn('font-medium text-content-muted mb-0.5 truncate', dense ? 'text-[10px]' : 'text-xs')}>
+        {label}
+      </p>
+      <p
+        className={cn(
+          'font-bold text-content-primary metric-tabular tracking-tight leading-none',
+          dense ? 'text-lg mb-0' : 'text-2xl mb-1'
+        )}
+      >
         {value}
       </p>
-      {change !== undefined && changeLabel && (
+      {change !== undefined && changeLabel && !dense && (
         <p className="text-content-muted text-[11px] mb-2">{changeLabel}</p>
       )}
 
       {chartData.length > 0 && (
-        <div className="-mx-1 mt-auto opacity-70 group-hover:opacity-100 transition-opacity h-10">
+        <div
+          className={cn(
+            '-mx-1 mt-auto opacity-70 group-hover:opacity-100 transition-opacity',
+            dense ? 'h-5' : 'h-10'
+          )}
+        >
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id={`kpi-${index}`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor={sparkColor} stopOpacity={0.25} />

@@ -31,16 +31,16 @@ export default function OperationsKpiCards({ kpis, kpiTrends, sparklines, loadin
 
   if (loading && !kpis) {
     return (
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5 md:gap-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5 md:gap-4">
         {[...Array(10)].map((_, i) => (
-          <div key={i} className="h-[148px] animate-pulse rounded-2xl border border-slate-200 bg-white" />
+          <div key={i} className="h-[74px] animate-pulse rounded-xl border border-slate-200 bg-white" />
         ))}
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5 md:gap-5">
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5 md:gap-4">
       {KPI_CONFIG.map((item, i) => {
         const trend = kpiTrends?.[item.key] || { change: 'No change', changeType: 'neutral' };
         const sparkData = sparklines?.[item.key]?.length
@@ -60,6 +60,7 @@ export default function OperationsKpiCards({ kpis, kpiTrends, sparklines, loadin
             sparkColor={item.sparkColor}
             sparkData={sparkData}
             index={i}
+            dense
             to={item.to}
           />
         );
