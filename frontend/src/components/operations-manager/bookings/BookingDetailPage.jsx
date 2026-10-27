@@ -19,6 +19,7 @@ import {
 import OperationsItineraryBuilder from './OperationsItineraryBuilder';
 import HotelBookingSection from './HotelBookingSection';
 import CompanyBookingVoucher from './CompanyBookingVoucher';
+import AddLeadPaymentModal from '../../leads/AddLeadPaymentModal';
 
 const DOC_TYPES = [
   { value: 'customer_id', label: 'Customer ID' },
@@ -206,6 +207,7 @@ export default function BookingDetailPage() {
   const [catalogHotels, setCatalogHotels] = useState([]);
   const [catalogCabs, setCatalogCabs] = useState([]);
   const [sendingTransportVoucher, setSendingTransportVoucher] = useState(null);
+  const [addPaymentOpen, setAddPaymentOpen] = useState(false);
 
   const setters = { setBooking, setItinerary, setHotels, setTransport };
 
@@ -361,6 +363,10 @@ export default function BookingDetailPage() {
 
   const amount = booking.totalAmount ?? booking.amount ?? 0;
   const quoteMeta = booking.quotationMeta || booking.quotationPreview?.meta;
+  const pending =
+    Number(booking.pendingAmount) ||
+    Math.max(0, amount - (Number(booking.advanceReceived) || 0));
+  const canAddPayment = pending > 0;
 
   return (
     <div className="space-y-6 pb-10">
@@ -545,10 +551,32 @@ export default function BookingDetailPage() {
                 <p className="rounded-xl border border-dashed border-subtle p-3 text-center text-xs text-content-muted">No payment received yet</p>
               )}
             </div>
+            {canAddPayment ? (
+              <Button
+                type="button"
+                variant="emerald"
+                className="mt-4 w-full rounded-xl gap-2"
+                onClick={() => setAddPaymentOpen(true)}
+              >
+                <Wallet className="w-4 h-4" />
+                Add Payment
+              </Button>
+            ) : null}
           </div>
 
           <div className="rounded-3xl border border-subtle bg-surface/90 p-5 space-y-2">
             <h3 className="font-bold mb-3">Quick Actions</h3>
+            {canAddPayment ? (
+              <Button
+                type="button"
+                variant="emerald"
+                className="w-full rounded-xl gap-2"
+                onClick={() => setAddPaymentOpen(true)}
+              >
+                <Wallet className="w-4 h-4" />
+                Add Payment
+              </Button>
+            ) : null}
             {['booking_received', 'pending_verification', 'pending'].includes(booking.status) && (
               <Button
                 variant="emerald"
@@ -620,6 +648,22 @@ export default function BookingDetailPage() {
           )}
         </aside>
       </div>
+
+      {addPaymentOpen ? (
+        <AddLeadPaymentModal
+          open={addPaymentOpen}
+          onClose={() => setAddPaymentOpen(false)}
+          endpoint={`/operations-manager/bookings/${id}/record-payment`}
+          customerName={booking.customerName || ''}
+          totalAmount={amount}
+          advanceReceived={booking.advanceReceived || 0}
+          balanceDue={pending}
+          onSaved={() => {
+            setAddPaymentOpen(false);
+            fetchBooking();
+          }}
+        />
+      ) : null}
     </div>
   );
 }

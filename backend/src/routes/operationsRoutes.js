@@ -11,6 +11,7 @@ const {
   getBooking,
   syncBookingQuotation,
   updateBooking,
+  recordBookingPayment,
   confirmHotel,
   confirmCab,
   listHotels,
@@ -59,6 +60,7 @@ router.post('/bookings', requirePermission('operations', 'create'), createBookin
 router.get('/bookings/:id', requirePermission('operations', 'view'), getBooking);
 router.post('/bookings/:id/sync-quotation', requirePermission('operations', 'edit'), syncBookingQuotation);
 router.put('/bookings/:id', requirePermission('operations', 'edit'), updateBooking);
+router.post('/bookings/:id/record-payment', requirePermission('operations', 'edit'), recordBookingPayment);
 router.post('/bookings/:id/itinerary-pdf', requirePermission('operations', 'edit'), generateItineraryPdf);
 router.post('/bookings/:id/confirm-hotel', requirePermission('operations', 'edit'), confirmHotel);
 router.post('/bookings/:id/confirm-cab', requirePermission('operations', 'edit'), confirmCab);

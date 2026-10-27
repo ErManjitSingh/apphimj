@@ -285,6 +285,44 @@ const updateBooking = asyncHandler(async (req, res) => {
   res.json(booking);
 });
 
+/** Ops: record additional client payment (+ screenshot) against booking's lead payment. */
+const recordBookingPayment = asyncHandler(async (req, res) => {
+  const booking = await Booking.findById(req.params.id).lean();
+  if (!booking) throw new ApiError(404, 'Booking not found');
+  if (!booking.lead) {
+    throw new ApiError(400, 'Booking has no linked lead — cannot record payment');
+  }
+
+  const { recordAdditionalLeadPayment } = require('../services/conversionCommercialService');
+  const result = await recordAdditionalLeadPayment({
+    leadId: booking.lead,
+    userId: req.user._id,
+    branchId: req.branchId || booking.branchId || null,
+    body: req.body,
+    requireAssignee: false,
+  });
+
+  const refreshed = await Booking.findById(req.params.id).lean();
+  const payments = await Payment.find({
+    $or: [
+      { booking: booking._id },
+      { lead: booking.lead },
+    ],
+  })
+    .sort({ createdAt: 1 })
+    .lean();
+
+  res.json({
+    ...result,
+    balanceDue: result.balanceDue ?? refreshed?.pendingAmount ?? 0,
+    booking: {
+      ...refreshed,
+      paymentLedger: paymentLedger(payments),
+      payments,
+    },
+  });
+});
+
 const confirmHotel = asyncHandler(async (req, res) => {
   const existing = await Booking.findById(req.params.id).lean();
   if (!existing) throw new ApiError(404, 'Booking not found');
@@ -868,6 +906,7 @@ module.exports = {
   getBooking,
   syncBookingQuotation,
   updateBooking,
+  recordBookingPayment,
   confirmHotel,
   confirmCab,
   listHotels,
