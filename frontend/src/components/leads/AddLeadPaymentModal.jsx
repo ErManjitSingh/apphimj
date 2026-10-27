@@ -72,26 +72,21 @@ export default function AddLeadPaymentModal({
       toast.error(`Amount exceeds pending balance (${formatINR(pending)})`);
       return;
     }
-    if (!shotFiles.length) {
-      toast.error('Upload payment screenshot');
-      return;
-    }
 
     setSaving(true);
     try {
-      const { data } = await API.post(
-        endpoint,
-        {
-          amount: addAmt,
-          paymentMethod: method,
-          reference: reference.trim() || undefined,
-          notes: notes.trim() || undefined,
-          paymentScreenshots: shotFiles.map((f) => ({ base64: f.base64, name: f.name })),
-          paymentScreenshotBase64: shotFiles[0]?.base64,
-          paymentScreenshotName: shotFiles[0]?.name,
-        },
-        { skipSuccessToast: true }
-      );
+      const payload = {
+        amount: addAmt,
+        paymentMethod: method,
+        reference: reference.trim() || undefined,
+        notes: notes.trim() || undefined,
+      };
+      if (shotFiles.length) {
+        payload.paymentScreenshots = shotFiles.map((f) => ({ base64: f.base64, name: f.name }));
+        payload.paymentScreenshotBase64 = shotFiles[0]?.base64;
+        payload.paymentScreenshotName = shotFiles[0]?.name;
+      }
+      const { data } = await API.post(endpoint, payload, { skipSuccessToast: true });
       toast.success(
         `Payment saved · Pending ${formatINR(data?.balanceDue ?? nextPending)}`
       );
@@ -115,7 +110,7 @@ export default function AddLeadPaymentModal({
           </h3>
           <p className="mt-1 text-sm text-slate-500">
             {customerName ? `${customerName} · ` : ''}
-            Record money received + screenshot. Pending balance updates automatically.
+            Record money received. Screenshot optional — pending balance updates automatically.
           </p>
         </div>
 
@@ -181,10 +176,10 @@ export default function AddLeadPaymentModal({
         </div>
 
         <div>
-          <p className="mb-1.5 text-xs font-semibold text-slate-600">Payment screenshot *</p>
+          <p className="mb-1.5 text-xs font-semibold text-slate-600">Payment screenshot (optional)</p>
           <PaymentScreenshotField
             value={shotFiles}
-            required
+            required={false}
             onChange={({ files, error }) => {
               setShotFiles(files || []);
               setShotError(error || '');
