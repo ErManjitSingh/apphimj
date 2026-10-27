@@ -1217,7 +1217,8 @@ export default function PackageResourcePickerDrawer({
                 <CatalogCabSelector
                   lead={lead}
                   pkg={pkg}
-                  packageCabs={options}
+                  packageCabs={alwaysShowCabCatalog ? [] : options}
+                  autoSelectDefault={!alwaysShowCabCatalog}
                   value={null}
                   onChange={(cab) => {
                     if (cab) onSelect?.(cab);

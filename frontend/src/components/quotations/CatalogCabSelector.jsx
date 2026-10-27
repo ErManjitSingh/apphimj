@@ -115,6 +115,8 @@ export default function CatalogCabSelector({
   packageCabs = [],
   value,
   onChange,
+  /** When false, do not auto-pick the first/default package cab on mount. */
+  autoSelectDefault = true,
 }) {
   const destination = lead?.destination || pkg?.destination || '';
   const routing = pkg?.routing || pkg?.route || '';
@@ -156,13 +158,13 @@ export default function CatalogCabSelector({
   }, [attachedCabs.length, pkg?.id, pkg?.slug]);
 
   useEffect(() => {
-    if (!attachedCabs.length || value || autoSelectedRef.current) return;
+    if (!autoSelectDefault || !attachedCabs.length || value || autoSelectedRef.current) return;
     const defaultCab = attachedCabs.find((cab) => cab.isDefault) || attachedCabs[0];
     if (defaultCab) {
       onChange(defaultCab);
       autoSelectedRef.current = true;
     }
-  }, [attachedCabs, value, onChange]);
+  }, [attachedCabs, value, onChange, autoSelectDefault]);
 
   const canSearch = form.pickupCity && form.dropCity && form.dropState && form.travelDate;
 

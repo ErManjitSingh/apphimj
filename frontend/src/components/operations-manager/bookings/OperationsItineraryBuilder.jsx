@@ -167,6 +167,8 @@ export default function OperationsItineraryBuilder({
       return true;
     });
   }, [catalogCabs]);
+  const cabLead = useMemo(() => ({ destination }), [destination]);
+  const cabPkg = useMemo(() => ({ destination }), [destination]);
   const hotelsById = useMemo(
     () => new Map(hotelOptions.flatMap((hotel) => [
       [String(hotel.id), hotel],
@@ -315,8 +317,8 @@ export default function OperationsItineraryBuilder({
         options={cabOptions}
         selectedId={packageCab?.id}
         onSelect={selectCab}
-        lead={{ destination }}
-        pkg={{ destination }}
+        lead={cabLead}
+        pkg={cabPkg}
         alwaysShowCabCatalog
       />
     </div>
