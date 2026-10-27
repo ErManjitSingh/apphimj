@@ -97,7 +97,7 @@ async function enrichTransportContacts(rows = []) {
 }
 
 function paymentLedger(payments = []) {
-  return payments.flatMap((payment) => {
+  const rows = payments.flatMap((payment) => {
     if (payment.installments?.length) {
       return payment.installments.map((item, index) => ({
         _id: item._id,
@@ -105,6 +105,7 @@ function paymentLedger(payments = []) {
         invoiceNumber: payment.invoiceNumber,
         receiptNumber: payment.receiptNumber,
         installment: index + 1,
+        isAdvance: index === 0,
         amount: item.amount,
         receivedAt: item.receivedAt,
         method: item.method,
@@ -120,6 +121,7 @@ function paymentLedger(payments = []) {
         invoiceNumber: payment.invoiceNumber,
         receiptNumber: payment.receiptNumber,
         installment: 1,
+        isAdvance: true,
         amount: payment.paidAmount,
         receivedAt: payment.paidAt || payment.updatedAt || payment.createdAt,
         method: payment.method,
@@ -129,6 +131,9 @@ function paymentLedger(payments = []) {
     }
     return [];
   }).sort((a, b) => new Date(a.receivedAt) - new Date(b.receivedAt));
+
+  // Earliest payment = client token / advance; rest are additional collections.
+  return rows.map((row, index) => ({ ...row, isAdvance: index === 0 }));
 }
 
 function serviceKey(value) {

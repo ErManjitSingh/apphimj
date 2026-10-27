@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -43,53 +43,91 @@ function openReceipt(receiptHtml) {
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-/** Keeps Customer + Payment cards pinned while scrolling, with a soft stick animation. */
-function StickyCustomerPaymentRail({ children }) {
-  const sentinelRef = useRef(null);
-  const [stuck, setStuck] = useState(false);
+function PaymentLedgerList({ booking, canAddPayment, onAddPayment }) {
+  const ledger = booking.paymentLedger || [];
+  const token = ledger.find((row) => row.isAdvance) || ledger[0] || null;
+  const rest = ledger.filter((row) => row !== token);
+  const showSyntheticAdvance = !token && Number(booking.advanceReceived) > 0;
 
-  useEffect(() => {
-    const node = sentinelRef.current;
-    if (!node || typeof IntersectionObserver === 'undefined') return undefined;
-    const observer = new IntersectionObserver(
-      ([entry]) => setStuck(!entry.isIntersecting),
-      { threshold: 0, rootMargin: '-72px 0px 0px 0px' }
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
+  const renderRow = (payment, label, accent = false) => (
+    <button
+      key={payment._id || `${payment.paymentId}-${label}`}
+      type="button"
+      onClick={() => openReceipt(payment.receiptHtml)}
+      disabled={!payment.receiptHtml}
+      className={cn(
+        'flex w-full items-center gap-2 rounded-xl border p-2.5 text-left transition disabled:cursor-default',
+        accent
+          ? 'border-emerald-400/40 bg-emerald-500/10 hover:border-emerald-500/50'
+          : 'border-emerald-500/15 bg-white/50 hover:border-emerald-500/30 dark:bg-surface/50'
+      )}
+    >
+      <div className={cn(
+        'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+        accent ? 'bg-emerald-500 text-white' : 'bg-emerald-500/10 text-emerald-600'
+      )}>
+        <Wallet className="h-4 w-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-bold text-content-primary">
+          {label} · {formatINR(payment.amount)}
+        </p>
+        <p className="truncate text-[10px] text-content-muted">
+          {formatDate(payment.receivedAt)}
+          {payment.method ? ` · ${String(payment.method).replace(/_/g, ' ')}` : ''}
+          {payment.reference ? ` · ${payment.reference}` : ''}
+        </p>
+      </div>
+      {payment.receiptHtml ? <ExternalLink className="h-3.5 w-3.5 text-emerald-600" /> : null}
+    </button>
+  );
 
   return (
-    <>
-      <div ref={sentinelRef} className="pointer-events-none h-px w-full" aria-hidden />
-      <motion.div
-        layout
-        className={cn(
-          'z-20 space-y-4 xl:sticky xl:top-20',
-          stuck && 'xl:pb-1'
-        )}
-        animate={{
-          y: stuck ? 0 : 4,
-        }}
-        transition={{ type: 'spring', stiffness: 280, damping: 26, mass: 0.7 }}
-      >
-        <motion.div
-          animate={{
-            scale: stuck ? 1 : 0.985,
-            opacity: 1,
-          }}
-          transition={{ type: 'spring', stiffness: 260, damping: 24 }}
-          className={cn(
-            'space-y-4 rounded-[1.75rem] transition-[box-shadow,background-color,backdrop-filter] duration-300',
-            stuck
-              ? 'bg-white/75 p-2 shadow-[0_22px_60px_-28px_rgba(15,23,42,0.45)] ring-1 ring-slate-200/80 backdrop-blur-xl dark:bg-slate-950/70 dark:ring-slate-700/60'
-              : 'bg-transparent p-0 shadow-none'
+    <div className="mt-4 space-y-2">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">Advance / Token</p>
+      {token
+        ? renderRow(token, 'Advance / Token', true)
+        : showSyntheticAdvance
+          ? renderRow(
+            {
+              _id: 'advance-token',
+              amount: booking.advanceReceived,
+              receivedAt: booking.createdAt,
+              method: booking.paymentStatus || 'partial',
+              receiptHtml: null,
+            },
+            'Advance / Token',
+            true
+          )
+          : (
+            <p className="rounded-xl border border-dashed border-subtle p-3 text-center text-xs text-content-muted">
+              No advance / token recorded yet
+            </p>
           )}
+
+      {rest.length > 0 ? (
+        <>
+          <p className="pt-2 text-[10px] font-bold uppercase tracking-wide text-content-muted">
+            More payments
+          </p>
+          {rest.map((payment, index) =>
+            renderRow(payment, `Payment ${index + 2}`)
+          )}
+        </>
+      ) : null}
+
+      {canAddPayment ? (
+        <Button
+          type="button"
+          variant="emerald"
+          className="mt-2 w-full rounded-xl gap-2"
+          onClick={onAddPayment}
         >
-          {children}
-        </motion.div>
-      </motion.div>
-    </>
+          <Wallet className="w-4 h-4" />
+          Add Payment
+        </Button>
+      ) : null}
+    </div>
   );
 }
 
@@ -560,13 +598,9 @@ export default function BookingDetailPage() {
         </div>
 
         <aside className="xl:col-span-4 space-y-4">
-          <StickyCustomerPaymentRail>
-            <motion.div
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ type: 'spring', stiffness: 220, damping: 22, delay: 0.05 }}
-              className="rounded-3xl border border-subtle bg-surface/95 p-5 shadow-sm"
-            >
+          {/* Sticky must NOT use CSS transform (breaks position:sticky). */}
+          <div className="space-y-4 xl:sticky xl:top-4 xl:z-20 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto xl:overscroll-contain xl:pb-2">
+            <div className="rounded-3xl border border-subtle bg-surface/95 p-5 shadow-sm">
               <h3 className="font-bold mb-4">Customer</h3>
               <p className="font-bold text-xl text-content-primary">{booking.customerName}</p>
               <div className="mt-3 space-y-2 text-sm text-content-secondary">
@@ -577,57 +611,25 @@ export default function BookingDetailPage() {
                   <Mail className="w-4 h-4 text-teal-600" />{booking.customerEmail || '—'}
                 </a>
               </div>
-            </motion.div>
+            </div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ type: 'spring', stiffness: 220, damping: 22, delay: 0.12 }}
-              className="max-h-[min(52vh,420px)] overflow-y-auto rounded-3xl border border-subtle bg-gradient-to-br from-emerald-500/10 to-teal-500/5 p-5"
-            >
-              <h3 className="font-bold mb-3 flex items-center gap-2"><Receipt className="w-4 h-4 text-emerald-600" /> Payment & Receipts</h3>
+            <div className="rounded-3xl border border-subtle bg-gradient-to-br from-emerald-500/10 to-teal-500/5 p-5 shadow-sm">
+              <h3 className="font-bold mb-3 flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-emerald-600" /> Payment & Receipts
+              </h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between"><span className="text-content-muted">Advance</span><span className="font-bold">{formatINR(booking.advanceReceived)}</span></div>
                 <div className="flex justify-between"><span className="text-content-muted">Pending</span><span className="font-bold text-amber-600">{formatINR(booking.pendingAmount)}</span></div>
                 <div className="h-px bg-subtle my-2" />
                 <div className="flex justify-between"><span className="font-medium">Total</span><span className="font-black text-lg">{formatINR(amount)}</span></div>
               </div>
-              <div className="mt-4 space-y-2">
-                {(booking.paymentLedger || []).map((payment, index) => (
-                  <button
-                    key={payment._id || `${payment.paymentId}-${index}`}
-                    type="button"
-                    onClick={() => openReceipt(payment.receiptHtml)}
-                    disabled={!payment.receiptHtml}
-                    className="flex w-full items-center gap-2 rounded-xl border border-emerald-500/15 bg-white/50 p-2.5 text-left transition hover:border-emerald-500/30 disabled:cursor-default dark:bg-surface/50"
-                  >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
-                      <Wallet className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold text-content-primary">Payment {payment.installment} · {formatINR(payment.amount)}</p>
-                      <p className="truncate text-[10px] text-content-muted">{formatDate(payment.receivedAt)} · {payment.method?.replace(/_/g, ' ') || 'Payment'}</p>
-                    </div>
-                    {payment.receiptHtml ? <ExternalLink className="h-3.5 w-3.5 text-emerald-600" /> : null}
-                  </button>
-                ))}
-                {!booking.paymentLedger?.length && (
-                  <p className="rounded-xl border border-dashed border-subtle p-3 text-center text-xs text-content-muted">No payment received yet</p>
-                )}
-              </div>
-              {canAddPayment ? (
-                <Button
-                  type="button"
-                  variant="emerald"
-                  className="mt-4 w-full rounded-xl gap-2"
-                  onClick={() => setAddPaymentOpen(true)}
-                >
-                  <Wallet className="w-4 h-4" />
-                  Add Payment
-                </Button>
-              ) : null}
-            </motion.div>
-          </StickyCustomerPaymentRail>
+              <PaymentLedgerList
+                booking={booking}
+                canAddPayment={canAddPayment}
+                onAddPayment={() => setAddPaymentOpen(true)}
+              />
+            </div>
+          </div>
 
           <div className="rounded-3xl border border-subtle bg-surface/90 p-5 space-y-2">
             <h3 className="font-bold mb-3">Quick Actions</h3>
