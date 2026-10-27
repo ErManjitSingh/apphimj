@@ -26,6 +26,34 @@ function Field({ label, children, className }) {
   );
 }
 
+/** Keep empty while typing — don't force 0 back into the input. */
+function numberInputValue(value) {
+  if (value === '' || value === null || value === undefined) return '';
+  return value;
+}
+
+function parseOptionalNumber(raw) {
+  if (raw === '' || raw == null) return '';
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : '';
+}
+
+function toMoney(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function normalizeHotelsForSave(list = []) {
+  return list.map((hotel) => ({
+    ...hotel,
+    rooms: Math.max(1, Number(hotel.rooms) || 1),
+    persons: toMoney(hotel.persons),
+    kids: toMoney(hotel.kids),
+    internalPrice: toMoney(hotel.internalPrice),
+    advancePaid: toMoney(hotel.advancePaid),
+  }));
+}
+
 function letterFor(booking, hotel) {
   const persons = Number(hotel.persons) || (Number(booking.adults || 0) + Number(booking.children || 0));
   const arrangements = [...(hotel.specialArrangements || [])];
@@ -72,7 +100,9 @@ export default function HotelBookingSection({ bookingId, booking, hotels, onChan
     setSaving(true);
     setNotice('');
     try {
-      await API.put(`/operations-manager/bookings/${bookingId}`, { hotels });
+      const normalized = normalizeHotelsForSave(hotels);
+      onChange(normalized);
+      await API.put(`/operations-manager/bookings/${bookingId}`, { hotels: normalized });
       onSaved?.();
     } finally {
       setSaving(false);
@@ -95,26 +125,29 @@ export default function HotelBookingSection({ bookingId, booking, hotels, onChan
     setSendingId(hotel._id);
     setNotice('');
     try {
-      await API.put(`/operations-manager/bookings/${bookingId}`, { hotels });
+      const normalized = normalizeHotelsForSave(hotels);
+      onChange(normalized);
+      await API.put(`/operations-manager/bookings/${bookingId}`, { hotels: normalized });
+      const savedHotel = normalized.find((row) => String(row._id) === String(hotel._id)) || hotel;
       const response = await API.post(
         `/operations-manager/bookings/${bookingId}/hotels/${hotel._id}/confirmation`,
         {
-          email: hotel.email,
-          phone: hotel.phone,
-          contactPerson: hotel.contactPerson,
-          companyName: hotel.companyName || 'Him Journey Tours',
-          mealPlan: hotel.mealPlan,
-          rooms: hotel.rooms || 1,
-          nights: hotel.nights || 1,
-          persons: Number(hotel.persons) || (Number(booking.adults || 0) + Number(booking.children || 0)),
-          kids: Number(hotel.kids) || 0,
-          internalPrice: Number(hotel.internalPrice) || 0,
-          advancePaid: Number(hotel.advancePaid) || 0,
-          extraMatters: hotel.extraMatters || '',
-          checkIn: hotel.checkIn,
-          checkOut: hotel.checkOut,
-          specialArrangements: hotel.specialArrangements || [],
-          specialArrangementNote: hotel.specialArrangementNote || '',
+          email: savedHotel.email,
+          phone: savedHotel.phone,
+          contactPerson: savedHotel.contactPerson,
+          companyName: savedHotel.companyName || 'Him Journey Tours',
+          mealPlan: savedHotel.mealPlan,
+          rooms: savedHotel.rooms || 1,
+          nights: savedHotel.nights || 1,
+          persons: Number(savedHotel.persons) || (Number(booking.adults || 0) + Number(booking.children || 0)),
+          kids: Number(savedHotel.kids) || 0,
+          internalPrice: Number(savedHotel.internalPrice) || 0,
+          advancePaid: Number(savedHotel.advancePaid) || 0,
+          extraMatters: savedHotel.extraMatters || '',
+          checkIn: savedHotel.checkIn,
+          checkOut: savedHotel.checkOut,
+          specialArrangements: savedHotel.specialArrangements || [],
+          specialArrangementNote: savedHotel.specialArrangementNote || '',
           channels,
         }
       );
@@ -201,8 +234,8 @@ export default function HotelBookingSection({ bookingId, booking, hotels, onChan
                   <input
                     type="number"
                     min="1"
-                    value={hotel.rooms || 1}
-                    onChange={(e) => update(index, { rooms: Number(e.target.value) || 1 })}
+                    value={numberInputValue(hotel.rooms === undefined || hotel.rooms === null ? 1 : hotel.rooms)}
+                    onChange={(e) => update(index, { rooms: parseOptionalNumber(e.target.value) })}
                     className="input-premium h-10 w-full rounded-xl text-sm"
                   />
                 </Field>
@@ -210,8 +243,12 @@ export default function HotelBookingSection({ bookingId, booking, hotels, onChan
                   <input
                     type="number"
                     min="0"
-                    value={defaultPersons}
-                    onChange={(e) => update(index, { persons: Number(e.target.value) || 0 })}
+                    value={numberInputValue(
+                      hotel.persons === undefined || hotel.persons === null || hotel.persons === ''
+                        ? defaultPersons
+                        : hotel.persons
+                    )}
+                    onChange={(e) => update(index, { persons: parseOptionalNumber(e.target.value) })}
                     className="input-premium h-10 w-full rounded-xl text-sm"
                   />
                 </Field>
@@ -219,9 +256,10 @@ export default function HotelBookingSection({ bookingId, booking, hotels, onChan
                   <input
                     type="number"
                     min="0"
-                    value={hotel.kids ?? 0}
-                    onChange={(e) => update(index, { kids: Number(e.target.value) || 0 })}
+                    value={numberInputValue(hotel.kids)}
+                    onChange={(e) => update(index, { kids: parseOptionalNumber(e.target.value) })}
                     className="input-premium h-10 w-full rounded-xl text-sm"
+                    placeholder="0"
                   />
                 </Field>
                 <Field label="Check-in date">
@@ -263,8 +301,8 @@ export default function HotelBookingSection({ bookingId, booking, hotels, onChan
                   <input
                     type="number"
                     min="0"
-                    value={hotel.internalPrice ?? ''}
-                    onChange={(e) => update(index, { internalPrice: e.target.value === '' ? 0 : Number(e.target.value) })}
+                    value={numberInputValue(hotel.internalPrice)}
+                    onChange={(e) => update(index, { internalPrice: parseOptionalNumber(e.target.value) })}
                     className="input-premium h-10 w-full rounded-xl text-sm font-bold"
                     placeholder="Full stay cost"
                   />
@@ -273,8 +311,8 @@ export default function HotelBookingSection({ bookingId, booking, hotels, onChan
                   <input
                     type="number"
                     min="0"
-                    value={hotel.advancePaid ?? ''}
-                    onChange={(e) => update(index, { advancePaid: e.target.value === '' ? 0 : Number(e.target.value) })}
+                    value={numberInputValue(hotel.advancePaid)}
+                    onChange={(e) => update(index, { advancePaid: parseOptionalNumber(e.target.value) })}
                     className="input-premium h-10 w-full rounded-xl text-sm font-bold text-amber-800"
                     placeholder="Manual advance amount"
                   />
