@@ -2,6 +2,7 @@ import OperationsDashboardHeader from './dashboard/OperationsDashboardHeader';
 import OperationsExecutionHub from './dashboard/OperationsExecutionHub';
 import OperationsKpiCards from './dashboard/OperationsKpiCards';
 import OperationsCommandPanels from './dashboard/OperationsCommandPanels';
+import OperationsBottomPanels from './dashboard/OperationsBottomPanels';
 import { useDashboardQuery } from '../../features/dashboard/hooks/useDashboardQuery';
 
 export default function OperationsDashboard() {
@@ -36,7 +37,7 @@ export default function OperationsDashboard() {
   }
 
   return (
-    <div className="space-y-5 pb-8">
+    <div className="space-y-6 pb-10">
       {isFetching && (
         <div className="h-0.5 w-full overflow-hidden rounded-full bg-orange-500/20">
           <div className="h-full w-1/3 animate-pulse bg-orange-500" />
@@ -59,6 +60,8 @@ export default function OperationsDashboard() {
       />
 
       <OperationsCommandPanels data={data} />
+
+      <OperationsBottomPanels data={data} />
     </div>
   );
 }

@@ -89,7 +89,7 @@ export default function OperationsCommandPanels({ data }) {
   const tasks = data.operationsTasks || [];
 
   return (
-    <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
       <PanelShell title="Recent Bookings" to="/operations-manager/bookings/pending" delay={0.05}>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[420px] text-left">

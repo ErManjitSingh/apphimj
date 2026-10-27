@@ -1,34 +1,30 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, Car, MapPin, Plane } from 'lucide-react';
+import { BadgeCheck, MapPin, Plane, PlaneTakeoff } from 'lucide-react';
 
-const HUB_BG =
-  'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1600&q=70';
+const HUB_BG = '/login-himalaya-bg.png';
 
-function HubStat({ icon: Icon, iconWrap, value, label, subtitle, to }) {
+function HubPill({ icon: Icon, iconWrap, value, label, subtitle, to }) {
   const Shell = to ? Link : 'div';
   const shellProps = to ? { to } : {};
   return (
     <Shell
       {...shellProps}
-      className={`min-w-[120px] text-center ${to ? 'rounded-xl p-2 transition hover:bg-slate-50' : ''}`}
+      className="flex min-w-[148px] items-center gap-3 rounded-2xl border border-white/70 bg-white/92 px-4 py-3 shadow-lg shadow-slate-900/10 backdrop-blur-md transition hover:bg-white"
     >
-      <div
-        className={`mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full ${iconWrap}`}
-      >
-        <Icon className="h-4.5 w-4.5 h-[18px] w-[18px]" strokeWidth={2.25} />
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${iconWrap}`}>
+        <Icon className="h-[18px] w-[18px]" strokeWidth={2.25} />
       </div>
-      <p className="text-3xl font-bold tabular-nums leading-none text-slate-900">{value}</p>
-      <p className="mt-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
-      <p className="mt-0.5 text-[11px] text-slate-400">{subtitle}</p>
+      <div className="min-w-0">
+        <p className="text-2xl font-bold tabular-nums leading-none text-slate-900">{value}</p>
+        <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
+        <p className="mt-0.5 truncate text-[11px] text-slate-400">{subtitle}</p>
+      </div>
     </Shell>
   );
 }
 
 export default function OperationsExecutionHub({ kpis, hubStats }) {
-  const pending = Number(kpis?.pendingBookings ?? 0);
-  const hotel = Number(kpis?.hotelConfirmations ?? kpis?.hotelPending ?? 0);
-  const cab = Number(kpis?.cabConfirmations ?? kpis?.cabPending ?? 0);
   const onTrip = Number(hubStats?.onTrip ?? kpis?.activeTrips ?? 0);
   const departures = Number(hubStats?.departuresToday ?? kpis?.todaysDepartures ?? 0);
   const arrivals = Number(hubStats?.arrivalsToday ?? kpis?.todaysArrivals ?? 0);
@@ -37,59 +33,64 @@ export default function OperationsExecutionHub({ kpis, hubStats }) {
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm"
+      className="relative isolate overflow-hidden rounded-[22px] shadow-sm ring-1 ring-slate-200/60"
     >
-      <div
-        className="pointer-events-none absolute inset-y-0 right-0 w-[55%] bg-cover bg-center opacity-[0.18] sm:opacity-[0.22]"
-        style={{ backgroundImage: `url(${HUB_BG})` }}
+      <img
+        src={HUB_BG}
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover object-[72%_40%]"
         aria-hidden
       />
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-[55%] bg-gradient-to-l from-transparent via-white/40 to-white" aria-hidden />
+      <div className="absolute inset-0 bg-gradient-to-r from-white via-white/88 to-white/15" />
+      <div className="absolute inset-y-0 right-0 w-[48%] bg-gradient-to-l from-slate-900/35 via-slate-900/10 to-transparent" />
 
-      <div className="relative z-10 grid grid-cols-1 gap-6 p-6 sm:p-8 lg:grid-cols-[1.15fr_auto]">
-        <div className="max-w-xl">
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-orange-500">
-            Trip Execution Hub
-          </p>
-          <h2 className="text-2xl font-bold leading-tight tracking-tight text-slate-900 sm:text-[28px]">
-            <span className="text-orange-500">{pending}</span>{' '}
-            booking{pending === 1 ? '' : 's'} need{pending === 1 ? 's' : ''} operations setup
-          </h2>
-          <p className="mt-2 text-sm text-slate-500">
-            {hotel} hotel · {cab} cab confirmations pending
-          </p>
-          <Link
-            to="/operations-manager/bookings/pending"
-            className="mt-5 inline-flex h-11 items-center gap-2 rounded-xl bg-orange-500 px-5 text-sm font-bold text-white shadow-md shadow-orange-500/25 transition hover:bg-orange-600"
+      <div className="relative z-10 flex min-h-[220px] flex-col justify-between gap-8 px-6 py-6 sm:px-8 sm:py-7">
+        <div className="flex items-start justify-between gap-6">
+          <div className="max-w-xl">
+            <div className="mb-2 flex items-center gap-2.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-500 text-white shadow-md shadow-sky-500/30">
+                <BadgeCheck className="h-5 w-5" strokeWidth={2.25} />
+              </span>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-[28px]">
+                Operations Command Center
+              </h1>
+            </div>
+            <p className="text-[15px] font-medium text-slate-600 sm:text-base">
+              All Tours. All Bookings. Real-time Ops.
+            </p>
+          </div>
+
+          <p
+            className="hidden max-w-[220px] text-right text-[28px] font-semibold leading-tight text-white drop-shadow-md sm:block lg:text-[32px]"
+            style={{ fontFamily: '"Caveat", cursive' }}
           >
-            View Pending Bookings
-            <ArrowRight className="h-4 w-4" />
-          </Link>
+            Turning Journeys into Memories
+          </p>
         </div>
 
-        <div className="flex flex-wrap items-center justify-start gap-6 border-t border-slate-100 pt-5 lg:justify-end lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
-          <HubStat
-            icon={Car}
-            iconWrap="bg-emerald-50 text-emerald-600"
-            value={onTrip}
-            label="On Trip"
-            subtitle={onTrip ? 'Bookings in progress' : 'Bookings in progress'}
-            to="/operations-manager/bookings/active"
-          />
-          <HubStat
+        <div className="flex flex-wrap gap-3">
+          <HubPill
             icon={Plane}
             iconWrap="bg-sky-50 text-sky-600"
+            value={onTrip}
+            label="On Trip"
+            subtitle="Active Tours"
+            to="/operations-manager/bookings/active"
+          />
+          <HubPill
+            icon={PlaneTakeoff}
+            iconWrap="bg-amber-50 text-amber-600"
             value={departures}
             label="Departures Today"
-            subtitle={departures ? 'Departing today' : 'No departures'}
+            subtitle="Travellers"
             to="/operations-manager/calendar"
           />
-          <HubStat
+          <HubPill
             icon={MapPin}
             iconWrap="bg-violet-50 text-violet-600"
             value={arrivals}
             label="Arrivals Today"
-            subtitle={arrivals ? 'Arriving today' : 'No arrivals'}
+            subtitle="Travellers"
             to="/operations-manager/calendar"
           />
         </div>
