@@ -426,11 +426,179 @@ async function saveCommercialForm({ leadId, executiveId, branchId, body }) {
   return getCommercialFormDraft({ leadId, executiveId, branchId });
 }
 
+/**
+ * Apply a newly received amount against pending scheduled installments (FIFO).
+ * Fully covered rows → paid; partial cover reduces remaining amount on that row.
+ */
+function applyAmountToScheduledInstallments(schedule, amountToApply) {
+  let left = Math.max(0, Math.round(Number(amountToApply) || 0));
+  const next = (Array.isArray(schedule) ? schedule : []).map((row) => {
+    const plain = row?.toObject ? row.toObject() : { ...row };
+    return {
+      label: plain.label || '',
+      percent: Number(plain.percent) || 0,
+      amount: Math.max(0, Number(plain.amount) || 0),
+      dueDate: plain.dueDate || null,
+      status: ['pending', 'paid', 'waived'].includes(plain.status) ? plain.status : 'pending',
+    };
+  });
+
+  for (const row of next) {
+    if (left <= 0) break;
+    if (row.status === 'paid' || row.status === 'waived') continue;
+    const due = row.amount;
+    if (due <= 0) {
+      row.status = 'paid';
+      continue;
+    }
+    if (due <= left) {
+      row.status = 'paid';
+      left -= due;
+    } else {
+      row.amount = due - left;
+      left = 0;
+    }
+  }
+  return next;
+}
+
+/**
+ * Record an additional client payment on an existing lead payment
+ * (amount + optional screenshots). Updates pending installment schedule.
+ */
+async function recordAdditionalLeadPayment({
+  leadId,
+  userId,
+  branchId,
+  body = {},
+  requireAssignee = false,
+}) {
+  const leadFilter = {
+    _id: leadId,
+    isDeleted: { $ne: true },
+    ...(branchId ? { branchId } : {}),
+  };
+  if (requireAssignee) leadFilter.assignedTo = userId;
+
+  const lead = await Lead.findOne(leadFilter);
+  if (!lead) throw new ApiError(404, 'Lead not found');
+  if (lead.status !== 'converted' && lead.status !== 'booked') {
+    throw new ApiError(400, 'Payment can be added after the lead is booked');
+  }
+
+  const payment = await Payment.findOne({ lead: leadId }).sort({ createdAt: -1 });
+  if (!payment) {
+    throw new ApiError(404, 'Payment record not found — save advance / commercial form first');
+  }
+
+  const addAmount = Math.round(Number(body.amount) || 0);
+  if (addAmount <= 0) throw new ApiError(400, 'Enter a valid payment amount');
+
+  const packageTotal = Math.max(0, Number(payment.amount) || 0);
+  const previousPaid = Math.max(0, Number(payment.paidAmount) || 0);
+  const remainingBefore = Math.max(0, packageTotal - previousPaid);
+  if (addAmount > remainingBefore + 1) {
+    throw new ApiError(
+      400,
+      `Amount exceeds pending balance (₹${remainingBefore.toLocaleString('en-IN')})`
+    );
+  }
+
+  const method = ['cash', 'upi', 'card', 'bank_transfer', 'cheque'].includes(body.paymentMethod)
+    ? body.paymentMethod
+    : payment.method || 'upi';
+
+  const nextPaid =
+    packageTotal > 0 ? Math.min(packageTotal, previousPaid + addAmount) : previousPaid + addAmount;
+  payment.paidAmount = nextPaid;
+  payment.method = method;
+  payment.paidAt = body.paidAt ? new Date(body.paidAt) : new Date();
+  payment.status =
+    packageTotal > 0 && nextPaid >= packageTotal ? 'paid' : nextPaid > 0 ? 'partial' : 'pending';
+
+  payment.installments = payment.installments || [];
+  payment.installments.push({
+    amount: addAmount,
+    receivedAt: payment.paidAt,
+    method,
+    reference: String(body.reference || '').trim(),
+    note: String(body.notes || body.note || 'Additional payment').trim() || 'Additional payment',
+    recordedBy: userId,
+  });
+
+  payment.scheduledInstallments = applyAmountToScheduledInstallments(
+    payment.scheduledInstallments,
+    addAmount
+  );
+
+  const nextDue = (payment.scheduledInstallments || [])
+    .filter((r) => r.status === 'pending' && r.dueDate)
+    .map((r) => new Date(r.dueDate))
+    .filter((d) => Number.isFinite(d.getTime()))
+    .sort((a, b) => a - b)[0];
+  if (nextDue) payment.dueDate = nextDue;
+
+  if (body.paymentScreenshotBase64 || (Array.isArray(body.paymentScreenshots) && body.paymentScreenshots.length)) {
+    applyPaymentScreenshotsToPayment(payment, collectPaymentScreenshotUploads(body), leadId);
+  }
+
+  await payment.save();
+
+  // Keep ops booking totals in sync
+  try {
+    const { createBookingFromPayment } = require('./operationsService');
+    await createBookingFromPayment(payment._id, { _id: userId });
+  } catch (err) {
+    console.error('[recordAdditionalLeadPayment] booking sync failed:', err.message);
+  }
+
+  try {
+    const { generateAndStoreReceipt } = require('./paymentReceiptService');
+    const Booking = require('../models/Booking');
+    const booking = await Booking.findOne({ lead: leadId }).sort({ createdAt: -1 }).lean();
+    const quotation = payment.quotation
+      ? await Quotation.findById(payment.quotation).lean()
+      : null;
+    await generateAndStoreReceipt({
+      lead,
+      payment,
+      booking,
+      quotation,
+      actor: { _id: userId, name: 'Him Journey Tours' },
+    });
+  } catch (err) {
+    console.error('[recordAdditionalLeadPayment] receipt refresh failed:', err.message);
+  }
+
+  await syncPaymentReminders({
+    lead,
+    payment,
+    user: { _id: userId },
+    schedule: payment.scheduledInstallments,
+  }).catch((err) => {
+    console.error('[recordAdditionalLeadPayment] reminders failed:', err.message);
+  });
+
+  const { getLeadPaymentSummary } = require('./paymentReceiptService');
+  const paymentSummary = await getLeadPaymentSummary(leadId);
+  return {
+    paymentId: payment._id,
+    amountAdded: addAmount,
+    paidAmount: payment.paidAmount,
+    totalAmount: payment.amount,
+    balanceDue: Math.max(0, Number(payment.amount || 0) - Number(payment.paidAmount || 0)),
+    status: payment.status,
+    paymentSummary,
+  };
+}
+
 module.exports = {
   buildInstallmentSchedule,
   normalizeCustomInstallments,
   getCommercialFormDraft,
   saveCommercialForm,
+  recordAdditionalLeadPayment,
+  applyAmountToScheduledInstallments,
   syncPaymentReminders,
   savePaymentScreenshotBase64,
   saveAddressProofBase64,

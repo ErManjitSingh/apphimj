@@ -10,6 +10,7 @@ const {
   getLeadNotesList,
   getLeadPaymentReceiptDoc,
   sendLeadPaymentReceipt,
+  recordLeadPayment,
   createLead,
   seedDemoLeads,
   clearAllLeads,
@@ -75,6 +76,7 @@ router.get('/:id/quotations', getLeadQuotations);
 router.get('/:id/notes-list', getLeadNotesList);
 router.get('/:id/payment-receipt', getLeadPaymentReceiptDoc);
 router.post('/:id/payment-receipt/send', sendLeadPaymentReceipt);
+router.post('/:id/record-payment', requirePermission('leads', 'edit'), recordLeadPayment);
 router.get('/:id/timeline', getTimeline);
 router.get('/:id/transfer-history', getTransferHistory);
 router.get('/:id/audit', getAudit);

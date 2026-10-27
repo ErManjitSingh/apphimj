@@ -1375,6 +1375,18 @@ const saveCommercialForm = asyncHandler(async (req, res) => {
   res.json(saved);
 });
 
+const recordLeadPayment = asyncHandler(async (req, res) => {
+  const { recordAdditionalLeadPayment } = require('../services/conversionCommercialService');
+  const result = await recordAdditionalLeadPayment({
+    leadId: req.params.id,
+    userId: req.user._id,
+    branchId: req.branchId,
+    body: req.body,
+    requireAssignee: true,
+  });
+  res.json(result);
+});
+
 module.exports = {
   LEAD_FILTER_KEYS,
   getDashboard,
@@ -1389,6 +1401,7 @@ module.exports = {
   acceptLead,
   getCommercialForm,
   saveCommercialForm,
+  recordLeadPayment,
   addLeadNote,
   listFollowUps,
   getFollowUpSummary,

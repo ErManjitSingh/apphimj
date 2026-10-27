@@ -204,6 +204,7 @@ export default function ExecutiveLeadDetailPage() {
         onScheduleFollowUp={openBookedCommercialOrOutcome}
         onChangeStatus={openBookedCommercialOrOutcome}
         onEditCommercial={() => setCommercialOpen(true)}
+        onPaymentRecorded={() => loadLead({ silent: true })}
         onContactLogged={loadLead}
         onEmailSent={loadLead}
         canCreateFollowUp={!isBookedStatus(lead?.status)}

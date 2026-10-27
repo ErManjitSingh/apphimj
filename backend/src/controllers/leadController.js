@@ -278,6 +278,21 @@ const sendLeadPaymentReceipt = asyncHandler(async (req, res) => {
   res.json(result);
 });
 
+const recordLeadPayment = asyncHandler(async (req, res) => {
+  const lead = await loadAccessibleLeadCore(req, req.params.id);
+  if (!lead) throw new ApiError(404, 'Lead not found');
+
+  const { recordAdditionalLeadPayment } = require('../services/conversionCommercialService');
+  const result = await recordAdditionalLeadPayment({
+    leadId: lead._id,
+    userId: req.user._id,
+    branchId: req.branchId,
+    body: req.body,
+    requireAssignee: false,
+  });
+  res.json(result);
+});
+
 const getLeadFollowups = asyncHandler(async (req, res) => {
   const lead = await loadAccessibleLeadCore(req, req.params.id);
   if (!lead) throw new ApiError(404, 'Lead not found');
@@ -1205,6 +1220,7 @@ module.exports = {
   getLeadNotesList,
   getLeadPaymentReceiptDoc,
   sendLeadPaymentReceipt,
+  recordLeadPayment,
   createLead,
   seedDemoLeads,
   clearAllLeads,

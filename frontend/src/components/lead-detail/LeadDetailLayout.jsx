@@ -57,6 +57,7 @@ export default function LeadDetailLayout({
   bottomExtra,
   receiptEndpoint,
   onEditCommercial,
+  onPaymentRecorded,
   flashMessage,
   highlightQuotationId,
 }) {
@@ -322,6 +323,7 @@ export default function LeadDetailLayout({
           onAddNote={handleAddNote}
           onUpdateStatus={onChangeStatus || onScheduleFollowUp}
           onEditCommercial={onEditCommercial || onChangeStatus}
+          onPaymentRecorded={onPaymentRecorded || onContactLogged}
           sidebarExtra={sidebarExtra}
         />
       ) : null}
@@ -369,7 +371,9 @@ export default function LeadDetailLayout({
               lead={lead}
               paymentSummary={lead.paymentSummary}
               receiptEndpoint={paymentReceiptEndpoint}
+              contactEndpoint={contactEndpoint || relatedBasePath || '/leads'}
               onEditCommercial={onEditCommercial || onChangeStatus}
+              onPaymentRecorded={onPaymentRecorded || onContactLogged}
             />
           ) : (
             <div className="rounded-[20px] border border-slate-100 bg-white p-8 text-center text-sm text-slate-400">

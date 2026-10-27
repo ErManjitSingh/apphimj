@@ -2,6 +2,7 @@ import { useState } from 'react';
 import API from '../../api/axios';
 import PaymentVoucherModal from './PaymentVoucherModal';
 import LeadPaymentSummaryCard from './LeadPaymentSummaryCard';
+import AddLeadPaymentModal from '../leads/AddLeadPaymentModal';
 import { toast } from '../../context/ToastContext';
 import { isBookedStatus } from '../../lib/leadPipeline';
 
@@ -9,7 +10,9 @@ export default function LeadPaymentVoucherPanel({
   lead,
   paymentSummary: summaryProp,
   receiptEndpoint,
+  contactEndpoint = '/leads',
   onEditCommercial,
+  onPaymentRecorded,
 }) {
   const summary = summaryProp || lead?.paymentSummary;
   const [open, setOpen] = useState(false);
@@ -17,11 +20,18 @@ export default function LeadPaymentVoucherPanel({
   const [voucher, setVoucher] = useState(null);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [addPaymentOpen, setAddPaymentOpen] = useState(false);
 
   const isBookedLead =
     lead?.status === 'converted' || lead?.status === 'booked' || isBookedStatus(lead?.status);
   if (!summary && !isBookedLead) return null;
   if (!summary) return null;
+
+  const canAddPayment =
+    Boolean(summary.paymentId) && isBookedLead && Number(summary.balanceDue || 0) > 0;
+  const recordPaymentEndpoint = lead?._id
+    ? `${contactEndpoint}/${lead._id}/record-payment`
+    : null;
 
   const endpoint =
     receiptEndpoint ||
@@ -107,11 +117,28 @@ export default function LeadPaymentVoucherPanel({
         paymentScreenshots={screenshots}
         canManage={isBookedLead || Boolean(summary)}
         onEditAdvance={isBookedLead ? onEditCommercial : undefined}
+        onAddPayment={canAddPayment ? () => setAddPaymentOpen(true) : undefined}
         onSendVoucher={isBookedLead && sendEndpoint ? sendVoucherNow : undefined}
         onViewVoucher={openVoucher}
         sendingVoucher={sending}
         voucherLoading={loading}
       />
+
+      {addPaymentOpen && recordPaymentEndpoint ? (
+        <AddLeadPaymentModal
+          open={addPaymentOpen}
+          onClose={() => setAddPaymentOpen(false)}
+          endpoint={recordPaymentEndpoint}
+          customerName={lead?.name || ''}
+          totalAmount={summary.totalAmount}
+          advanceReceived={summary.advanceReceived}
+          balanceDue={summary.balanceDue}
+          onSaved={() => {
+            setAddPaymentOpen(false);
+            onPaymentRecorded?.();
+          }}
+        />
+      ) : null}
 
       <PaymentVoucherModal
         open={open}

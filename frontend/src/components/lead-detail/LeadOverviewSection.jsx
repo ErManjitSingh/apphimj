@@ -19,6 +19,7 @@ import {
   StickyNote,
   Plus,
   CalendarDays,
+  Wallet,
 } from 'lucide-react';
 import Avatar from '../ui/Avatar';
 import { useAuth } from '../../context/AuthContext';
@@ -28,6 +29,7 @@ import { openCrmWhatsApp } from '../../lib/openCrmWhatsApp';
 import LeadStatusPipeline from './LeadStatusPipeline';
 import LeadPaymentSummaryCard from './LeadPaymentSummaryCard';
 import MetaFormAnswersCard from './MetaFormAnswersCard';
+import AddLeadPaymentModal from '../leads/AddLeadPaymentModal';
 import API from '../../api/axios';
 import { CHANNELS } from '../../config/channels';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -85,6 +87,8 @@ function ActionTile({ icon: Icon, label, tone, onClick, disabled }) {
     green: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
     violet: 'bg-violet-50 text-violet-700 hover:bg-violet-100',
     blue: 'bg-blue-50 text-blue-700 hover:bg-blue-100',
+    teal: 'bg-teal-50 text-teal-700 hover:bg-teal-100',
+    orange: 'bg-orange-50 text-orange-700 hover:bg-orange-100',
   };
   return (
     <button
@@ -121,6 +125,7 @@ export default function LeadOverviewSection({
   onAddNote,
   onUpdateStatus,
   onEditCommercial,
+  onPaymentRecorded,
   sidebarExtra,
 }) {
   const navigate = useNavigate();
@@ -137,6 +142,7 @@ export default function LeadOverviewSection({
   const [noteDraft, setNoteDraft] = useState('');
   const [addingNote, setAddingNote] = useState(false);
   const [showNoteBox, setShowNoteBox] = useState(false);
+  const [addPaymentOpen, setAddPaymentOpen] = useState(false);
 
   const travelers = travelersSummary(lead);
   const reqs = requirementItems(lead);
@@ -146,6 +152,9 @@ export default function LeadOverviewSection({
   const balance = summary?.balanceDue ?? (packageCost - advance);
   const booked = isBookedStatus(lead?.status);
   const canManageVoucher = Boolean(booked || summary);
+  const canAddPayment = Boolean(summary?.paymentId) && booked && Number(balance) > 0;
+  const recordPaymentEndpoint =
+    leadId && contactEndpoint ? `${contactEndpoint}/${leadId}/record-payment` : null;
   const editAdvanceHandler = onEditCommercial || (canManageVoucher ? onUpdateStatus : null);
   const upcoming = getUpcomingFollowUp(followups) || (lead?.nextFollowUp ? { scheduledAt: lead.nextFollowUp } : null);
   const noteItems = notes.length
@@ -328,6 +337,7 @@ export default function LeadOverviewSection({
           }
           canManage={canManageVoucher}
           onEditAdvance={editAdvanceHandler}
+          onAddPayment={canAddPayment ? () => setAddPaymentOpen(true) : undefined}
           onSendVoucher={sendEndpoint ? sendVoucherNow : undefined}
           onViewVoucher={openVoucher}
           sendingVoucher={sendingVoucher}
@@ -384,7 +394,21 @@ export default function LeadOverviewSection({
               disabled={!onCreateQuote}
               onClick={onCreateQuote}
             />
+            {canAddPayment ? (
+              <ActionTile
+                icon={Wallet}
+                label="Add Payment"
+                tone="teal"
+                disabled={!recordPaymentEndpoint}
+                onClick={() => setAddPaymentOpen(true)}
+              />
+            ) : null}
           </div>
+          {canAddPayment ? (
+            <p className="mt-2 text-[11px] font-semibold tabular-nums text-orange-600">
+              Pending balance {formatDetailMoney(balance)}
+            </p>
+          ) : null}
           <DropdownMenuRoot>
             <DropdownMenuTrigger asChild>
               <button
@@ -396,6 +420,9 @@ export default function LeadOverviewSection({
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
+              {canAddPayment ? (
+                <DropdownMenuItem onClick={() => setAddPaymentOpen(true)}>Add Payment</DropdownMenuItem>
+              ) : null}
               {onLogCallNote ? <DropdownMenuItem onClick={onLogCallNote}>Log Call Note</DropdownMenuItem> : null}
               {onAssign ? (
                 <DropdownMenuItem onClick={onAssign}>
@@ -613,6 +640,22 @@ export default function LeadOverviewSection({
           />
         ) : null}
       </Suspense>
+
+      {addPaymentOpen && recordPaymentEndpoint ? (
+        <AddLeadPaymentModal
+          open={addPaymentOpen}
+          onClose={() => setAddPaymentOpen(false)}
+          endpoint={recordPaymentEndpoint}
+          customerName={lead?.name || ''}
+          totalAmount={packageCost}
+          advanceReceived={advance}
+          balanceDue={balance}
+          onSaved={() => {
+            setAddPaymentOpen(false);
+            (onPaymentRecorded || onContactLogged)?.();
+          }}
+        />
+      ) : null}
     </div>
   );
 }

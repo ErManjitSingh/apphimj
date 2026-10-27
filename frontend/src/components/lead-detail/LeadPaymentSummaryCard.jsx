@@ -59,6 +59,7 @@ export default function LeadPaymentSummaryCard({
   paymentScreenshots = [],
   canManage = false,
   onEditAdvance,
+  onAddPayment,
   onSendVoucher,
   onViewVoucher,
   sendingVoucher = false,
@@ -93,6 +94,16 @@ export default function LeadPaymentSummaryCard({
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
+          {canManage && onAddPayment && !fullyPaid ? (
+            <button
+              type="button"
+              onClick={onAddPayment}
+              className="inline-flex h-7 items-center gap-1 rounded-lg bg-orange-400 px-2 text-[11px] font-bold text-slate-950 hover:bg-orange-300"
+            >
+              <Wallet className="h-3 w-3" />
+              Add Payment
+            </button>
+          ) : null}
           {canManage && onEditAdvance ? (
             <button
               type="button"
