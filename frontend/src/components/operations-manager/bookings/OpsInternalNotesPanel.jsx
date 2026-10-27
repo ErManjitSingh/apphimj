@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Loader2, NotebookPen, Save, StickyNote } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Loader2, NotebookPen, Send, StickyNote } from 'lucide-react';
 import API from '../../../api/axios';
 import { Button } from '../../ui/button';
 import { cn } from '../../../lib/utils';
@@ -11,22 +11,24 @@ const THEMES = {
     badge: 'bg-amber-500/15 text-amber-800 ring-1 ring-amber-500/20',
     accent: 'text-amber-700',
     iconWrap: 'bg-amber-500 text-white shadow-md shadow-amber-500/25',
-    textarea: 'border-amber-200/80 bg-white/90 focus:border-amber-400 focus:ring-amber-100',
-    card: 'border-amber-200/70 bg-white/85',
+    thread: 'border-amber-200/60 bg-white/55',
+    bubble: 'bg-white border-amber-200/80 text-slate-800 shadow-sm',
+    meta: 'text-amber-800/70',
+    composer: 'border-amber-200/80 bg-white/90 focus:border-amber-400 focus:ring-amber-100',
     button: 'bg-amber-600 hover:bg-amber-500 text-white',
-    rail: 'from-amber-400 to-orange-500',
-    empty: 'border-amber-200/70 bg-amber-50/50 text-amber-900/70',
+    empty: 'text-amber-900/60',
   },
   cab: {
     shell: 'border-cyan-300/50 bg-gradient-to-br from-slate-900 via-slate-900 to-cyan-950 text-slate-100 shadow-[0_10px_28px_-16px_rgba(8,145,178,0.45)]',
     badge: 'bg-cyan-400/15 text-cyan-200 ring-1 ring-cyan-400/25',
     accent: 'text-cyan-300',
     iconWrap: 'bg-cyan-400 text-slate-950 shadow-md shadow-cyan-400/25',
-    textarea: 'border-cyan-500/30 bg-slate-950/50 text-slate-100 placeholder:text-slate-500 focus:border-cyan-400 focus:ring-cyan-500/20',
-    card: 'border-cyan-500/20 bg-slate-950/55',
+    thread: 'border-cyan-500/20 bg-slate-950/45',
+    bubble: 'bg-slate-800/90 border-cyan-500/25 text-slate-100 shadow-sm',
+    meta: 'text-cyan-200/70',
+    composer: 'border-cyan-500/30 bg-slate-950/50 text-slate-100 placeholder:text-slate-500 focus:border-cyan-400 focus:ring-cyan-500/20',
     button: 'bg-cyan-400 hover:bg-cyan-300 text-slate-950',
-    rail: 'from-cyan-400 to-sky-500',
-    empty: 'border-cyan-500/25 bg-slate-950/40 text-slate-400',
+    empty: 'text-slate-400',
   },
 };
 
@@ -35,24 +37,27 @@ function formatStamp(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '—';
   return date.toLocaleString('en-IN', {
-    weekday: 'short',
     day: 'numeric',
     month: 'short',
-    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
     hour12: true,
   });
 }
 
+function noteKey(note, index) {
+  return note._id || `${note.createdAt || 't'}-${index}-${String(note.text || '').slice(0, 16)}`;
+}
+
 /**
- * Ops-only notes log. Pass hotelAssignmentId / transportAssignmentId for per-row notes.
+ * WhatsApp-style ops notes: thread on top, composer at bottom.
+ * Saves without refreshing the whole booking page.
  */
 export default function OpsInternalNotesPanel({
   bookingId,
   scope = 'hotel',
   notes: notesProp = [],
-  onSaved,
+  onNotesSynced,
   hotelAssignmentId,
   transportAssignmentId,
   title: titleProp,
@@ -62,24 +67,31 @@ export default function OpsInternalNotesPanel({
   const theme = THEMES[scope] || THEMES.hotel;
   const [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false);
-  const [localNotes, setLocalNotes] = useState(null);
+  const [notes, setNotes] = useState(() => [...(notesProp || [])]);
+  const threadRef = useRef(null);
+  const bottomRef = useRef(null);
+  const skipPropSync = useRef(false);
+
+  const orderedNotes = useMemo(
+    () => [...notes].sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0)),
+    [notes]
+  );
 
   useEffect(() => {
-    setLocalNotes(null);
+    if (skipPropSync.current) {
+      skipPropSync.current = false;
+      return;
+    }
+    setNotes([...(notesProp || [])]);
   }, [notesProp, hotelAssignmentId, transportAssignmentId]);
 
-  const notes = useMemo(() => {
-    const list = localNotes ?? notesProp ?? [];
-    return [...list].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }, [localNotes, notesProp]);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [orderedNotes.length]);
 
   const title =
     titleProp ||
     (scope === 'cab' ? 'Cab internal notes' : 'Hotel internal notes');
-  const hint =
-    scope === 'cab'
-      ? 'Vendor / driver notes for this vehicle — date & time lock on save.'
-      : 'Notes for this hotel stay — date & time lock on save.';
 
   const save = async () => {
     const text = draft.trim();
@@ -102,14 +114,28 @@ export default function OpsInternalNotesPanel({
         payload,
         { skipSuccessToast: true }
       );
-      setLocalNotes(data.notes || []);
+      const nextNotes = data.notes || [...notes, data.note].filter(Boolean);
+      skipPropSync.current = true;
+      setNotes(nextNotes);
       setDraft('');
-      toast.success('Note saved with date & time');
-      onSaved?.();
+      onNotesSynced?.({
+        scope,
+        hotelAssignmentId,
+        transportAssignmentId,
+        notes: nextNotes,
+        note: data.note,
+      });
     } catch (err) {
       toast.error(err.response?.data?.message || 'Could not save note');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const onKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (!saving && draft.trim() && !disabledReason) save();
     }
   };
 
@@ -121,87 +147,91 @@ export default function OpsInternalNotesPanel({
         theme.shell
       )}
     >
-      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-2.5">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2.5">
           <span
             className={cn(
               'inline-flex shrink-0 items-center justify-center rounded-xl',
-              compact ? 'h-9 w-9' : 'h-11 w-11 rounded-2xl',
+              compact ? 'h-8 w-8' : 'h-10 w-10 rounded-2xl',
               theme.iconWrap
             )}
           >
-            <NotebookPen className={compact ? 'h-4 w-4' : 'h-5 w-5'} />
+            <NotebookPen className={compact ? 'h-3.5 w-3.5' : 'h-4.5 w-4.5'} />
           </span>
-          <div>
+          <div className="min-w-0">
             <p className={cn('text-[10px] font-bold uppercase tracking-[0.16em]', theme.accent)}>
-              Ops log · internal only
+              Ops chat · internal
             </p>
-            <h4 className={cn('mt-0.5 font-black', compact ? 'text-sm' : 'text-base', scope === 'cab' ? 'text-white' : 'text-slate-900')}>
+            <h4 className={cn('truncate font-black', compact ? 'text-sm' : 'text-base', scope === 'cab' ? 'text-white' : 'text-slate-900')}>
               {title}
             </h4>
-            {!compact ? (
-              <p className={cn('mt-1 max-w-xl text-xs leading-relaxed', scope === 'cab' ? 'text-slate-400' : 'text-slate-600')}>
-                {hint}
-              </p>
-            ) : null}
           </div>
         </div>
-        <span className={cn('inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-1 text-[10px] font-bold uppercase', theme.badge)}>
+        <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase', theme.badge)}>
           <StickyNote className="h-3 w-3" />
-          {notes.length} saved
+          {orderedNotes.length}
         </span>
       </div>
 
-      <div className={cn('space-y-2.5', compact ? 'mt-3' : 'mt-4 space-y-3')}>
+      <div
+        ref={threadRef}
+        className={cn(
+          'rounded-2xl border p-2.5',
+          theme.thread,
+          compact ? 'max-h-52' : 'max-h-72',
+          'overflow-y-auto overscroll-contain'
+        )}
+      >
+        {!orderedNotes.length ? (
+          <p className={cn('px-2 py-8 text-center text-xs', theme.empty)}>
+            Pehla note bhejo — yahan WhatsApp ki tarah niche dikhega.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {orderedNotes.map((note, index) => (
+              <div key={noteKey(note, index)} className="flex justify-end">
+                <article
+                  className={cn(
+                    'max-w-[92%] rounded-2xl rounded-br-md border px-3 py-2',
+                    theme.bubble
+                  )}
+                >
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed">{note.text}</p>
+                  <p className={cn('mt-1 text-right text-[10px] font-semibold', theme.meta)}>
+                    {note.createdByName ? `${note.createdByName} · ` : ''}
+                    {formatStamp(note.createdAt)}
+                  </p>
+                </article>
+              </div>
+            ))}
+            <div ref={bottomRef} />
+          </div>
+        )}
+      </div>
+
+      <div className="mt-3 flex items-end gap-2">
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          rows={compact ? 2 : 3}
-          placeholder="Type anything… then Save note"
+          onKeyDown={onKeyDown}
+          rows={compact ? 2 : 2}
+          placeholder={disabledReason || 'Type a note… Enter to send'}
+          disabled={Boolean(disabledReason) || saving}
           className={cn(
-            'w-full resize-y rounded-xl border px-3 py-2.5 text-sm outline-none transition focus:ring-4',
-            theme.textarea
+            'min-h-[44px] flex-1 resize-none rounded-2xl border px-3 py-2.5 text-sm outline-none transition focus:ring-4 disabled:opacity-60',
+            theme.composer
           )}
         />
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-[11px] text-slate-500">
-            {disabledReason || 'Save pe date & time auto lock.'}
-          </p>
-          <Button
-            type="button"
-            size="sm"
-            className={cn('rounded-xl gap-1.5 border-0 font-bold', theme.button)}
-            disabled={saving || !draft.trim() || Boolean(disabledReason)}
-            onClick={save}
-          >
-            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-            Save note
-          </Button>
-        </div>
-      </div>
-
-      <div className={cn('space-y-2', compact ? 'mt-3' : 'mt-5 space-y-2.5')}>
-        {!notes.length ? (
-          <p className={cn('rounded-xl border border-dashed px-3 py-4 text-center text-xs', theme.empty)}>
-            No notes yet for this {scope === 'cab' ? 'cab' : 'hotel'}.
-          </p>
-        ) : (
-          notes.map((note) => (
-            <article
-              key={note._id || `${note.createdAt}-${note.text?.slice(0, 12)}`}
-              className={cn('relative overflow-hidden rounded-xl border p-3 pl-3.5', theme.card)}
-            >
-              <span className={cn('absolute left-0 top-0 h-full w-1 bg-gradient-to-b', theme.rail)} />
-              <p className={cn('whitespace-pre-wrap text-sm leading-relaxed', scope === 'cab' ? 'text-slate-100' : 'text-slate-800')}>
-                {note.text}
-              </p>
-              <div className={cn('mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold', scope === 'cab' ? 'text-cyan-200/80' : 'text-amber-800/80')}>
-                <span>{formatStamp(note.createdAt)}</span>
-                {note.createdByName ? <span>· {note.createdByName}</span> : null}
-              </div>
-            </article>
-          ))
-        )}
+        <Button
+          type="button"
+          size="sm"
+          className={cn('h-11 w-11 shrink-0 rounded-2xl border-0 p-0', theme.button)}
+          disabled={saving || !draft.trim() || Boolean(disabledReason)}
+          onClick={save}
+          aria-label="Send note"
+        >
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        </Button>
       </div>
     </div>
   );

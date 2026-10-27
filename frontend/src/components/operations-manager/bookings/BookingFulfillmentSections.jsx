@@ -511,7 +511,6 @@ export function BookingTransportEditor({
   sendingVoucher,
   packageRouting = '',
   bookingId,
-  onNotesSaved,
 }) {
   const update = (i, field, value) => {
     onChange(transport.map((t, idx) => (idx === i ? { ...t, [field]: value } : t)));
@@ -682,7 +681,16 @@ export function BookingTransportEditor({
                 title={`Vehicle #${i + 1} · internal notes`}
                 notes={t.internalNotes || []}
                 disabledReason={t._id ? '' : 'Pehle transport save karo, phir note add hoga'}
-                onSaved={onNotesSaved}
+                onNotesSynced={({ transportAssignmentId, notes: nextNotes }) => {
+                  if (!transportAssignmentId) return;
+                  onChange(
+                    transport.map((row) =>
+                      String(row._id) === String(transportAssignmentId)
+                        ? { ...row, internalNotes: nextNotes }
+                        : row
+                    )
+                  );
+                }}
               />
             ) : null}
           </div>

@@ -391,7 +391,16 @@ export default function HotelBookingSection({ bookingId, booking, hotels, onChan
                 title={`${hotel.hotelName || 'Hotel'} · internal notes`}
                 notes={hotel.internalNotes || []}
                 disabledReason={hotel._id ? '' : 'Pehle hotel save karo, phir note add hoga'}
-                onSaved={onSaved}
+                onNotesSynced={({ hotelAssignmentId, notes: nextNotes }) => {
+                  if (!hotelAssignmentId) return;
+                  onChange(
+                    hotels.map((row) =>
+                      String(row._id) === String(hotelAssignmentId)
+                        ? { ...row, internalNotes: nextNotes }
+                        : row
+                    )
+                  );
+                }}
               />
             </article>
           );

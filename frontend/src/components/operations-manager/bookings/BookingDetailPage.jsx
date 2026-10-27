@@ -261,11 +261,13 @@ export default function BookingDetailPage() {
 
   const setters = { setBooking, setItinerary, setHotels, setTransport };
 
-  const fetchBooking = () => {
-    setLoading(true);
-    API.get(`/operations-manager/bookings/${id}`)
+  const fetchBooking = ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
+    return API.get(`/operations-manager/bookings/${id}`)
       .then((r) => applyBookingState(r.data, setters))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!silent) setLoading(false);
+      });
   };
 
   useEffect(() => { fetchBooking(); }, [id]);
@@ -493,7 +495,7 @@ export default function BookingDetailPage() {
             booking={booking}
             hotels={hotels}
             onChange={setHotels}
-            onSaved={fetchBooking}
+            onSaved={() => fetchBooking({ silent: true })}
           />
 
           <BookingTransportEditor
@@ -507,7 +509,6 @@ export default function BookingDetailPage() {
             sendingVoucher={sendingTransportVoucher}
             packageRouting={booking.packageRouting || ''}
             bookingId={id}
-            onNotesSaved={fetchBooking}
           />
 
           <CompanyBookingVoucher booking={booking} onSaved={fetchBooking} />
