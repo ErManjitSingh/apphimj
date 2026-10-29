@@ -244,6 +244,10 @@ function applyNameSearch(items, search) {
   });
 }
 
+async function invalidateLocalCatalogCache() {
+  await cacheService.invalidate('local-catalog:').catch(() => {});
+}
+
 async function loadLocalCatalogItems() {
   return cacheService.getOrSet(
     'local-catalog:items-v1',
@@ -256,8 +260,19 @@ async function loadLocalCatalogItems() {
         .lean();
 
       return docs.map((doc) => {
-        if (doc.listData && doc.listData.name) return doc.listData;
-        return toListItem(doc, doc);
+        const item =
+          doc.listData && doc.listData.name ? { ...doc.listData } : toListItem(doc, doc);
+        const mongoId = String(doc._id);
+        return {
+          ...item,
+          // Prefer Mongo id so admin delete hits /packages/:id correctly
+          _id: mongoId,
+          id: mongoId,
+          mongoId,
+          slug: item.slug || doc.slug || '',
+          sourceSlug: doc.sourceSlug || item.slug || '',
+          sourcePackageId: doc.sourcePackageId || item.id || '',
+        };
       });
     },
     LOCAL_CATALOG_LIST_CACHE_MS
@@ -428,6 +443,7 @@ module.exports = {
   upsertCatalogPackage,
   importAllUnoPackages,
   getImportStatus,
+  invalidateLocalCatalogCache,
   toPlain,
   mapItineraryForDb,
 };

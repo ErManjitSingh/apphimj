@@ -5,11 +5,13 @@ const Flight = require('../models/Flight');
 const ApiError = require('../utils/apiError');
 const asyncHandler = require('../utils/asyncHandler');
 const { getUnoPackageById } = require('../services/unoHotelsPackageService');
+const mongoose = require('mongoose');
 const {
   getLocalCatalogPackage,
   importAllUnoPackages,
   getImportStatus,
   countLocalCatalog,
+  invalidateLocalCatalogCache,
   toPlain,
   mapItineraryForDb,
 } = require('../services/localPackageCatalogService');
@@ -181,10 +183,26 @@ const updatePackage = asyncHandler(async (req, res) => {
 });
 
 const deletePackage = asyncHandler(async (req, res) => {
-  const pkg = await Package.findById(req.params.id);
+  const key = String(req.params.id || '').trim();
+  if (!key) throw new ApiError(400, 'Package id is required');
+
+  let pkg = null;
+  if (mongoose.isValidObjectId(key)) {
+    pkg = await Package.findById(key);
+  }
+  if (!pkg) {
+    pkg = await Package.findOne({
+      $or: [{ slug: key }, { sourceSlug: key }, { sourcePackageId: key }],
+    });
+  }
   if (!pkg) throw new ApiError(404, 'Package not found');
+
+  const wasCatalog = pkg.sourceType === 'uno_catalog';
   await pkg.deleteOne();
-  res.json({ message: 'Package deleted' });
+  if (wasCatalog) {
+    await invalidateLocalCatalogCache().catch(() => {});
+  }
+  res.json({ message: 'Package deleted', id: pkg._id, sourceType: pkg.sourceType });
 });
 
 const duplicatePackage = asyncHandler(async (req, res) => {

@@ -24,7 +24,8 @@ const TOUR_TYPES = [
 export default function PackageManagementPage() {
   const { user } = useAuth();
   const canCreate = canAccess(user, 'packages', 'create');
-  const canDelete = canAccess(user, 'packages', 'delete');
+  // Admin always gets delete — also honor packages.delete for ops roles.
+  const canDelete = user?.role === 'admin' || canAccess(user, 'packages', 'delete');
   const { confirm, dialogNode } = useConfirmDialog();
   const [packages, setPackages] = useState([]);
   const [customCopies, setCustomCopies] = useState([]);
@@ -201,7 +202,10 @@ export default function PackageManagementPage() {
       if ((selectedPkg?._id || selectedPkg?.id) === id || (detail?._id || detail?.id) === id) {
         closeDetail();
       }
-      await fetchCustomCopies();
+      setPackages((rows) => rows.filter((p) => String(p._id || p.id) !== String(id)));
+      setCustomCopies((rows) => rows.filter((p) => String(p._id || p.id) !== String(id)));
+      setMeta((m) => ({ ...m, total: Math.max(0, Number(m.total || 0) - 1) }));
+      await fetchAll();
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Could not delete package');
     } finally {
@@ -283,7 +287,9 @@ export default function PackageManagementPage() {
           packages={packages}
           onView={openDetail}
           onEdit={handleEdit}
+          onDelete={canDelete ? handleDelete : undefined}
           editingId={cloningId}
+          deletingId={deletingId}
         />
       )}
 
