@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Hotel, Loader2, Save, Send } from 'lucide-react';
+import { Hotel, Loader2, NotebookPen, Save, Send } from 'lucide-react';
 import API from '../../../api/axios';
 import { Button } from '../../ui/button';
 import { formatDate, formatINR } from '../operationsUtils';
@@ -193,15 +193,6 @@ export default function HotelBookingSection({
         </Button>
       </div>
 
-      {locked && (
-        <div className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <p className="font-bold">Hotel Master locked</p>
-          <p className="mt-0.5 text-xs text-amber-800/90">
-            {lockMessage || 'Pehle hotel change ka note save karo — uske baad master editable hoga.'}
-          </p>
-        </div>
-      )}
-
       {notice && (
         <p className="mb-4 rounded-xl border border-teal-500/20 bg-teal-500/10 px-3 py-2 text-xs text-teal-800">{notice}</p>
       )}
@@ -212,13 +203,29 @@ export default function HotelBookingSection({
         </p>
       )}
 
-      <div
-        className={cn(
-          'space-y-4 transition duration-300',
-          locked && 'pointer-events-none select-none blur-[2.5px] opacity-60'
+      <div className="relative">
+        {locked && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-4">
+            <div className="max-w-md rounded-2xl border border-amber-300/80 bg-white/95 px-5 py-4 text-center shadow-lg shadow-amber-900/10 backdrop-blur-sm">
+              <span className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-white shadow-md shadow-amber-500/30">
+                <NotebookPen className="h-5 w-5" />
+              </span>
+              <p className="text-sm font-black text-slate-900">
+                Add a hotel note explaining why you are changing the hotel
+              </p>
+              <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
+                {lockMessage || 'Hotel Master stays locked until you save the change reason note above.'}
+              </p>
+            </div>
+          </div>
         )}
-        aria-disabled={locked || undefined}
-      >
+        <div
+          className={cn(
+            'space-y-4 transition duration-300',
+            locked && 'pointer-events-none select-none blur-[2.5px] opacity-55'
+          )}
+          aria-disabled={locked || undefined}
+        >
         {hotels.map((hotel, index) => {
           const internal = Number(hotel.internalPrice) || 0;
           const advance = Number(hotel.advancePaid) || 0;
@@ -434,6 +441,7 @@ export default function HotelBookingSection({
             </article>
           );
         })}
+        </div>
       </div>
     </section>
   );

@@ -756,7 +756,7 @@ export default function BookingDetailPage() {
             locked={Boolean(pendingHotelChange)}
             lockMessage={
               pendingHotelChange
-                ? `Day ${pendingHotelChange.dayNumber}: ${pendingHotelChange.previousName} → ${pendingHotelChange.nextName}. Upar note save karo, phir master unlock hoga.`
+                ? `Day ${pendingHotelChange.dayNumber}: ${pendingHotelChange.previousName} → ${pendingHotelChange.nextName}. Save the note above to unlock Hotel Master.`
                 : ''
             }
           />
