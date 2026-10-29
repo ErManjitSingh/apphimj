@@ -145,7 +145,7 @@ function PaymentLedgerList({ booking, canAddPayment, onAddPayment }) {
 
       {!moreReceived.length && !pending.length ? (
         <p className="rounded-xl border border-dashed border-subtle p-3 text-center text-xs text-content-muted">
-          No more payments yet — Add Payment se next installment record karo
+          No more payments yet — use Add Payment to record the next installment
         </p>
       ) : null}
 
