@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { BadgeCheck, Eye, Loader2, Send } from 'lucide-react';
+import { BadgeCheck, Eye, Loader2, Pencil, Send } from 'lucide-react';
 import { ACTIVITY_CONFIG, findQuotationForActivity } from './leadDetailData';
 import QuotationPdfOverlay from '../quotations/QuotationPdfOverlay';
 import SendQuotationModal from './SendQuotationModal';
@@ -17,6 +18,21 @@ function formatActivityDate(iso) {
     date: d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
     time: d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
   };
+}
+
+function resolveQuoteEditHref(quoteId, contactEndpoint = '') {
+  if (!quoteId) return null;
+  const base = String(contactEndpoint || '');
+  if (base.includes('sales-executive')) {
+    return `/sales-executive/quotations/${quoteId}/edit`;
+  }
+  if (base.includes('sales-manager')) {
+    return `/sales-manager/quotations/new?edit=${quoteId}`;
+  }
+  if (base.includes('team-leader')) {
+    return `/team-leader/quotations/new?edit=${quoteId}`;
+  }
+  return `/quotations/new?edit=${quoteId}`;
 }
 
 function resolveFinalQuotationEndpoint(contactEndpoint = '', leadId) {
@@ -202,6 +218,10 @@ export default function LeadActivityTimeline({
                   const emailLogId = item.meta?.emailLogId || null;
                   const quote = isQuote ? findQuotationForActivity(item, quotations) : null;
                   const quoteId = quote?._id || item.meta?.quotationId || null;
+                  const quoteStatus = String(quote?.status || item.meta?.status || 'draft');
+                  const canEditDraft = ['draft', 'pending_approval', 'rejected'].includes(quoteStatus);
+                  const editHref =
+                    isQuote && canEditDraft ? resolveQuoteEditHref(quoteId, contactEndpoint) : null;
                   const isFinalQuote =
                     quoteId && finalQuotationId && String(quoteId) === String(finalQuotationId);
                   const canMarkFinal = Boolean(isQuote && quoteId && leadId);
@@ -242,8 +262,16 @@ export default function LeadActivityTimeline({
                               {' · '}{date} at {time}
                             </p>
                           </div>
-                          {isQuote && (canMarkFinal || canView || canSend) && (
+                          {isQuote && (editHref || canMarkFinal || canView || canSend) && (
                             <div className="flex flex-wrap items-center gap-1.5">
+                              {editHref && (
+                                <Link
+                                  to={editHref}
+                                  className="inline-flex h-7 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 text-[11px] font-semibold text-violet-700 hover:bg-violet-100"
+                                >
+                                  <Pencil className="w-3 h-3" /> Edit draft
+                                </Link>
+                              )}
                               {canMarkFinal && (
                                 <Button
                                   type="button"
