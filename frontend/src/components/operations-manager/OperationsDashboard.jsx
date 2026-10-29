@@ -50,7 +50,7 @@ export default function OperationsDashboard() {
         refreshing={isFetching}
       />
 
-      <OperationsExecutionHub kpis={data?.kpis} hubStats={data?.hubStats} />
+      <OperationsExecutionHub />
 
       <OperationsKpiCards
         kpis={data?.kpis || {}}

@@ -87,28 +87,30 @@ async function dailyBookingCounts(filterBuilder, days = 7) {
   return series;
 }
 
-async function buildOpsSparklines(base, pendingHotel, pendingCab, pendingActivity, pendingVoucher) {
+async function buildOpsSparklines(base, postponedLeadIds = []) {
   const defs = {
-    todaysArrivals: (start, end) => ({ ...base, travelDate: { $gte: start, $lte: end } }),
-    todaysDepartures: (start, end) => ({ ...base, returnDate: { $gte: start, $lte: end } }),
+    totalBookings: (start, end) => ({ ...base, createdAt: { $gte: start, $lte: end } }),
     upcomingTours: (start, end) => ({
       ...base,
       createdAt: { $gte: start, $lte: end },
       travelDate: { $gt: end },
       status: { $in: ['confirmed', 'in_progress', 'booking_received', 'pending_verification'] },
     }),
-    pendingBookings: (start, end) => ({
-      ...base,
-      createdAt: { $gte: start, $lte: end },
-      status: { $in: STATUS_ROUTE_MAP.pending },
-    }),
-    hotelPending: (start, end) => ({ ...pendingHotel, updatedAt: { $gte: start, $lte: end } }),
-    cabPending: (start, end) => ({ ...pendingCab, updatedAt: { $gte: start, $lte: end } }),
-    activityPending: (start, end) => ({ ...pendingActivity, updatedAt: { $gte: start, $lte: end } }),
-    voucherPending: (start, end) => ({ ...pendingVoucher, updatedAt: { $gte: start, $lte: end } }),
     activeTrips: (start, end) => ({
       ...base,
       status: 'in_progress',
+      updatedAt: { $gte: start, $lte: end },
+    }),
+    // Departures = trips starting that day
+    todaysDepartures: (start, end) => ({ ...base, travelDate: { $gte: start, $lte: end } }),
+    postponedBookings: (start, end) => ({
+      ...base,
+      lead: { $in: postponedLeadIds },
+      updatedAt: { $gte: start, $lte: end },
+    }),
+    cancelledBookings: (start, end) => ({
+      ...base,
+      status: 'cancelled',
       updatedAt: { $gte: start, $lte: end },
     }),
     completedTrips: (start, end) => ({
@@ -159,9 +161,14 @@ async function buildDashboard(branchId) {
   };
   const pendingVoucher = { ...base, voucherStatus: 'pending' };
 
+  const postponedLeads = await Lead.find({ status: 'postponed', isDeleted: { $ne: true } })
+    .select('_id')
+    .lean();
+  const postponedLeadIds = postponedLeads.map((l) => l._id);
+
   const [
-    todaysArrivals,
     todaysDepartures,
+    todaysArrivals,
     upcomingTours,
     pendingBookings,
     hotelPending,
@@ -170,6 +177,8 @@ async function buildDashboard(branchId) {
     voucherPending,
     activeTrips,
     completedTrips,
+    postponedBookings,
+    cancelledBookings,
     openTickets,
     totalBookings,
     branchStats,
@@ -179,6 +188,7 @@ async function buildDashboard(branchId) {
     openTicketsList,
     operationsTasksList,
   ] = await Promise.all([
+    // Departures today = travel start date today
     Booking.countDocuments({ ...base, travelDate: { $gte: todayStart, $lte: todayEnd } }),
     Booking.countDocuments({ ...base, returnDate: { $gte: todayStart, $lte: todayEnd } }),
     Booking.countDocuments({
@@ -196,6 +206,10 @@ async function buildDashboard(branchId) {
     Booking.countDocuments(pendingVoucher),
     Booking.countDocuments({ ...base, status: 'in_progress' }),
     Booking.countDocuments({ ...base, status: 'completed' }),
+    postponedLeadIds.length
+      ? Booking.countDocuments({ ...base, lead: { $in: postponedLeadIds } })
+      : Promise.resolve(0),
+    Booking.countDocuments({ ...base, status: 'cancelled' }),
     SupportTicket.countDocuments({ status: { $in: ['open', 'in_progress'] } }),
     Booking.countDocuments(base),
     Booking.aggregate([
@@ -240,20 +254,18 @@ async function buildDashboard(branchId) {
     statusBreakdown,
     guestsOnTripAgg,
     branchDocs,
+    trendTotalThis,
+    trendTotalLast,
     trendUpcomingThis,
     trendUpcomingLast,
-    trendPendingThis,
-    trendPendingLast,
-    trendHotelThis,
-    trendHotelLast,
-    trendCabThis,
-    trendCabLast,
-    trendActivityThis,
-    trendActivityLast,
-    trendVoucherThis,
-    trendVoucherLast,
     trendActiveThis,
     trendActiveLast,
+    trendDeparturesThis,
+    trendDeparturesLast,
+    trendPostponedThis,
+    trendPostponedLast,
+    trendCancelledThis,
+    trendCancelledLast,
     trendCompletedThis,
     trendCompletedLast,
     sparklines,
@@ -270,6 +282,8 @@ async function buildDashboard(branchId) {
       },
     ]),
     Branch.find({}).select('name code').lean(),
+    Booking.countDocuments({ ...base, createdAt: { $gte: thisWeek.start, $lte: thisWeek.end } }),
+    Booking.countDocuments({ ...base, createdAt: { $gte: lastWeek.start, $lte: lastWeek.end } }),
     Booking.countDocuments({
       ...base,
       travelDate: { $gt: todayEnd, $lte: thisWeek.end },
@@ -277,24 +291,32 @@ async function buildDashboard(branchId) {
     }),
     Booking.countDocuments({
       ...base,
-      travelDate: { $gt: lastWeek.end, $lte: lastWeek.end },
+      travelDate: { $gt: lastWeek.start, $lte: lastWeek.end },
       status: { $in: ['confirmed', 'in_progress', 'booking_received', 'pending_verification'] },
     }),
-    Booking.countDocuments({ ...base, status: { $in: STATUS_ROUTE_MAP.pending }, createdAt: { $gte: thisWeek.start, $lte: thisWeek.end } }),
-    Booking.countDocuments({ ...base, status: { $in: STATUS_ROUTE_MAP.pending }, createdAt: { $gte: lastWeek.start, $lte: lastWeek.end } }),
-    Booking.countDocuments({ ...pendingHotel, updatedAt: { $gte: thisWeek.start, $lte: thisWeek.end } }),
-    Booking.countDocuments({ ...pendingHotel, updatedAt: { $gte: lastWeek.start, $lte: lastWeek.end } }),
-    Booking.countDocuments({ ...pendingCab, updatedAt: { $gte: thisWeek.start, $lte: thisWeek.end } }),
-    Booking.countDocuments({ ...pendingCab, updatedAt: { $gte: lastWeek.start, $lte: lastWeek.end } }),
-    Booking.countDocuments({ ...pendingActivity, updatedAt: { $gte: thisWeek.start, $lte: thisWeek.end } }),
-    Booking.countDocuments({ ...pendingActivity, updatedAt: { $gte: lastWeek.start, $lte: lastWeek.end } }),
-    Booking.countDocuments({ ...pendingVoucher, updatedAt: { $gte: thisWeek.start, $lte: thisWeek.end } }),
-    Booking.countDocuments({ ...pendingVoucher, updatedAt: { $gte: lastWeek.start, $lte: lastWeek.end } }),
     Booking.countDocuments({ ...base, status: 'in_progress', updatedAt: { $gte: thisWeek.start, $lte: thisWeek.end } }),
     Booking.countDocuments({ ...base, status: 'in_progress', updatedAt: { $gte: lastWeek.start, $lte: lastWeek.end } }),
+    Booking.countDocuments({ ...base, travelDate: { $gte: thisWeek.start, $lte: thisWeek.end } }),
+    Booking.countDocuments({ ...base, travelDate: { $gte: lastWeek.start, $lte: lastWeek.end } }),
+    postponedLeadIds.length
+      ? Booking.countDocuments({
+          ...base,
+          lead: { $in: postponedLeadIds },
+          updatedAt: { $gte: thisWeek.start, $lte: thisWeek.end },
+        })
+      : Promise.resolve(0),
+    postponedLeadIds.length
+      ? Booking.countDocuments({
+          ...base,
+          lead: { $in: postponedLeadIds },
+          updatedAt: { $gte: lastWeek.start, $lte: lastWeek.end },
+        })
+      : Promise.resolve(0),
+    Booking.countDocuments({ ...base, status: 'cancelled', updatedAt: { $gte: thisWeek.start, $lte: thisWeek.end } }),
+    Booking.countDocuments({ ...base, status: 'cancelled', updatedAt: { $gte: lastWeek.start, $lte: lastWeek.end } }),
     Booking.countDocuments({ ...base, status: 'completed', updatedAt: { $gte: thisWeek.start, $lte: thisWeek.end } }),
     Booking.countDocuments({ ...base, status: 'completed', updatedAt: { $gte: lastWeek.start, $lte: lastWeek.end } }),
-    buildOpsSparklines(base, pendingHotel, pendingCab, pendingActivity, pendingVoucher),
+    buildOpsSparklines(base, postponedLeadIds),
   ]);
 
   const branchMap = Object.fromEntries(branchDocs.map((b) => [String(b._id), b.name]));
@@ -315,23 +337,26 @@ async function buildDashboard(branchId) {
   const guestsOnTrip = guestsOnTripAgg[0] || { guests: 0, bookings: 0 };
 
   const kpiTrends = {
-    todaysArrivals: pctChangeLabel(todaysArrivals, 0),
-    todaysDepartures: pctChangeLabel(todaysDepartures, 0),
+    totalBookings: pctChangeLabel(trendTotalThis, trendTotalLast),
     upcomingTours: pctChangeLabel(trendUpcomingThis, trendUpcomingLast),
-    pendingBookings: pctChangeLabel(trendPendingThis, trendPendingLast),
-    hotelPending: pctChangeLabel(trendHotelThis, trendHotelLast),
-    cabPending: pctChangeLabel(trendCabThis, trendCabLast),
-    activityPending: pctChangeLabel(trendActivityThis, trendActivityLast),
-    voucherPending: pctChangeLabel(trendVoucherThis, trendVoucherLast),
     activeTrips: pctChangeLabel(trendActiveThis, trendActiveLast),
+    todaysDepartures: pctChangeLabel(trendDeparturesThis, trendDeparturesLast),
+    postponedBookings: pctChangeLabel(trendPostponedThis, trendPostponedLast),
+    cancelledBookings: pctChangeLabel(trendCancelledThis, trendCancelledLast),
     completedTrips: pctChangeLabel(trendCompletedThis, trendCompletedLast),
   };
 
   return {
     kpis: {
-      todaysArrivals,
-      todaysDepartures,
+      totalBookings,
       upcomingTours,
+      activeTrips,
+      todaysDepartures,
+      postponedBookings,
+      cancelledBookings,
+      completedTrips,
+      // Keep legacy keys for other panels that still read them
+      todaysArrivals,
       pendingBookings,
       hotelPending,
       cabPending,
@@ -339,11 +364,8 @@ async function buildDashboard(branchId) {
       voucherPending,
       hotelConfirmations: hotelPending,
       cabConfirmations: cabPending,
-      activeTrips,
-      completedTrips,
       totalActiveTrips: activeTrips,
       openTickets,
-      totalBookings,
       pendingConfirmations: hotelPending + cabPending,
       pendingTasks,
       tripsStartingTomorrow,
