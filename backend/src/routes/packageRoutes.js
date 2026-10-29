@@ -26,6 +26,7 @@ const {
 } = require('../controllers/packageController');
 const { protect } = require('../middleware/auth');
 const { authorize } = require('../middleware/rbac');
+const { requirePermission } = require('../middleware/requirePermission');
 
 router.use(protect);
 
@@ -39,6 +40,10 @@ router.post(
 router.post('/clone-from-catalog/:id', cloneFromUnoPackage);
 router.post('/duplicate/:id', duplicatePackage);
 router.route('/').get(listPackages).post(createPackage);
-router.route('/:id').get(getPackage).put(updatePackage).delete(deletePackage);
+router
+  .route('/:id')
+  .get(getPackage)
+  .put(updatePackage)
+  .delete(requirePermission('packages', 'delete'), deletePackage);
 
 module.exports = router;

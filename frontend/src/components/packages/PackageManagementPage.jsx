@@ -7,6 +7,8 @@ import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useDataRefresh } from '../../hooks/useDataRefresh';
 import { useAuth } from '../../context/AuthContext';
 import { canAccess } from '../../lib/permissions';
+import { useConfirmDialog } from '../../hooks/useConfirmDialog';
+import { toast } from '../../context/ToastContext';
 import TablePagination, { PACKAGES_PAGE_SIZE } from '../ui/TablePagination';
 import PackageListTable from './PackageListTable';
 import PackageDetailModal from './PackageDetailModal';
@@ -22,6 +24,8 @@ const TOUR_TYPES = [
 export default function PackageManagementPage() {
   const { user } = useAuth();
   const canCreate = canAccess(user, 'packages', 'create');
+  const canDelete = canAccess(user, 'packages', 'delete');
+  const { confirm, dialogNode } = useConfirmDialog();
   const [packages, setPackages] = useState([]);
   const [customCopies, setCustomCopies] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,6 +40,7 @@ export default function PackageManagementPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editPackage, setEditPackage] = useState(null);
   const [cloningId, setCloningId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   const debouncedSearch = useDebouncedValue(search, 350);
 
@@ -43,15 +48,17 @@ export default function PackageManagementPage() {
     try {
       const res = await API.get('/packages', { skipErrorToast: true });
       const rows = Array.isArray(res.data) ? res.data : [];
-      setCustomCopies(
-        rows.filter((p) =>
-          ['custom', 'clone', 'local'].includes(String(p.sourceType || ''))
-        )
-      );
+      // Admin / delete-capable users see all non-catalog packages so they can clean up.
+      const filtered = canDelete
+        ? rows
+        : rows.filter((p) =>
+            ['custom', 'clone', 'local', 'uno_clone'].includes(String(p.sourceType || ''))
+          );
+      setCustomCopies(filtered);
     } catch {
       setCustomCopies([]);
     }
-  }, []);
+  }, [canDelete]);
 
   const fetchPackages = useCallback(async () => {
     setLoading(true);
@@ -173,8 +180,38 @@ export default function PackageManagementPage() {
     fetchCustomCopies();
   };
 
+  const handleDelete = async (pkg) => {
+    const id = pkg?._id || pkg?.id;
+    if (!id || !canDelete) return;
+    const ok = await confirm({
+      title: 'Delete package?',
+      message: `"${pkg.name || 'This package'}" permanently delete ho jayega. Yeh undo nahi hoga.`,
+      confirmLabel: 'Delete package',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setDeletingId(id);
+    try {
+      await API.delete(`/packages/${id}`);
+      toast.success('Package deleted');
+      if (editPackage?._id === id) {
+        setModalOpen(false);
+        setEditPackage(null);
+      }
+      if ((selectedPkg?._id || selectedPkg?.id) === id || (detail?._id || detail?.id) === id) {
+        closeDetail();
+      }
+      await fetchCustomCopies();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Could not delete package');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pb-8">
+      {dialogNode}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
         <div>
           <div className="flex items-center gap-3 mb-1">
@@ -267,9 +304,13 @@ export default function PackageManagementPage() {
 
       {customCopies.length > 0 && (
         <div className="mt-8">
-          <h2 className="text-lg font-bold text-content-primary mb-1">Your packages</h2>
+          <h2 className="text-lg font-bold text-content-primary mb-1">
+            {canDelete ? 'Managed packages' : 'Your packages'}
+          </h2>
           <p className="text-sm text-content-muted mb-4">
-            Packages you created or cloned — safe to edit without changing the main catalog
+            {canDelete
+              ? 'Created / cloned packages — admin can delete unused ones from here'
+              : 'Packages you created or cloned — safe to edit without changing the main catalog'}
           </p>
           <PackageListTable
             packages={customCopies.map((p) => ({
@@ -283,7 +324,9 @@ export default function PackageManagementPage() {
               setDetailLoading(false);
             }}
             onEdit={handleEditCopy}
+            onDelete={canDelete ? handleDelete : undefined}
             editingId={cloningId}
+            deletingId={deletingId}
           />
         </div>
       )}

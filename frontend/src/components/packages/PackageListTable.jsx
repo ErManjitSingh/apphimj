@@ -5,7 +5,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 import { motion } from 'framer-motion';
-import { MapPin, Clock, Eye, Pencil, Loader2 } from 'lucide-react';
+import { MapPin, Clock, Eye, Pencil, Loader2, Trash2 } from 'lucide-react';
 import { formatINR } from '../quotations/quotationUtils';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
@@ -30,7 +30,14 @@ function TypeBadge({ type }) {
   );
 }
 
-export default function PackageListTable({ packages, onView, onEdit, editingId }) {
+export default function PackageListTable({
+  packages,
+  onView,
+  onEdit,
+  onDelete,
+  editingId,
+  deletingId,
+}) {
   const columns = useMemo(
     () => [
       {
@@ -98,6 +105,7 @@ export default function PackageListTable({ packages, onView, onEdit, editingId }
           const pkg = row.original;
           const id = pkg._id || pkg.id;
           const isEditing = editingId === id;
+          const isDeleting = deletingId === id;
           return (
             <div className="flex items-center justify-end gap-1">
               <Button
@@ -120,12 +128,30 @@ export default function PackageListTable({ packages, onView, onEdit, editingId }
                 {isEditing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />}
                 <span className="ml-1 hidden sm:inline">Edit copy</span>
               </Button>
+              {onDelete && id ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 rounded-lg text-content-secondary hover:text-red-600 hover:bg-red-500/10"
+                  disabled={isDeleting || isEditing}
+                  onClick={() => onDelete(pkg)}
+                  title="Delete package"
+                >
+                  {isDeleting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                  <span className="ml-1 hidden sm:inline">Delete</span>
+                </Button>
+              ) : null}
             </div>
           );
         },
       },
     ],
-    [onView, onEdit, editingId]
+    [onView, onEdit, onDelete, editingId, deletingId]
   );
 
   const table = useReactTable({
