@@ -127,6 +127,10 @@ const leadSchema = new mongoose.Schema(
     convertedAt: { type: Date, index: true },
     /** Alias stamp for booked date (mirrors convertedAt when booked) */
     bookingDate: { type: Date, index: true },
+    /** SE-selected final quotation — pinned to Operations booking on convert */
+    finalQuotation: { type: mongoose.Schema.Types.ObjectId, ref: 'Quotation', index: true },
+    finalQuotationSetAt: { type: Date },
+    finalQuotationSetBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     /** Latest call outcome — independent of pipeline status */
     callOutcome: {
       type: String,

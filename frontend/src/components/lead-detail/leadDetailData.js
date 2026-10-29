@@ -8,6 +8,7 @@ import {
   FileText,
   RefreshCw,
   Trophy,
+  BadgeCheck,
 } from 'lucide-react';
 import { getLeadStatusLabel } from '../../lib/leadStatusLabel';
 
@@ -52,6 +53,7 @@ export const ACTIVITY_CONFIG = {
   quotation_submitted: { label: 'Quotation Submitted', icon: FileText, color: 'bg-violet-500/10 text-violet-600' },
   quotation_approved: { label: 'Quotation Approved', icon: FileText, color: 'bg-emerald-500/10 text-emerald-700' },
   quotation_rejected: { label: 'Quotation Rejected', icon: FileText, color: 'bg-rose-500/10 text-rose-600' },
+  quotation_final: { label: 'Final Quotation', icon: BadgeCheck, color: 'bg-teal-500/10 text-teal-700' },
   note_added: { label: 'Note Added', icon: FileText, color: 'bg-slate-500/10 text-slate-700' },
   call_note_added: { label: 'Call Note Added', icon: Phone, color: 'bg-emerald-500/10 text-emerald-600' },
   payment_recorded: { label: 'Payment Recorded', icon: Trophy, color: 'bg-emerald-500/10 text-emerald-700' },

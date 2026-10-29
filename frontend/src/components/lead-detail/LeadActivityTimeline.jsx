@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Eye, Pencil, Send } from 'lucide-react';
+import { BadgeCheck, Eye, Loader2, Send } from 'lucide-react';
 import { ACTIVITY_CONFIG, findQuotationForActivity } from './leadDetailData';
 import QuotationPdfOverlay from '../quotations/QuotationPdfOverlay';
 import SendQuotationModal from './SendQuotationModal';
@@ -9,6 +8,8 @@ import EmailSentViewModal from './EmailSentViewModal';
 import { Button } from '../ui/button';
 import { DETAIL_CARD } from './leadDetailUtils';
 import { cn } from '../../lib/utils';
+import API from '../../api/axios';
+import { toast } from '../../context/ToastContext';
 
 function formatActivityDate(iso) {
   const d = new Date(iso);
@@ -18,19 +19,13 @@ function formatActivityDate(iso) {
   };
 }
 
-function resolveQuoteEditHref(quoteId, contactEndpoint = '') {
-  if (!quoteId) return null;
+function resolveFinalQuotationEndpoint(contactEndpoint = '', leadId) {
+  if (!leadId) return null;
   const base = String(contactEndpoint || '');
   if (base.includes('sales-executive')) {
-    return `/sales-executive/quotations/${quoteId}/edit`;
+    return `/sales-executive/leads/${leadId}/final-quotation`;
   }
-  if (base.includes('sales-manager')) {
-    return `/sales-manager/quotations/new?edit=${quoteId}`;
-  }
-  if (base.includes('team-leader')) {
-    return `/team-leader/quotations/new?edit=${quoteId}`;
-  }
-  return `/quotations/new?edit=${quoteId}`;
+  return `/leads/${leadId}/final-quotation`;
 }
 
 function parseChangesFromNotes(notes) {
@@ -114,12 +109,45 @@ export default function LeadActivityTimeline({
   leadId = null,
   contactEndpoint = '/leads',
   onQuotationSent,
+  onFinalQuotationSet,
 }) {
   const [pdfQuote, setPdfQuote] = useState(null);
   const [sendQuote, setSendQuote] = useState(null);
   const [viewEmail, setViewEmail] = useState(null);
+  const [savingFinalId, setSavingFinalId] = useState(null);
+  const [localFinalId, setLocalFinalId] = useState(null);
   const pdfRef = useRef(null);
   const highlightRef = useRef(null);
+
+  const finalQuotationId = String(
+    localFinalId || lead?.finalQuotation?._id || lead?.finalQuotation || ''
+  );
+
+  useEffect(() => {
+    setLocalFinalId(null);
+  }, [lead?.finalQuotation, lead?._id]);
+
+  const markFinalQuotation = async (quoteId) => {
+    if (!quoteId || !leadId) return;
+    const endpoint = resolveFinalQuotationEndpoint(contactEndpoint, leadId);
+    if (!endpoint) return;
+    setSavingFinalId(String(quoteId));
+    try {
+      const { data } = await API.post(endpoint, { quotationId: quoteId });
+      setLocalFinalId(String(quoteId));
+      toast.success(
+        data?.syncedToOps
+          ? 'Final quotation set · package synced to Operations'
+          : 'Final quotation set — yeh package convert pe Operations me jayega'
+      );
+      onFinalQuotationSet?.(quoteId, data);
+      onQuotationSent?.();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Could not set final quotation');
+    } finally {
+      setSavingFinalId(null);
+    }
+  };
   const sorted = useMemo(() => {
     if (!Array.isArray(activities) || activities.length === 0) return [];
     // Upstream merge is newest-first; only re-sort if needed
@@ -174,10 +202,9 @@ export default function LeadActivityTimeline({
                   const emailLogId = item.meta?.emailLogId || null;
                   const quote = isQuote ? findQuotationForActivity(item, quotations) : null;
                   const quoteId = quote?._id || item.meta?.quotationId || null;
-                  const quoteStatus = String(quote?.status || item.meta?.status || 'draft');
-                  const canEditDraft = ['draft', 'pending_approval', 'rejected'].includes(quoteStatus);
-                  const editHref =
-                    isQuote && canEditDraft ? resolveQuoteEditHref(quoteId, contactEndpoint) : null;
+                  const isFinalQuote =
+                    quoteId && finalQuotationId && String(quoteId) === String(finalQuotationId);
+                  const canMarkFinal = Boolean(isQuote && quoteId && leadId);
                   const canView = Boolean(quote?._id && (quote.pricing || quote.packageSnapshot));
                   const canViewEmail = Boolean(emailLogId);
                   const canSend =
@@ -186,9 +213,10 @@ export default function LeadActivityTimeline({
                     leadId &&
                     !['draft', 'pending_approval', 'rejected'].includes(quote?.status);
                   const isHighlight =
-                    highlightQuotationId &&
-                    (String(item.meta?.quotationId) === String(highlightQuotationId) ||
-                      String(quote?._id) === String(highlightQuotationId));
+                    (highlightQuotationId &&
+                      (String(item.meta?.quotationId) === String(highlightQuotationId) ||
+                        String(quote?._id) === String(highlightQuotationId))) ||
+                    isFinalQuote;
 
                   return (
                     <motion.div
@@ -214,15 +242,28 @@ export default function LeadActivityTimeline({
                               {' · '}{date} at {time}
                             </p>
                           </div>
-                          {isQuote && (editHref || canView || canSend) && (
+                          {isQuote && (canMarkFinal || canView || canSend) && (
                             <div className="flex flex-wrap items-center gap-1.5">
-                              {editHref && (
-                                <Link
-                                  to={editHref}
-                                  className="inline-flex h-7 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 text-[11px] font-semibold text-violet-700 hover:bg-violet-100"
+                              {canMarkFinal && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  disabled={savingFinalId === String(quoteId) || isFinalQuote}
+                                  onClick={() => markFinalQuotation(quoteId)}
+                                  className={cn(
+                                    'rounded-lg h-7 gap-1 text-[11px]',
+                                    isFinalQuote
+                                      ? 'bg-teal-600 text-white hover:bg-teal-600 border-0'
+                                      : 'bg-teal-50 text-teal-800 hover:bg-teal-100 border border-teal-200'
+                                  )}
                                 >
-                                  <Pencil className="w-3 h-3" /> Edit draft
-                                </Link>
+                                  {savingFinalId === String(quoteId) ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <BadgeCheck className="w-3 h-3" />
+                                  )}
+                                  {isFinalQuote ? 'Final quotation' : 'Set final quotation'}
+                                </Button>
                               )}
                               {canView && (
                                 <Button

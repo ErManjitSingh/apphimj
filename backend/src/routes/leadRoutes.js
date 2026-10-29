@@ -19,6 +19,7 @@ const {
   getAssignees,
   assignLeads,
   transferLeadBranch,
+  setFinalQuotation,
   addLeadNote,
   reactivateLead,
   reassignReactivatedLead,
@@ -95,6 +96,7 @@ router.patch('/:id/transfer-branch', authorize('admin'), transferLeadBranch);
 router.post('/:id/reactivate', authorize('admin', 'sales_manager', 'team_leader'), reactivateLead);
 router.post('/:id/reassign-reactivated', authorize('admin', 'sales_manager', 'team_leader'), reassignReactivatedLead);
 router.patch('/:id/reactivation-stage', authorize('admin', 'sales_manager', 'team_leader'), updateReactivationStage);
+router.post('/:id/final-quotation', requirePermission('leads', 'edit'), setFinalQuotation);
 router.post('/:id/notes', addLeadNote);
 router.post('/:id/whatsapp-contact', requirePermission('whatsapp', 'use'), initiateWhatsAppContact);
 router.post('/:id/send-quotation-whatsapp', requirePermission('whatsapp', 'use'), sendQuotationWhatsApp);

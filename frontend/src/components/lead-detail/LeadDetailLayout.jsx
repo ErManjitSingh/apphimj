@@ -339,6 +339,7 @@ export default function LeadDetailLayout({
             leadId={leadId}
             contactEndpoint={contactEndpoint || relatedBasePath || '/leads'}
             onQuotationSent={onContactLogged}
+            onFinalQuotationSet={onContactLogged}
           />
         ) : null}
 

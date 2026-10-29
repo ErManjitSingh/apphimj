@@ -7,6 +7,7 @@ const {
   getLeadDetail,
   authorizeLeadCallAccess,
   getLeadQuotationsList,
+  setFinalQuotation,
   getLeadNotesList,
   getLeadPaymentReceiptDoc,
   sendLeadPaymentReceipt,
@@ -61,6 +62,7 @@ router.put('/quotations/:id', updateQuotation);
 router.get('/leads', listLeads);
 router.post('/leads/:id/call-access', authorizeLeadCallAccess);
 router.get('/leads/:id/quotations', getLeadQuotationsList);
+router.post('/leads/:id/final-quotation', setFinalQuotation);
 router.get('/leads/:id/notes-list', getLeadNotesList);
 router.get('/leads/:id/payment-receipt', getLeadPaymentReceiptDoc);
 router.post('/leads/:id/payment-receipt/send', sendLeadPaymentReceipt);

@@ -151,7 +151,13 @@ export default function AddFollowUpModal({
       setQuotations(rows);
       setForm((prev) => {
         if (prev.quotationId) return prev;
-        const nextId = preferDefaultQuoteId(rows);
+        const pinned =
+          lead?.finalQuotation?._id || lead?.finalQuotation
+            ? String(lead.finalQuotation._id || lead.finalQuotation)
+            : '';
+        const nextId =
+          (pinned && rows.some((q) => String(q._id) === pinned) && pinned) ||
+          preferDefaultQuoteId(rows);
         if (!nextId) return prev;
         const selected = rows.find((q) => String(q._id) === String(nextId));
         const amount = Number(selected?.pricing?.total || selected?.costing?.grandTotal || 0);
@@ -171,7 +177,7 @@ export default function AddFollowUpModal({
     return () => {
       cancelled = true;
     };
-  }, [open, isBooked, leadIdForQuotes]);
+  }, [open, isBooked, leadIdForQuotes, lead?.finalQuotation]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

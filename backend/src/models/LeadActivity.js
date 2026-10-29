@@ -20,6 +20,7 @@ const LEAD_ACTIVITY_TYPES = [
   'quotation_sent',
   'quotation_approved',
   'quotation_rejected',
+  'quotation_final',
   'status_changed',
   'lead_edited',
   'lead_lost',

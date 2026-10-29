@@ -23,12 +23,65 @@ async function pickQuotationForLead(leadId, preferredId = null) {
     const preferred = await Quotation.findOne({ _id: preferredId, lead: leadId });
     if (preferred) return preferred;
   }
+  const lead = await Lead.findById(leadId).select('finalQuotation').lean();
+  if (lead?.finalQuotation) {
+    const pinned = await Quotation.findOne({ _id: lead.finalQuotation, lead: leadId });
+    if (pinned) return pinned;
+  }
   const approved = await Quotation.findOne({ lead: leadId, status: 'approved' }).sort({ updatedAt: -1 });
   if (approved) return approved;
   return Quotation.findOne({
     lead: leadId,
     status: { $in: ['approved', 'sent', 'viewed', 'negotiation', 'pending_approval'] },
   }).sort({ updatedAt: -1 });
+}
+
+/**
+ * Mark the quotation that should go to Operations when this lead converts.
+ */
+async function setLeadFinalQuotation(lead, quotationId, actor) {
+  if (!lead?._id) throw new Error('Lead required');
+  if (!quotationId) throw new Error('quotationId required');
+
+  const quotation = await Quotation.findOne({ _id: quotationId, lead: lead._id });
+  if (!quotation) {
+    const err = new Error('Quotation not found for this lead');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const updatedLead = await Lead.findByIdAndUpdate(
+    lead._id,
+    {
+      finalQuotation: quotation._id,
+      finalQuotationSetAt: new Date(),
+      finalQuotationSetBy: actor?._id || null,
+    },
+    { new: true }
+  );
+
+  const { logLeadActivity } = require('./leadActivityService');
+  await logLeadActivity({
+    leadId: lead._id,
+    branchId: lead.branchId,
+    type: 'quotation_final',
+    description: `Final quotation set for Operations · ${quotation.quoteNumber || quotation._id}`,
+    actor,
+    meta: {
+      quotationId: quotation._id,
+      quoteNumber: quotation.quoteNumber,
+      packageName: quotation.packageSnapshot?.name || quotation.title || '',
+      amount: quotation.pricing?.total || quotation.costing?.grandTotal || null,
+    },
+  }).catch(() => {});
+
+  // If already booked, push package to ops booking immediately
+  const booking = await Booking.findOne({ lead: lead._id }).sort({ createdAt: -1 });
+  if (booking) {
+    await pinQuotationToOpsBooking(booking, quotation, actor);
+  }
+
+  return { lead: updatedLead, quotation, booking: booking || null };
 }
 
 /**
@@ -162,7 +215,8 @@ async function notifyOperationsTeam(lead, booking) {
  */
 async function onLeadConverted(lead, actor, options = {}) {
   const existingBooking = await Booking.findOne({ lead: lead._id });
-  const preferredQuoteId = options.quotationId || options.quoteId || null;
+  const preferredQuoteId =
+    options.quotationId || options.quoteId || lead.finalQuotation || null;
   let quotation = await pickQuotationForLead(lead._id, preferredQuoteId);
   quotation = await ensureQuotationApproved(quotation, actor);
 
@@ -291,4 +345,5 @@ module.exports = {
   TERMINAL_STATUSES,
   pickQuotationForLead,
   pinQuotationToOpsBooking,
+  setLeadFinalQuotation,
 };

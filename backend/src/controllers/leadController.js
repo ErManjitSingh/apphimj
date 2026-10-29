@@ -1170,6 +1170,25 @@ const transferLeadBranch = asyncHandler(async (req, res) => {
   res.json(enrichLead(populated));
 });
 
+const setFinalQuotation = asyncHandler(async (req, res) => {
+  const lead = await findAccessibleLeadDoc(req, req.params.id);
+  if (!lead) throw new ApiError(404, 'Lead not found');
+  const quotationId = req.body?.quotationId || req.body?.quoteId;
+  if (!quotationId) throw new ApiError(400, 'quotationId is required');
+  const { setLeadFinalQuotation } = require('../services/leadConversionService');
+  try {
+    const result = await setLeadFinalQuotation(lead, quotationId, req.user);
+    res.json({
+      message: 'Final quotation set for Operations',
+      finalQuotation: result.quotation?._id,
+      quoteNumber: result.quotation?.quoteNumber,
+      syncedToOps: Boolean(result.booking),
+    });
+  } catch (err) {
+    throw new ApiError(err.statusCode || 400, err.message || 'Could not set final quotation');
+  }
+});
+
 const addLeadNote = asyncHandler(async (req, res) => {
   const { text } = req.body;
   if (!text?.trim()) throw new ApiError(400, 'Note text is required');
@@ -1231,6 +1250,7 @@ module.exports = {
   getAssignees,
   assignLeads,
   transferLeadBranch,
+  setFinalQuotation,
   addLeadNote,
   reactivateLead,
   reassignReactivatedLead,

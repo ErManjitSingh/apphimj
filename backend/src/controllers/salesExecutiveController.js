@@ -318,6 +318,30 @@ const getLeadQuotationsList = asyncHandler(async (req, res) => {
   res.json(result);
 });
 
+const setFinalQuotation = asyncHandler(async (req, res) => {
+  const lead = await Lead.findOne({
+    _id: req.params.id,
+    assignedTo: req.user._id,
+    ...(req.branchId ? { branchId: req.branchId } : {}),
+    isDeleted: { $ne: true },
+  });
+  if (!lead) throw new ApiError(404, 'Lead not found');
+  const quotationId = req.body?.quotationId || req.body?.quoteId;
+  if (!quotationId) throw new ApiError(400, 'quotationId is required');
+  const { setLeadFinalQuotation } = require('../services/leadConversionService');
+  try {
+    const result = await setLeadFinalQuotation(lead, quotationId, req.user);
+    res.json({
+      message: 'Final quotation set for Operations',
+      finalQuotation: result.quotation?._id,
+      quoteNumber: result.quotation?.quoteNumber,
+      syncedToOps: Boolean(result.booking),
+    });
+  } catch (err) {
+    throw new ApiError(err.statusCode || 400, err.message || 'Could not set final quotation');
+  }
+});
+
 const getLeadNotesList = asyncHandler(async (req, res) => {
   const lead = await loadLeadCore(req.params.id, {
     branchId: req.branchId,
@@ -1399,6 +1423,7 @@ module.exports = {
   getLeadDetail,
   authorizeLeadCallAccess,
   getLeadQuotationsList,
+  setFinalQuotation,
   getLeadNotesList,
   getLeadPaymentReceiptDoc,
   sendLeadPaymentReceipt,

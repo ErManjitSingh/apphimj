@@ -21,6 +21,7 @@ const ACTIVITY_TITLES = {
   quotation_sent: 'Quotation Sent',
   quotation_approved: 'Quotation Approved',
   quotation_rejected: 'Quotation Rejected',
+  quotation_final: 'Final Quotation for Operations',
   status_changed: 'Status Changed',
   lead_edited: 'Lead Edited',
   lead_lost: 'Lead Lost',
