@@ -147,6 +147,7 @@ export default function OperationsItineraryBuilder({
   destination,
 }) {
   const [picker, setPicker] = useState(null);
+  const [hotelSeason, setHotelSeason] = useState('onSeason');
   const hotelOptions = useMemo(() => {
     const merged = [...quotationHotels, ...catalogHotels].map(hotelOption).filter((hotel) => hotel.name);
     const seen = new Set();
@@ -199,6 +200,7 @@ export default function OperationsItineraryBuilder({
     if (!picker?.day) return;
     const roomType = textValue(option.room) || option.tierName || '';
     const mealPlan = textValue(option.mealPlan) || option.meals || '';
+    const hotelId = String(option.hotelId || option.id || '');
     emitChange(timelineDays.map((day) => {
       if (day.id !== picker.day.id) return day;
       return {
@@ -206,13 +208,16 @@ export default function OperationsItineraryBuilder({
         accommodation: [option.name, roomType, mealPlan].filter(Boolean).join(' · '),
         meals: mealPlan || day.meals,
         dayHotel: {
-          hotelId: option.hotelId || option.id,
+          hotelId,
           hotelName: option.name,
           destination: option.city || option.location || destination || '',
           location: option.location || '',
           roomType,
           mealPlan,
           source: 'catalog',
+          email: option.email || '',
+          phone: option.phone || '',
+          contactPerson: option.contactPerson || '',
         },
         hotelMeta: {
           name: option.name,
@@ -292,6 +297,7 @@ export default function OperationsItineraryBuilder({
         onOpenHotelPicker={(day) => setPicker({ type: 'hotel', day })}
         onChangeCab={() => setPicker({ type: 'cab' })}
         destination={destination || 'Destination'}
+        hotelSeason={hotelSeason}
         embedded
       />
 
@@ -306,6 +312,8 @@ export default function OperationsItineraryBuilder({
         onSelect={selectHotel}
         nights={1}
         destination={destination}
+        hotelSeason={hotelSeason}
+        onHotelSeasonChange={setHotelSeason}
       />
 
       <PackageResourcePickerDrawer

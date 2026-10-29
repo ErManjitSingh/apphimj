@@ -258,20 +258,47 @@ function applyBookingState(data, setters) {
   setTransport(data.transport?.length ? data.transport : []);
 }
 
-function hotelsFromItinerary(days = [], currentHotels = []) {
+function isMongoId(value) {
+  return /^[a-f\d]{24}$/i.test(String(value || ''));
+}
+
+function hotelStayKey(list = []) {
+  return list
+    .map((h) => `${String(h.hotelName || '').toLowerCase()}:${h.day || 0}:${h.nights || 1}:${h.hotelId || h.externalHotelId || ''}`)
+    .join('|');
+}
+
+function resolveItineraryHotelName(day = {}) {
+  if (day.dayHotel?.hotelName) return String(day.dayHotel.hotelName).trim();
+  const raw = String(day.accommodation || '').trim();
+  if (!raw) return '';
+  return raw.split('·')[0].trim();
+}
+
+function findCatalogHotel(catalogHotels = [], hotelId, hotelName) {
+  const byId = catalogHotels.find((h) => String(h._id || h.id || h.hotelId || '') === String(hotelId || ''));
+  if (byId) return byId;
+  const name = String(hotelName || '').trim().toLowerCase();
+  if (!name) return null;
+  return catalogHotels.find((h) => String(h.name || h.hotelName || '').trim().toLowerCase() === name) || null;
+}
+
+/** Build Hotel Master rows from itinerary — match ops costs by day slot, hotel identity from dayHotel. */
+function hotelsFromItinerary(days = [], currentHotels = [], catalogHotels = []) {
   const used = new Set();
   const stays = [];
   [...days]
     .sort((a, b) => Number(a.day) - Number(b.day))
     .forEach((day) => {
       const selected = day.dayHotel;
-      const hotelName = selected?.hotelName || day.accommodation || '';
+      const hotelName = resolveItineraryHotelName(day);
       if (!hotelName) return;
       const dayNumber = Number(day.day) || stays.length + 1;
       const previous = stays[stays.length - 1];
       const sameAsPrevious =
         previous &&
         String(previous.hotelName).toLowerCase() === String(hotelName).toLowerCase() &&
+        String(previous.hotelId || previous.externalHotelId || '') === String(selected?.hotelId || previous.hotelId || previous.externalHotelId || '') &&
         Number(previous.day) + Number(previous.nights || 1) === dayNumber;
       if (sameAsPrevious) {
         previous.nights += 1;
@@ -280,24 +307,49 @@ function hotelsFromItinerary(days = [], currentHotels = []) {
           checkout.setDate(checkout.getDate() + previous.nights);
           previous.checkOut = checkout.toISOString();
         }
+        if (selected?.roomType) previous.roomType = selected.roomType;
+        if (selected?.mealPlan) previous.mealPlan = selected.mealPlan;
         return;
       }
 
+      // Prefer same day-slot stay so changing hotel keeps ops cost/advance on that night.
       const existing = currentHotels.find((hotel) => {
+        if (hotel._id && used.has(String(hotel._id))) return false;
+        const start = Number(hotel.day) || 0;
+        if (!start) return false;
+        const end = start + (Number(hotel.nights) || 1) - 1;
+        return dayNumber >= start && dayNumber <= end;
+      }) || currentHotels.find((hotel) => {
         if (hotel._id && used.has(String(hotel._id))) return false;
         return String(hotel.hotelName || '').toLowerCase() === String(hotelName).toLowerCase();
       });
       if (existing?._id) used.add(String(existing._id));
+
+      const hotelChanged = existing
+        && String(existing.hotelName || '').toLowerCase() !== String(hotelName).toLowerCase();
+      const catalog = findCatalogHotel(catalogHotels, selected?.hotelId, hotelName);
+      const rawId = selected?.hotelId || (hotelChanged ? '' : existing?.hotelId) || catalog?._id || '';
       const checkIn = day.date || existing?.checkIn;
       const checkout = checkIn ? new Date(checkIn) : null;
       if (checkout) checkout.setDate(checkout.getDate() + 1);
+
       stays.push({
         ...(existing || {}),
-        hotelId: selected?.hotelId || existing?.hotelId,
+        hotelId: isMongoId(rawId) ? rawId : undefined,
+        externalHotelId: !isMongoId(rawId) && rawId ? String(rawId) : (hotelChanged ? '' : existing?.externalHotelId || ''),
         hotelName,
-        destination: selected?.destination || selected?.location || existing?.destination || '',
-        roomType: selected?.roomType || existing?.roomType || '',
-        mealPlan: selected?.mealPlan || existing?.mealPlan || '',
+        destination: selected?.destination || selected?.location || catalog?.location || catalog?.city || existing?.destination || '',
+        roomType: selected?.roomType || (hotelChanged ? '' : existing?.roomType) || '',
+        mealPlan: selected?.mealPlan || (hotelChanged ? '' : existing?.mealPlan) || '',
+        email: hotelChanged
+          ? (catalog?.email || catalog?.contact?.email || '')
+          : (existing?.email || catalog?.email || ''),
+        phone: hotelChanged
+          ? (catalog?.phone || catalog?.contact?.phone || '')
+          : (existing?.phone || catalog?.phone || ''),
+        contactPerson: hotelChanged
+          ? (catalog?.contactPerson || catalog?.contact?.name || '')
+          : (existing?.contactPerson || catalog?.contactPerson || ''),
         day: dayNumber,
         nights: 1,
         rooms: existing?.rooms || 1,
@@ -366,6 +418,16 @@ export default function BookingDetailPage() {
     }).catch(() => {});
   }, []);
 
+  // Keep Hotel Master in sync when ops changes day hotels in the itinerary.
+  useEffect(() => {
+    if (!itinerary?.length) return;
+    setHotels((prev) => {
+      const next = hotelsFromItinerary(itinerary, prev, catalogHotels);
+      if (hotelStayKey(next) === hotelStayKey(prev)) return prev;
+      return next;
+    });
+  }, [itinerary, catalogHotels]);
+
   const syncFromQuotation = async () => {
     setSyncingQuote(true);
     try {
@@ -378,11 +440,14 @@ export default function BookingDetailPage() {
 
   const saveItinerary = async () => {
     setSavingItinerary(true);
-    const itineraryHotels = hotelsFromItinerary(itinerary, hotels);
-    await API.put(`/operations-manager/bookings/${id}`, { itinerary, hotels: itineraryHotels });
-    setHotels(itineraryHotels);
-    fetchBooking();
-    setSavingItinerary(false);
+    try {
+      const itineraryHotels = hotelsFromItinerary(itinerary, hotels, catalogHotels);
+      setHotels(itineraryHotels);
+      await API.put(`/operations-manager/bookings/${id}`, { itinerary, hotels: itineraryHotels });
+      await fetchBooking({ silent: true });
+    } finally {
+      setSavingItinerary(false);
+    }
   };
 
   const saveTransport = async () => {

@@ -798,7 +798,22 @@ export default function PackageResourcePickerDrawer({
   /** Ops / booking: keep full cab list and still allow catalog search below. */
   alwaysShowCabCatalog = false,
 }) {
-  const seasonKey = hotelSeason === 'offSeason' ? 'offSeason' : 'onSeason';
+  // Local season so On/Off toggle works even when parent (ops) doesn't wire a setter.
+  const [localHotelSeason, setLocalHotelSeason] = useState(
+    hotelSeason === 'offSeason' ? 'offSeason' : 'onSeason'
+  );
+  useEffect(() => {
+    setLocalHotelSeason(hotelSeason === 'offSeason' ? 'offSeason' : 'onSeason');
+  }, [hotelSeason]);
+  const activeHotelSeason = onHotelSeasonChange
+    ? (hotelSeason === 'offSeason' ? 'offSeason' : 'onSeason')
+    : localHotelSeason;
+  const handleHotelSeasonChange = (next) => {
+    const value = next === 'offSeason' ? 'offSeason' : 'onSeason';
+    setLocalHotelSeason(value);
+    onHotelSeasonChange?.(value);
+  };
+  const seasonKey = activeHotelSeason === 'offSeason' ? 'offSeason' : 'onSeason';
   const [query, setQuery] = useState('');
   const [starFilter, setStarFilter] = useState(0); // 0 = all, 1-5 = star rating
   const [step, setStep] = useState(lockHotel || initialHotel ? 'room' : 'hotel');
@@ -1235,8 +1250,8 @@ export default function PackageResourcePickerDrawer({
             onClose={resetClose}
             title={title || 'Change Hotel'}
             lockHotel={hotelLocked}
-            hotelSeason={hotelSeason}
-            onHotelSeasonChange={onHotelSeasonChange}
+            hotelSeason={activeHotelSeason}
+            onHotelSeasonChange={handleHotelSeasonChange}
           />
 
           <div className="flex-1 min-h-0 overflow-y-auto bg-[#F7F6FB]">
@@ -1387,7 +1402,7 @@ export default function PackageResourcePickerDrawer({
                           onSelect={selectRoom}
                           basePrice={basePrice}
                           defaultMealPlanKey={packageMealKey}
-                          hotelSeason={hotelSeason}
+                          hotelSeason={activeHotelSeason}
                         />
                       ))}
                     </div>
@@ -1462,7 +1477,7 @@ export default function PackageResourcePickerDrawer({
                           selectMealPlan(priced || nextPlan);
                         }}
                         basePrice={mealCompareBase}
-                        hotelSeason={hotelSeason}
+                        hotelSeason={activeHotelSeason}
                       />
                     ))}
                   </div>

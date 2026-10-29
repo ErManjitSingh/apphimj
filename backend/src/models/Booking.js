@@ -148,7 +148,9 @@ const opsInternalNoteSchema = new mongoose.Schema(
 
 const itineraryDayHotelSchema = new mongoose.Schema(
   {
-    hotelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Hotel' },
+    // String (not ObjectId) — ops catalog / quotation hotels often use non-ObjectId ids.
+    // ObjectId casting was silently dropping hotel changes and keeping sales stay defaults.
+    hotelId: { type: String, trim: true, default: '' },
     hotelName: { type: String, trim: true, default: '' },
     destination: { type: String, trim: true, default: '' },
     location: { type: String, trim: true, default: '' },

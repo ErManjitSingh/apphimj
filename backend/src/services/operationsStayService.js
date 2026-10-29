@@ -82,12 +82,19 @@ function collapseHotelStays(rows = []) {
   return stays;
 }
 
+function resolveDayHotelName(day = {}) {
+  if (day.dayHotel?.hotelName) return String(day.dayHotel.hotelName).trim();
+  const raw = String(day.accommodation || '').trim();
+  if (!raw) return '';
+  return raw.split('·')[0].trim();
+}
+
 function deriveStaysFromItinerary(itinerary = [], travelDate) {
   const stays = [];
   [...itinerary]
     .sort((a, b) => Number(a.day) - Number(b.day))
     .forEach((day) => {
-      const hotelName = day.dayHotel?.hotelName || day.accommodation || '';
+      const hotelName = resolveDayHotelName(day);
       if (!hotelName) return;
       const dayNum = Number(day.day) || stays.length + 1;
       const previous = stays[stays.length - 1];
@@ -115,13 +122,15 @@ function deriveStaysFromItinerary(itinerary = [], travelDate) {
 }
 
 function staysOverlap(left, right) {
-  if (norm(left.hotelName) !== norm(right.hotelName)) return false;
+  // Prefer day-range overlap so ops hotel swaps keep costs but take the new hotel identity.
   const leftStart = dayNumber(left);
   const rightStart = dayNumber(right);
-  if (!leftStart || !rightStart) return true;
-  const leftEnd = leftStart + nightsOf(left) - 1;
-  const rightEnd = rightStart + nightsOf(right) - 1;
-  return leftStart <= rightEnd + 1 && rightStart <= leftEnd + 1;
+  if (leftStart && rightStart) {
+    const leftEnd = leftStart + nightsOf(left) - 1;
+    const rightEnd = rightStart + nightsOf(right) - 1;
+    return leftStart <= rightEnd && rightStart <= leftEnd;
+  }
+  return norm(left.hotelName) === norm(right.hotelName);
 }
 
 const HOTEL_OPS_FIELDS = [
@@ -137,6 +146,8 @@ function mergeHotelOps(derived = [], existing = []) {
     const index = pool.findIndex((row) => staysOverlap(stay, row));
     const previous = index >= 0 ? pool.splice(index, 1)[0] : null;
     if (!previous) return stay;
+    const hotelChanged = norm(stay.hotelName) !== norm(previous.hotelName)
+      || String(stay.hotelId || stay.externalHotelId || '') !== String(previous.hotelId || previous.externalHotelId || '');
     const merged = {
       ...stay,
       _id: previous._id,
@@ -144,6 +155,12 @@ function mergeHotelOps(derived = [], existing = []) {
     HOTEL_OPS_FIELDS.forEach((field) => {
       if (field === 'rooms') {
         merged.rooms = Math.max(Number(stay.rooms) || 1, Number(previous.rooms) || 1);
+        return;
+      }
+      // When hotel identity changes, don't keep old hotel email/phone/contact.
+      if (hotelChanged && ['email', 'phone', 'contactPerson', 'address', 'confirmationNumber'].includes(field)) {
+        if (stay[field] != null && stay[field] !== '') merged[field] = stay[field];
+        else merged[field] = stay[field] ?? '';
         return;
       }
       const incoming = stay[field];
