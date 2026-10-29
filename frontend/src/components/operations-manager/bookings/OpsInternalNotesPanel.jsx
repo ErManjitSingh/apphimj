@@ -159,7 +159,7 @@ export default function OpsInternalNotesPanel({
             </h4>
             {!compact ? (
               <p className={cn('mt-1 max-w-xl text-xs leading-relaxed', scope === 'cab' ? 'text-slate-400' : 'text-slate-600')}>
-                Save pe date & time lock ho jayegi — page refresh nahi hoga.
+                Date and time are locked on save — the page will not refresh.
               </p>
             ) : null}
           </div>

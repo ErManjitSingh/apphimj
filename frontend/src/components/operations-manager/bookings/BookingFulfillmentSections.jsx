@@ -879,7 +879,7 @@ export function BookingTransportEditor({
                   transportAssignmentId={t._id}
                   title={`Vehicle #${i + 1} · internal notes`}
                   notes={t.internalNotes || []}
-                  disabledReason={t._id ? '' : 'Pehle transport save karo, phir note add hoga'}
+                  disabledReason={t._id ? '' : 'Save transport first, then add a note'}
                   onNotesSynced={({ transportAssignmentId, notes: nextNotes }) => {
                     if (!transportAssignmentId) return;
                     onChange(

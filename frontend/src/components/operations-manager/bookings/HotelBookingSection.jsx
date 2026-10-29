@@ -204,21 +204,6 @@ export default function HotelBookingSection({
       )}
 
       <div className="relative">
-        {locked && (
-          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-4">
-            <div className="max-w-md rounded-2xl border border-amber-300/80 bg-white/95 px-5 py-4 text-center shadow-lg shadow-amber-900/10 backdrop-blur-sm">
-              <span className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-white shadow-md shadow-amber-500/30">
-                <NotebookPen className="h-5 w-5" />
-              </span>
-              <p className="text-sm font-black text-slate-900">
-                Add a hotel note explaining why you are changing the hotel
-              </p>
-              <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
-                {lockMessage || 'Hotel Master stays locked until you save the change reason note above.'}
-              </p>
-            </div>
-          </div>
-        )}
         <div
           className={cn(
             'space-y-4 transition duration-300',
@@ -426,7 +411,7 @@ export default function HotelBookingSection({
                 hotelAssignmentId={hotel._id}
                 title={`${hotel.hotelName || 'Hotel'} · internal notes`}
                 notes={hotel.internalNotes || []}
-                disabledReason={hotel._id ? '' : 'Pehle hotel save karo, phir note add hoga'}
+                disabledReason={hotel._id ? '' : 'Save the hotel stay first, then add a note'}
                 onNotesSynced={({ hotelAssignmentId, notes: nextNotes }) => {
                   if (!hotelAssignmentId) return;
                   onChange(
@@ -442,6 +427,24 @@ export default function HotelBookingSection({
           );
         })}
         </div>
+
+        {locked && (
+          <div className="pointer-events-none absolute inset-0 z-10">
+            <div className="sticky top-24 flex justify-center px-4 py-8 sm:top-28">
+              <div className="max-w-md rounded-2xl border border-amber-300/90 bg-white/95 px-5 py-4 text-center shadow-lg shadow-amber-900/15 backdrop-blur-sm">
+                <span className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-white shadow-md shadow-amber-500/30">
+                  <NotebookPen className="h-5 w-5" />
+                </span>
+                <p className="text-sm font-black text-slate-900">
+                  Add a hotel note explaining why you are changing the hotel
+                </p>
+                <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
+                  {lockMessage || 'Hotel Master stays locked until you save the change reason note above.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );

@@ -446,7 +446,7 @@ export default function BookingDetailPage() {
     if (!pendingHotelChange) return;
     const text = hotelChangeNote.trim();
     if (!text) {
-      toast.error('Pehle hotel change ka note likho');
+      toast.error('Please write a note explaining why you are changing the hotel');
       return;
     }
     setSavingHotelChangeNote(true);
@@ -497,7 +497,7 @@ export default function BookingDetailPage() {
 
   const saveItinerary = async () => {
     if (pendingHotelChange) {
-      toast.error('Pehle hotel change ka note save karo, phir itinerary save hogi');
+      toast.error('Save the hotel change note first, then save the itinerary');
       return;
     }
     setSavingItinerary(true);
@@ -709,14 +709,14 @@ export default function BookingDetailPage() {
                     Day {pendingHotelChange.dayNumber}: {pendingHotelChange.previousName} → {pendingHotelChange.nextName}
                   </h3>
                   <p className="mt-1 text-xs text-slate-600">
-                    Pehle reason note likho. Note save hone ke baad hi itinerary + Hotel Master update hoga aur master editable hoga.
+                    Add a note explaining why you are changing the hotel. The itinerary and Hotel Master will update only after you save this note.
                   </p>
                   <textarea
                     value={hotelChangeNote}
                     onChange={(e) => setHotelChangeNote(e.target.value)}
                     rows={3}
                     className="input-premium mt-3 w-full resize-y rounded-xl border-amber-200 text-sm"
-                    placeholder="Kyun hotel change kiya? (availability / upgrade / guest request…)"
+                    placeholder="Why are you changing the hotel? (availability / upgrade / guest request…)"
                     autoFocus
                   />
                   <div className="mt-3 flex flex-wrap gap-2">
