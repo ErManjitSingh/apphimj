@@ -343,14 +343,14 @@ function hotelsFromItinerary(days = [], currentHotels = [], catalogHotels = []) 
         roomType: selected?.roomType || (hotelChanged ? '' : existing?.roomType) || '',
         mealPlan: selected?.mealPlan || (hotelChanged ? '' : existing?.mealPlan) || '',
         email: hotelChanged
-          ? (catalog?.email || catalog?.contact?.email || '')
-          : (existing?.email || catalog?.email || ''),
+          ? (selected?.email || catalog?.email || catalog?.contact?.email || '')
+          : (existing?.email || selected?.email || catalog?.email || catalog?.contact?.email || ''),
         phone: hotelChanged
-          ? (catalog?.phone || catalog?.contact?.phone || '')
-          : (existing?.phone || catalog?.phone || ''),
+          ? (selected?.phone || catalog?.phone || catalog?.contact?.phone || '')
+          : (existing?.phone || selected?.phone || catalog?.phone || catalog?.contact?.phone || ''),
         contactPerson: hotelChanged
-          ? (catalog?.contactPerson || catalog?.contact?.name || '')
-          : (existing?.contactPerson || catalog?.contactPerson || ''),
+          ? (selected?.contactPerson || catalog?.contactPerson || catalog?.contact?.name || '')
+          : (existing?.contactPerson || selected?.contactPerson || catalog?.contactPerson || catalog?.contact?.name || ''),
         day: dayNumber,
         nights: 1,
         rooms: existing?.rooms || 1,
