@@ -384,32 +384,80 @@ function SectionShell({ gradient, icon: Icon, title, subtitle, children, actions
   );
 }
 
-export function QuotationSyncBanner({ meta, onSync, syncing, autoSynced }) {
-  if (!meta?.quoteNumber) return null;
+function quoteAmount(q) {
+  const n = Number(q?.pricing?.total ?? q?.costing?.grandTotal ?? 0);
+  return Number.isFinite(n) ? n : 0;
+}
+
+export function QuotationSyncBanner({
+  meta,
+  onSync,
+  syncing,
+  autoSynced,
+  quotations = [],
+  selectedQuoteId = '',
+  onSelectQuote,
+}) {
+  const hasQuotes = Array.isArray(quotations) && quotations.length > 0;
+  if (!meta?.quoteNumber && !hasQuotes) return null;
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="rounded-2xl border border-sky-500/20 bg-gradient-to-r from-sky-500/10 via-cyan-500/5 to-teal-500/10 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+      className="rounded-2xl border border-sky-500/20 bg-gradient-to-r from-sky-500/10 via-cyan-500/5 to-teal-500/10 p-4"
     >
-      <div className="flex items-center gap-3">
-        <div className="p-2 rounded-xl bg-sky-500/15">
-          <Sparkles className="w-4 h-4 text-sky-600" />
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-start gap-3 min-w-0">
+          <div className="p-2 rounded-xl bg-sky-500/15 shrink-0">
+            <Sparkles className="w-4 h-4 text-sky-600" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-content-primary">
+              {autoSynced ? 'Auto-loaded from executive quotation' : 'Final quotation for operations'}
+              {meta?.quoteNumber ? (
+                <span className="ml-2 font-mono text-sky-600">{meta.quoteNumber}</span>
+              ) : null}
+            </p>
+            <p className="text-xs text-content-muted mt-0.5">
+              Sales Executive ke final quotation se auto-load. Multiple quotes hon to yahan change karke refresh kar sakte ho.
+            </p>
+          </div>
         </div>
-        <div>
-          <p className="text-sm font-semibold text-content-primary">
-            {autoSynced ? 'Auto-loaded from executive quotation' : 'Linked quotation'}
-            <span className="ml-2 font-mono text-sky-600">{meta.quoteNumber}</span>
-          </p>
-          <p className="text-xs text-content-muted mt-0.5">
-            Itinerary & hotels match what the customer received · Ops can edit below
-          </p>
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center shrink-0">
+          {hasQuotes ? (
+            <select
+              value={selectedQuoteId || meta?.quoteId || ''}
+              onChange={(e) => onSelectQuote?.(e.target.value)}
+              disabled={syncing}
+              className="input-premium h-9 min-w-[220px] rounded-xl border-sky-500/30 bg-white text-xs font-semibold"
+            >
+              <option value="">Select final quotation…</option>
+              {quotations.map((q) => {
+                const id = String(q._id);
+                const amount = quoteAmount(q);
+                const pkg = q.packageSnapshot?.name || q.title || 'Package';
+                return (
+                  <option key={id} value={id}>
+                    {q.quoteNumber || id.slice(-6)} · {q.status || 'draft'} · {pkg}
+                    {amount ? ` · ₹${amount.toLocaleString('en-IN')}` : ''}
+                  </option>
+                );
+              })}
+            </select>
+          ) : null}
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-xl gap-2 border-sky-500/30 hover:bg-sky-500/10"
+            disabled={syncing || (hasQuotes && !(selectedQuoteId || meta?.quoteId))}
+            onClick={() => onSync?.(selectedQuoteId || meta?.quoteId || null)}
+          >
+            {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+            {hasQuotes ? 'Use selected & refresh' : 'Refresh from quote'}
+          </Button>
         </div>
       </div>
-      <Button variant="outline" size="sm" className="rounded-xl gap-2 border-sky-500/30 hover:bg-sky-500/10" disabled={syncing} onClick={onSync}>
-        {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-        Refresh from quote
-      </Button>
     </motion.div>
   );
 }

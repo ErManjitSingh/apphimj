@@ -797,6 +797,8 @@ const updateLead = asyncHandler(async (req, res) => {
 
   if (isBookedStatus(data.status) && !isBookedStatus(prevStatus)) {
     await onLeadConverted(lead, req.user, {
+      quotationId: req.body.quotationId || req.body.quoteId || null,
+      totalPackageCost: req.body.totalPackageCost,
       advanceAmount: req.body.advanceAmount ?? req.body.tokenAmount,
       paymentMethod: req.body.paymentMethod,
       sendReceipt: req.body.sendReceipt !== false,

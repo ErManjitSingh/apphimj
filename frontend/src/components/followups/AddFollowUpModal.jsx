@@ -2,6 +2,7 @@ import { X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import AppModal from '../ui/AppModal';
+import API from '../../api/axios';
 import { FOLLOWUP_PRIORITIES, FOLLOWUP_TYPES } from './constants';
 import {
   LEAD_PIPELINE_STATUSES,
@@ -31,7 +32,32 @@ const emptyForm = {
   remarks: '',
   totalPackageCost: '',
   tokenAmount: '',
+  quotationId: '',
 };
+
+function quoteLabel(q) {
+  const num = q.quoteNumber || String(q._id || '').slice(-6);
+  const pkg = q.packageSnapshot?.name || q.title || 'Package';
+  const amount = Number(q.pricing?.total || q.costing?.grandTotal || 0);
+  const amt = amount > 0 ? ` · ₹${amount.toLocaleString('en-IN')}` : '';
+  return `${num} · ${q.status || 'draft'} · ${pkg}${amt}`;
+}
+
+function preferDefaultQuoteId(rows = []) {
+  const rank = (s) => {
+    const status = String(s || '');
+    if (status === 'approved') return 1;
+    if (status === 'sent' || status === 'viewed' || status === 'negotiation') return 2;
+    if (status === 'pending_approval') return 3;
+    return 9;
+  };
+  const sorted = [...rows].sort((a, b) => {
+    const d = rank(a.status) - rank(b.status);
+    if (d !== 0) return d;
+    return new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
+  });
+  return sorted[0]?._id ? String(sorted[0]._id) : '';
+}
 
 export default function AddFollowUpModal({
   open,
@@ -49,6 +75,8 @@ export default function AddFollowUpModal({
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [quotations, setQuotations] = useState([]);
+  const [loadingQuotes, setLoadingQuotes] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -76,6 +104,7 @@ export default function AddFollowUpModal({
         remarks: editData.notes || '',
         totalPackageCost: '',
         tokenAmount: '',
+        quotationId: '',
       });
     } else {
       setForm({
@@ -93,6 +122,56 @@ export default function AddFollowUpModal({
   const isLost = isLostStatus(form.status);
   /** Lost / booked — no next follow-up to schedule */
   const skipFollowUpSchedule = isBooked || isLost;
+
+  const leadIdForQuotes = fixedLeadId || form.lead || lead?._id || '';
+
+  useEffect(() => {
+    if (!open || !isBooked || !leadIdForQuotes) {
+      setQuotations([]);
+      return undefined;
+    }
+    let cancelled = false;
+    setLoadingQuotes(true);
+    const paths = [
+      `/sales-executive/leads/${leadIdForQuotes}/quotations`,
+      `/leads/${leadIdForQuotes}/quotations`,
+    ];
+    (async () => {
+      let rows = [];
+      for (const path of paths) {
+        try {
+          const { data } = await API.get(path, { skipErrorToast: true, skipSuccessToast: true });
+          rows = Array.isArray(data) ? data : data?.data || data?.quotations || [];
+          if (rows.length || path.includes('sales-executive')) break;
+        } catch {
+          /* try next */
+        }
+      }
+      if (cancelled) return;
+      setQuotations(rows);
+      setForm((prev) => {
+        if (prev.quotationId) return prev;
+        const nextId = preferDefaultQuoteId(rows);
+        if (!nextId) return prev;
+        const selected = rows.find((q) => String(q._id) === String(nextId));
+        const amount = Number(selected?.pricing?.total || selected?.costing?.grandTotal || 0);
+        return {
+          ...prev,
+          quotationId: nextId,
+          totalPackageCost: prev.totalPackageCost || (amount > 0 ? String(amount) : prev.totalPackageCost),
+        };
+      });
+      setLoadingQuotes(false);
+    })().catch(() => {
+      if (!cancelled) {
+        setQuotations([]);
+        setLoadingQuotes(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, isBooked, leadIdForQuotes]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -119,6 +198,10 @@ export default function AddFollowUpModal({
       return;
     }
     if (showLeadOutcome && isBooked) {
+      if (quotations.length > 0 && !form.quotationId) {
+        setError('Select the final quotation for Operations');
+        return;
+      }
       const total = Number(form.totalPackageCost);
       if (!Number.isFinite(total) || total <= 0) {
         setError('Enter total package cost (₹)');
@@ -167,6 +250,7 @@ export default function AddFollowUpModal({
       if (statusUpdate && isBooked) {
         statusUpdate.totalPackageCost = Number(form.totalPackageCost);
         statusUpdate.tokenAmount = Number(form.tokenAmount);
+        if (form.quotationId) statusUpdate.quotationId = form.quotationId;
       }
 
       const category = isBooked ? 'converted' : isLost ? 'lost' : form.temperature || 'warm';
@@ -375,8 +459,45 @@ export default function AddFollowUpModal({
             {isBooked ? (
               <div className="space-y-3 rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
                 <p className="text-xs font-medium text-emerald-900">
-                  Booked starts the booking — enter total package cost and token amount received.
+                  Booked starts Operations — pick the final quotation, then enter package cost &amp; token.
                 </p>
+                <div>
+                  <label className="text-xs font-semibold text-black mb-1 block">
+                    Final quotation for Operations *
+                  </label>
+                  <select
+                    value={form.quotationId}
+                    disabled={loadingQuotes || quotations.length === 0}
+                    onChange={(e) => {
+                      const quotationId = e.target.value;
+                      const selected = quotations.find((q) => String(q._id) === String(quotationId));
+                      const amount = Number(selected?.pricing?.total || selected?.costing?.grandTotal || 0);
+                      setForm((prev) => ({
+                        ...prev,
+                        quotationId,
+                        totalPackageCost: amount > 0 ? String(amount) : prev.totalPackageCost,
+                      }));
+                    }}
+                    className="input-premium w-full h-11 rounded-xl"
+                    required={quotations.length > 0}
+                  >
+                    <option value="">
+                      {loadingQuotes
+                        ? 'Loading quotations…'
+                        : quotations.length
+                          ? 'Select final quotation…'
+                          : 'No quotation on this lead'}
+                    </option>
+                    {quotations.map((q) => (
+                      <option key={q._id} value={q._id}>
+                        {quoteLabel(q)}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[11px] text-emerald-800/80">
+                    Same quotation will open in the Operations booking panel (itinerary, hotels, cabs).
+                  </p>
+                </div>
                 <div>
                   <label className="text-xs font-semibold text-black mb-1 block">
                     Total package cost (₹) *

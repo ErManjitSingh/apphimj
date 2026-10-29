@@ -252,11 +252,23 @@ function QuotationSummary({ meta }) {
 function applyBookingState(data, setters) {
   const {
     setBooking, setItinerary, setHotels, setTransport,
+    setAvailableQuotations, setSelectedQuoteId,
   } = setters;
   setBooking(data);
   setItinerary(data.itinerary?.length ? data.itinerary : [{ day: 1, title: '', description: '' }]);
   setHotels(data.hotels?.length ? data.hotels : []);
   setTransport(data.transport?.length ? data.transport : []);
+  if (typeof setAvailableQuotations === 'function') {
+    setAvailableQuotations(Array.isArray(data.availableQuotations) ? data.availableQuotations : []);
+  }
+  if (typeof setSelectedQuoteId === 'function') {
+    const linked =
+      data.quotationMeta?.quoteId ||
+      data.quotationPreview?.meta?.quoteId ||
+      data.quotation ||
+      '';
+    setSelectedQuoteId(linked ? String(linked) : '');
+  }
 }
 
 function isMongoId(value) {
@@ -384,8 +396,17 @@ export default function BookingDetailPage() {
   const [pendingHotelChange, setPendingHotelChange] = useState(null);
   const [hotelChangeNote, setHotelChangeNote] = useState('');
   const [savingHotelChangeNote, setSavingHotelChangeNote] = useState(false);
+  const [availableQuotations, setAvailableQuotations] = useState([]);
+  const [selectedQuoteId, setSelectedQuoteId] = useState('');
 
-  const setters = { setBooking, setItinerary, setHotels, setTransport };
+  const setters = {
+    setBooking,
+    setItinerary,
+    setHotels,
+    setTransport,
+    setAvailableQuotations,
+    setSelectedQuoteId,
+  };
 
   const fetchBooking = ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
@@ -485,11 +506,18 @@ export default function BookingDetailPage() {
     }
   };
 
-  const syncFromQuotation = async () => {
+  const syncFromQuotation = async (quotationId = null) => {
     setSyncingQuote(true);
     try {
-      const r = await API.post(`/operations-manager/bookings/${id}/sync-quotation`, { force: true });
+      const quoteId = quotationId || selectedQuoteId || null;
+      const r = await API.post(`/operations-manager/bookings/${id}/sync-quotation`, {
+        force: true,
+        ...(quoteId ? { quotationId: quoteId } : {}),
+      });
       applyBookingState(r.data, setters);
+      toast.success(quoteId ? 'Final quotation linked and refreshed' : 'Booking refreshed from quotation');
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Could not sync quotation');
     } finally {
       setSyncingQuote(false);
     }
@@ -672,6 +700,9 @@ export default function BookingDetailPage() {
         meta={quoteMeta}
         autoSynced={booking.autoSyncedFromQuotation}
         syncing={syncingQuote}
+        quotations={availableQuotations}
+        selectedQuoteId={selectedQuoteId}
+        onSelectQuote={setSelectedQuoteId}
         onSync={syncFromQuotation}
       />
 

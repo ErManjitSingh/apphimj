@@ -345,6 +345,8 @@ const updateLead = asyncHandler(async (req, res) => {
     tokenAmount,
     paymentMethod,
     sendReceipt,
+    quotationId,
+    quoteId,
   } = req.body;
   const statusOnlyKeys = new Set([
     'status',
@@ -354,6 +356,8 @@ const updateLead = asyncHandler(async (req, res) => {
     'tokenAmount',
     'paymentMethod',
     'sendReceipt',
+    'quotationId',
+    'quoteId',
     'paymentScreenshotBase64',
     'paymentScreenshotName',
     'paymentScreenshots',
@@ -657,6 +661,7 @@ const updateLead = asyncHandler(async (req, res) => {
 
     if (becameBooked || refreshBookedPayment) {
       await onLeadConverted(lead, req.user, {
+        quotationId: quotationId || quoteId || null,
         totalPackageCost: Number(totalPackageCost),
         advanceAmount: Number(tokenAmount ?? advanceAmount),
         paymentMethod,

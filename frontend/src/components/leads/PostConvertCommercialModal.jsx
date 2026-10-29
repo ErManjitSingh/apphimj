@@ -47,6 +47,7 @@ export default function PostConvertCommercialModal({ open, leadId, onClose, onSa
   const [shotFiles, setShotFiles] = useState([]);
   const [installments, setInstallments] = useState([]);
   const [createReminders, setCreateReminders] = useState(true);
+  const [quotationId, setQuotationId] = useState('');
 
   useEffect(() => {
     if (!open || !leadId) return undefined;
@@ -68,6 +69,13 @@ export default function PostConvertCommercialModal({ open, leadId, onClose, onSa
         setShotFiles([]);
         setInstallments(rowsFromDraft(data));
         setCreateReminders(true);
+        setQuotationId(
+          data.selectedQuotationId
+            ? String(data.selectedQuotationId)
+            : data.quotation?._id
+              ? String(data.quotation._id)
+              : ''
+        );
       })
       .catch((err) => {
         if (!cancelled) setError(err.response?.data?.message || err.message || 'Failed to load form');
@@ -170,6 +178,7 @@ export default function PostConvertCommercialModal({ open, leadId, onClose, onSa
         amountReceived: Number(amountReceived) || 0,
         paymentMethod,
         totalAmount: draft?.totalAmount,
+        quotationId: quotationId || undefined,
         addressProofBase64: proofBase64 || undefined,
         addressProofName: proofName || undefined,
         paymentScreenshots: shotFiles.length
@@ -245,6 +254,31 @@ export default function PostConvertCommercialModal({ open, leadId, onClose, onSa
 
           {draft && !loading && (
             <>
+              {Array.isArray(draft.availableQuotations) && draft.availableQuotations.length > 0 ? (
+                <div className="rounded-[24px] border border-violet-200 bg-violet-50/40 p-4 sm:p-5 shadow-sm">
+                  <p className="text-[12px] font-bold uppercase tracking-[0.1em] text-violet-700">
+                    Final quotation for Operations
+                  </p>
+                  <p className="mt-1 text-xs text-violet-800/80">
+                    Jo quotation yahan select hogi, wahi Operations booking panel me open hogi.
+                  </p>
+                  <select
+                    value={quotationId}
+                    onChange={(e) => setQuotationId(e.target.value)}
+                    className={cn(fieldClass, 'mt-3')}
+                  >
+                    <option value="">Select final quotation…</option>
+                    {draft.availableQuotations.map((q) => (
+                      <option key={q._id} value={q._id}>
+                        {q.quoteNumber || String(q._id).slice(-6)} · {q.status || 'draft'} ·{' '}
+                        {q.packageName || 'Package'}
+                        {q.amount ? ` · ₹${Number(q.amount).toLocaleString('en-IN')}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
+
               <div className="rounded-[24px] border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
                 <div className="mb-4 flex items-center gap-2">
                   <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-slate-900 text-white">

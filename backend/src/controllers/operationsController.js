@@ -16,6 +16,7 @@ const { sendMailMessage, isEmailConfigured } = require('../services/emailService
 const {
   enrichBookingWithQuotation,
   syncBookingFromQuotation,
+  listQuotationsForBookingLead,
 } = require('../services/operationsQuotationSyncService');
 const { normalizeBookingAssignments } = require('../services/operationsStayService');
 const {
@@ -306,11 +307,15 @@ const getBooking = asyncHandler(async (req, res) => {
     enrichHotelContacts(booking.hotels || []),
     enrichTransportContacts(booking.transport || []),
   ]);
-  const refreshedVouchers = await refreshVoucherDocuments(vouchers, booking, hotels, transport);
+  const [refreshedVouchers, availableQuotations] = await Promise.all([
+    refreshVoucherDocuments(vouchers, booking, hotels, transport),
+    listQuotationsForBookingLead(booking),
+  ]);
   res.json({
     ...booking,
     hotels,
     transport,
+    availableQuotations,
     tasks,
     documents,
     payments,
@@ -321,18 +326,25 @@ const getBooking = asyncHandler(async (req, res) => {
 });
 
 const syncBookingQuotation = asyncHandler(async (req, res) => {
-  const result = await syncBookingFromQuotation(req.params.id, { force: req.body?.force === true });
+  const quotationId = req.body?.quotationId || req.body?.quoteId || null;
+  const force = req.body?.force === true || Boolean(quotationId);
+  const result = await syncBookingFromQuotation(req.params.id, { force, quotationId });
   if (!result?.booking) throw new ApiError(404, 'Booking not found');
-  if (!result.quotation) throw new ApiError(404, 'No quotation linked to this booking');
+  if (result.error === 'quotation_lead_mismatch') {
+    throw new ApiError(400, 'Selected quotation does not belong to this booking lead');
+  }
+  if (!result.quotation) throw new ApiError(404, 'No quotation found for this booking');
   await cacheService.invalidate('ops:');
-  const [tasks, documents] = await Promise.all([
+  const [tasks, documents, availableQuotations] = await Promise.all([
     ops.listTasks({ bookingId: req.params.id }),
     ops.listDocuments(req.params.id),
+    listQuotationsForBookingLead(result.booking),
   ]);
   res.json({
     ...result.booking,
     tasks,
     documents,
+    availableQuotations,
     quotationPreview: result.quotationPreview,
     quotationMeta: result.quotationPreview?.meta,
     syncedFromQuotation: result.synced,

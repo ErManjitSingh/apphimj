@@ -174,7 +174,10 @@ export default function LeadActivityTimeline({
                   const emailLogId = item.meta?.emailLogId || null;
                   const quote = isQuote ? findQuotationForActivity(item, quotations) : null;
                   const quoteId = quote?._id || item.meta?.quotationId || null;
-                  const editHref = isQuote ? resolveQuoteEditHref(quoteId, contactEndpoint) : null;
+                  const quoteStatus = String(quote?.status || item.meta?.status || 'draft');
+                  const canEditDraft = ['draft', 'pending_approval', 'rejected'].includes(quoteStatus);
+                  const editHref =
+                    isQuote && canEditDraft ? resolveQuoteEditHref(quoteId, contactEndpoint) : null;
                   const canView = Boolean(quote?._id && (quote.pricing || quote.packageSnapshot));
                   const canViewEmail = Boolean(emailLogId);
                   const canSend =
@@ -218,7 +221,7 @@ export default function LeadActivityTimeline({
                                   to={editHref}
                                   className="inline-flex h-7 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 text-[11px] font-semibold text-violet-700 hover:bg-violet-100"
                                 >
-                                  <Pencil className="w-3 h-3" /> Edit
+                                  <Pencil className="w-3 h-3" /> Edit draft
                                 </Link>
                               )}
                               {canView && (

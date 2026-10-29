@@ -1182,23 +1182,25 @@ async function createBookingFromPayment(paymentId, actor) {
       paymentStatus: nextStatus,
       status: bookingStatus,
     };
+    if (payment.quotation) {
+      patch.quotation = payment.quotation;
+    }
     // Backfill trip details if booking was created before hotel/cab mapping.
     const needsFulfillment =
       !(existing.hotels || []).length ||
       !(existing.transport || []).length ||
       !(existing.itinerary || []).length ||
-      !existing.packageName;
+      !existing.packageName ||
+      (payment.quotation && String(existing.quotation || '') !== String(payment.quotation));
     if (needsFulfillment) {
       const fresh = await buildBookingPayloadFromPayment(payment);
-      if (!existing.packageName && fresh.packageName) patch.packageName = fresh.packageName;
-      if (!existing.destination && fresh.destination) patch.destination = fresh.destination;
-      if (!existing.quotationReference && fresh.quotationReference) {
-        patch.quotationReference = fresh.quotationReference;
-      }
-      if (!(existing.hotels || []).length && fresh.hotels?.length) patch.hotels = fresh.hotels;
-      if (!(existing.transport || []).length && fresh.transport?.length) patch.transport = fresh.transport;
-      if (!(existing.itinerary || []).length && fresh.itinerary?.length) patch.itinerary = fresh.itinerary;
-      if (!(existing.activities || []).length && fresh.activities?.length) patch.activities = fresh.activities;
+      if (fresh.packageName) patch.packageName = fresh.packageName;
+      if (fresh.destination) patch.destination = fresh.destination;
+      if (fresh.quotationReference) patch.quotationReference = fresh.quotationReference;
+      if (fresh.hotels?.length) patch.hotels = fresh.hotels;
+      if (fresh.transport?.length) patch.transport = fresh.transport;
+      if (fresh.itinerary?.length) patch.itinerary = fresh.itinerary;
+      if (fresh.activities?.length) patch.activities = fresh.activities;
     }
     const updated = await updateBooking(existing._id, patch, actor);
     if (String(payment.booking || '') !== String(existing._id)) {

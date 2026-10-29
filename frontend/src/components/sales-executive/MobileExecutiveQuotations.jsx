@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   CalendarDays,
   CheckCircle2,
@@ -10,6 +10,7 @@ import {
   MapPin,
   Menu,
   MoreHorizontal,
+  Pencil,
   Plus,
   RefreshCw,
   Search,
@@ -19,6 +20,8 @@ import {
 import { useSidebar } from '../../context/SidebarContext';
 import { formatCurrency } from './executiveUtils';
 import { cn } from '../../lib/utils';
+
+const EDITABLE_QUOTE_STATUSES = new Set(['draft', 'pending_approval', 'rejected']);
 
 const HERO_IMG = '/quotations-hero-document-coin.png';
 
@@ -177,6 +180,7 @@ export default function MobileExecutiveQuotations({
   flash,
   onDismissFlash,
 }) {
+  const navigate = useNavigate();
   const { toggleMobileOpen } = useSidebar();
   const [searchOpen, setSearchOpen] = useState(false);
   const [menuId, setMenuId] = useState(null);
@@ -500,7 +504,20 @@ export default function MobileExecutiveQuotations({
                     <MoreHorizontal className="h-4 w-4" />
                   </button>
                   {open ? (
-                    <div className="absolute right-2 top-10 z-20 w-36 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                    <div className="absolute right-2 top-10 z-20 w-40 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                      {EDITABLE_QUOTE_STATUSES.has(status) ? (
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-violet-700 hover:bg-violet-50"
+                          onClick={() => {
+                            setMenuId(null);
+                            navigate(`/sales-executive/quotations/${q._id}/edit`);
+                          }}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          Edit draft
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         className="block w-full px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-violet-50"

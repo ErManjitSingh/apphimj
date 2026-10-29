@@ -258,15 +258,30 @@ async function resolveQuotationForBooking(booking) {
     const q = await Quotation.findById(booking.quotation).lean();
     if (q) return q;
   }
+  if (booking.quotationReference) {
+    const byRef = await Quotation.findOne({ quoteNumber: booking.quotationReference }).lean();
+    if (byRef) return byRef;
+  }
   if (booking.lead) {
-    return Quotation.findOne({ lead: booking.lead })
+    // Prefer customer-facing quotes over drafts when ops has not pinned one yet.
+    const preferred = await Quotation.findOne({
+      lead: booking.lead,
+      status: { $in: ['approved', 'sent', 'viewed', 'negotiation'] },
+    })
       .sort({ updatedAt: -1 })
       .lean();
-  }
-  if (booking.quotationReference) {
-    return Quotation.findOne({ quoteNumber: booking.quotationReference }).lean();
+    if (preferred) return preferred;
+    return Quotation.findOne({ lead: booking.lead }).sort({ updatedAt: -1 }).lean();
   }
   return null;
+}
+
+async function listQuotationsForBookingLead(booking) {
+  if (!booking?.lead) return [];
+  return Quotation.find({ lead: booking.lead })
+    .select('quoteNumber status title pricing costing packageSnapshot createdAt updatedAt sentAt')
+    .sort({ updatedAt: -1 })
+    .lean();
 }
 
 async function extractFulfillmentFromQuotation(quotation, booking = {}) {
@@ -304,15 +319,25 @@ async function extractFulfillmentFromQuotation(quotation, booking = {}) {
   };
 }
 
-async function syncBookingFromQuotation(bookingId, { force = false } = {}) {
+async function syncBookingFromQuotation(bookingId, { force = false, quotationId = null } = {}) {
   const booking = await Booking.findById(bookingId).lean();
   if (!booking) return null;
 
-  const quotation = await resolveQuotationForBooking(booking);
+  let quotation = null;
+  if (quotationId) {
+    quotation = await Quotation.findById(quotationId).lean();
+    if (!quotation) return { booking, quotation: null, synced: false };
+    if (booking.lead && quotation.lead && String(quotation.lead) !== String(booking.lead)) {
+      return { booking, quotation: null, synced: false, error: 'quotation_lead_mismatch' };
+    }
+  } else {
+    quotation = await resolveQuotationForBooking(booking);
+  }
   if (!quotation) return { booking, quotation: null, synced: false };
 
   const extracted = await extractFulfillmentFromQuotation(quotation, booking);
   const patch = {};
+  const pinQuote = Boolean(quotationId) || force;
 
   if (force || !booking.itinerary?.length) {
     if (extracted.itinerary.length) patch.itinerary = extracted.itinerary;
@@ -330,12 +355,23 @@ async function syncBookingFromQuotation(bookingId, { force = false } = {}) {
   if (force || !booking.activities?.length) {
     if (extracted.activities.length) patch.activities = extracted.activities;
   }
-  if (!booking.packageName && extracted.packageName) patch.packageName = extracted.packageName;
-  if (!booking.quotationReference && extracted.quotationReference) {
-    patch.quotationReference = extracted.quotationReference;
+  if ((force || !booking.packageName) && extracted.packageName) patch.packageName = extracted.packageName;
+  if (pinQuote || !booking.quotationReference) {
+    patch.quotationReference = extracted.quotationReference || quotation.quoteNumber || '';
   }
-  if (!booking.quotation && quotation._id) patch.quotation = quotation._id;
-  if (!booking.executiveName && extracted.executiveName) patch.executiveName = extracted.executiveName;
+  if (pinQuote || !booking.quotation) {
+    patch.quotation = quotation._id;
+  }
+  if ((force || !booking.executiveName) && extracted.executiveName) {
+    patch.executiveName = extracted.executiveName;
+  }
+  if (force && extracted.totalAmount != null && extracted.totalAmount !== '') {
+    const total = Number(extracted.totalAmount);
+    if (Number.isFinite(total) && total > 0 && !Number(booking.totalAmount)) {
+      patch.totalAmount = total;
+      patch.pendingAmount = Math.max(0, total - Number(booking.advanceReceived || 0));
+    }
+  }
 
   let updated = booking;
   if (Object.keys(patch).length) {
@@ -388,4 +424,5 @@ module.exports = {
   syncBookingFromQuotation,
   enrichBookingWithQuotation,
   resolveQuotationForBooking,
+  listQuotationsForBookingLead,
 };

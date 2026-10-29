@@ -18,13 +18,34 @@ function isLeadStatusLocked(status) {
   return TERMINAL_STATUSES.includes(String(status || ''));
 }
 
-async function pickQuotationForLead(leadId) {
+async function pickQuotationForLead(leadId, preferredId = null) {
+  if (preferredId) {
+    const preferred = await Quotation.findOne({ _id: preferredId, lead: leadId });
+    if (preferred) return preferred;
+  }
   const approved = await Quotation.findOne({ lead: leadId, status: 'approved' }).sort({ updatedAt: -1 });
   if (approved) return approved;
   return Quotation.findOne({
     lead: leadId,
     status: { $in: ['approved', 'sent', 'viewed', 'negotiation', 'pending_approval'] },
   }).sort({ updatedAt: -1 });
+}
+
+/**
+ * Pin the SE-selected final quotation onto the ops booking and refresh itinerary/hotels/cabs.
+ */
+async function pinQuotationToOpsBooking(booking, quotation, actor) {
+  if (!booking?._id || !quotation?._id) return booking;
+  const { syncBookingFromQuotation } = require('./operationsQuotationSyncService');
+  await Booking.findByIdAndUpdate(booking._id, {
+    quotation: quotation._id,
+    quotationReference: quotation.quoteNumber || '',
+  });
+  const result = await syncBookingFromQuotation(booking._id, {
+    force: true,
+    quotationId: quotation._id,
+  });
+  return result?.booking || (await Booking.findById(booking._id));
 }
 
 async function ensureQuotationApproved(quotation, actor) {
@@ -86,7 +107,8 @@ async function ensurePaymentForConversion(lead, quotation, actor, options = {}) 
       amount: amount > 0 ? amount : payment.amount,
     };
     if (paidAmount > 0) patch.paidAt = payment.paidAt || new Date();
-    if (quotation?._id && !payment.quotation) patch.quotation = quotation._id;
+    // Always pin the SE-selected final quotation when provided / resolved
+    if (quotation?._id) patch.quotation = quotation._id;
     payment = await Payment.findByIdAndUpdate(payment._id, patch, { new: true });
     return payment;
   }
@@ -136,11 +158,12 @@ async function notifyOperationsTeam(lead, booking) {
 /**
  * @param {object} lead
  * @param {object} actor
- * @param {{ totalPackageCost?: number, advanceAmount?: number, tokenAmount?: number, paymentMethod?: string, sendReceipt?: boolean, paymentScreenshotBase64?: string, paymentScreenshotName?: string, paymentScreenshots?: Array<{base64:string,name?:string}> }} [options]
+ * @param {{ quotationId?: string, quoteId?: string, totalPackageCost?: number, advanceAmount?: number, tokenAmount?: number, paymentMethod?: string, sendReceipt?: boolean, paymentScreenshotBase64?: string, paymentScreenshotName?: string, paymentScreenshots?: Array<{base64:string,name?:string}> }} [options]
  */
 async function onLeadConverted(lead, actor, options = {}) {
   const existingBooking = await Booking.findOne({ lead: lead._id });
-  let quotation = await pickQuotationForLead(lead._id);
+  const preferredQuoteId = options.quotationId || options.quoteId || null;
+  let quotation = await pickQuotationForLead(lead._id, preferredQuoteId);
   quotation = await ensureQuotationApproved(quotation, actor);
 
   if (!lead.convertedAt) {
@@ -216,8 +239,19 @@ async function onLeadConverted(lead, actor, options = {}) {
       advanceReceived: advance,
       pendingAmount: Math.max(0, total - advance),
       paymentStatus: payment.status === 'paid' ? 'paid' : payment.status === 'partial' ? 'partial' : 'pending',
+      ...(quotation?._id
+        ? {
+            quotation: quotation._id,
+            quotationReference: quotation.quoteNumber || '',
+          }
+        : {}),
     });
     booking = await Booking.findById(booking._id);
+  }
+
+  // SE final quotation → ops panel: always pin + refresh fulfillment from that quote
+  if (booking && quotation) {
+    booking = await pinQuotationToOpsBooking(booking, quotation, actor);
   }
 
   let receipt = null;
@@ -255,4 +289,6 @@ module.exports = {
   onLeadConverted,
   isLeadStatusLocked,
   TERMINAL_STATUSES,
+  pickQuotationForLead,
+  pinQuotationToOpsBooking,
 };

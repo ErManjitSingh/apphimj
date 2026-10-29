@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDataRefresh } from '../../hooks/useDataRefresh';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FileText, Send, TrendingUp, ChevronLeft, ChevronRight } from 'lucide-react';
+import { FileText, Pencil, Send, TrendingUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '../ui/button';
 import Avatar from '../ui/Avatar';
 import QuoteStatusBadge from './QuoteStatusBadge';
@@ -179,14 +179,25 @@ export default function QuotationListPage() {
                     <td className="px-4 py-3.5 whitespace-nowrap"><QuoteStatusBadge status={q.status} /></td>
                     <td className="px-4 py-3.5 text-xs text-content-muted whitespace-nowrap">{new Date(q.createdAt).toLocaleDateString('en-IN')}</td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 px-2.5 text-xs"
-                        onClick={() => setSelected(q)}
-                      >
-                        View
-                      </Button>
+                      <div className="flex items-center gap-1.5">
+                        {['draft', 'pending_approval', 'rejected'].includes(q.status || 'draft') ? (
+                          <Link
+                            to={`/quotations/new?edit=${q._id}`}
+                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-strong bg-slate-50 px-2.5 text-xs font-medium text-content-primary hover:bg-slate-100"
+                          >
+                            <Pencil className="w-3 h-3" />
+                            Edit draft
+                          </Link>
+                        ) : null}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2.5 text-xs"
+                          onClick={() => setSelected(q)}
+                        >
+                          View
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -224,7 +235,12 @@ export default function QuotationListPage() {
         quote={selected}
         open={!!selected && !showPdf}
         onClose={() => { setSelected(null); setShowPdf(false); }}
-        readOnly
+        readOnly={!selected || !['draft', 'pending_approval', 'rejected'].includes(selected.status || 'draft')}
+        editHref={
+          selected && ['draft', 'pending_approval', 'rejected'].includes(selected.status || 'draft')
+            ? `/quotations/new?edit=${selected._id}`
+            : undefined
+        }
         onDownloadPdf={handlePrint}
       />
 

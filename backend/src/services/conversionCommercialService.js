@@ -164,8 +164,22 @@ async function getCommercialFormDraft({ leadId, executiveId, branchId }) {
     throw new ApiError(400, 'Commercial form is available after lead is booked');
   }
 
-  const quotation = await Quotation.findOne({ lead: leadId }).sort({ updatedAt: -1 }).lean();
-  const payment = await Payment.findOne({ lead: leadId }).sort({ createdAt: -1 }).lean();
+  const Booking = require('../models/Booking');
+  const [quotations, payment, booking] = await Promise.all([
+    Quotation.find({ lead: leadId })
+      .select('quoteNumber status title pricing costing packageSnapshot updatedAt')
+      .sort({ updatedAt: -1 })
+      .lean(),
+    Payment.findOne({ lead: leadId }).sort({ createdAt: -1 }).lean(),
+    Booking.findOne({ lead: leadId }).select('quotation quotationReference').sort({ createdAt: -1 }).lean(),
+  ]);
+
+  const pinnedId = booking?.quotation || payment?.quotation || null;
+  const quotation =
+    (pinnedId && quotations.find((q) => String(q._id) === String(pinnedId))) ||
+    quotations.find((q) => q.status === 'approved') ||
+    quotations[0] ||
+    null;
 
   const total =
     Number(payment?.amount) ||
@@ -213,8 +227,18 @@ async function getCommercialFormDraft({ leadId, executiveId, branchId }) {
           quoteNumber: quotation.quoteNumber,
           packageName: quotation.packageSummary?.packageName || quotation.packageSnapshot?.name,
           costing2: quotation.costing2,
+          status: quotation.status,
         }
       : null,
+    availableQuotations: quotations.map((q) => ({
+      _id: q._id,
+      quoteNumber: q.quoteNumber,
+      status: q.status,
+      title: q.title,
+      packageName: q.packageSnapshot?.name || q.title || '',
+      amount: Number(q.pricing?.total || q.costing?.grandTotal || 0),
+    })),
+    selectedQuotationId: quotation?._id || null,
     paymentId: payment?._id || null,
     packageMarginPercent,
     totalCost,
@@ -414,6 +438,13 @@ async function saveCommercialForm({ leadId, executiveId, branchId, body }) {
     );
   }
 
+  const preferredQuoteId = body.quotationId || body.quoteId || null;
+  if (preferredQuoteId) {
+    const owned = await Quotation.findOne({ _id: preferredQuoteId, lead: leadId }).select('_id quoteNumber').lean();
+    if (!owned) throw new ApiError(400, 'Selected quotation does not belong to this lead');
+    payment.quotation = owned._id;
+  }
+
   await payment.save();
 
   // Keep advance voucher HTML in sync with edited commercial amounts
@@ -424,6 +455,10 @@ async function saveCommercialForm({ leadId, executiveId, branchId, body }) {
     const quotation = payment.quotation
       ? await Quotation.findById(payment.quotation).lean()
       : null;
+    if (booking && quotation) {
+      const { pinQuotationToOpsBooking } = require('./leadConversionService');
+      await pinQuotationToOpsBooking(booking, quotation, { _id: executiveId });
+    }
     await generateAndStoreReceipt({
       lead,
       payment,

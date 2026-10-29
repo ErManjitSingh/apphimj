@@ -352,7 +352,11 @@ export default function LeadDetailLayout({
         ) : null}
 
         {tab === 'quotations' ? (
-          <LeadQuotationSection quotations={quotations} loading={quotationsLoading} />
+          <LeadQuotationSection
+            quotations={quotations}
+            loading={quotationsLoading}
+            contactEndpoint={contactEndpoint || relatedBasePath || '/leads'}
+          />
         ) : null}
 
         {tab === 'bookings' ? (
