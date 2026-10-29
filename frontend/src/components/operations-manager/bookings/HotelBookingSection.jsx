@@ -1,10 +1,84 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Hotel, Loader2, NotebookPen, Save, Send } from 'lucide-react';
 import API from '../../../api/axios';
 import { Button } from '../../ui/button';
 import { formatDate, formatINR } from '../operationsUtils';
 import { cn } from '../../../lib/utils';
 import OpsInternalNotesPanel from './OpsInternalNotesPanel';
+
+/** Follows scroll while the locked Hotel Master block is on screen. */
+function HotelMasterLockOverlay({ anchorRef, lockMessage }) {
+  const [box, setBox] = useState(null);
+
+  useEffect(() => {
+    const anchor = anchorRef?.current;
+    if (!anchor) return undefined;
+
+    const scroller = anchor.closest('main') || document.scrollingElement || document.documentElement;
+
+    const update = () => {
+      const rect = anchor.getBoundingClientRect();
+      const scrollerRect =
+        scroller === document.scrollingElement || scroller === document.documentElement
+          ? { top: 0, bottom: window.innerHeight, left: 0, right: window.innerWidth }
+          : scroller.getBoundingClientRect();
+
+      const viewTop = scrollerRect.top + 12;
+      const viewBottom = scrollerRect.bottom - 12;
+      const inView = rect.bottom > viewTop && rect.top < viewBottom;
+      if (!inView) {
+        setBox(null);
+        return;
+      }
+
+      const bannerHeight = 112;
+      const top = Math.min(
+        Math.max(rect.top + 20, viewTop),
+        Math.max(viewTop, rect.bottom - bannerHeight - 12)
+      );
+      const width = Math.min(420, Math.max(260, rect.width - 32));
+      const left = rect.left + rect.width / 2;
+
+      setBox({ top, left, width });
+    };
+
+    update();
+    scroller.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => {
+      scroller.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [anchorRef]);
+
+  if (!box || typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div
+      className="pointer-events-none fixed z-[60] flex justify-center"
+      style={{
+        top: box.top,
+        left: box.left,
+        width: box.width,
+        transform: 'translateX(-50%)',
+      }}
+    >
+      <div className="w-full rounded-2xl border border-amber-300/90 bg-white/95 px-5 py-4 text-center shadow-lg shadow-amber-900/15 backdrop-blur-sm">
+        <span className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-white shadow-md shadow-amber-500/30">
+          <NotebookPen className="h-5 w-5" />
+        </span>
+        <p className="text-sm font-black text-slate-900">
+          Add a hotel note explaining why you are changing the hotel
+        </p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
+          {lockMessage || 'Hotel Master stays locked until you save the change reason note above.'}
+        </p>
+      </div>
+    </div>,
+    document.body
+  );
+}
 
 const ARRANGEMENTS = ['Candlelight Dinner', 'Cake', 'DJ', 'Bonfire', 'Flower Decoration', 'Honeymoon Setup'];
 
@@ -94,6 +168,7 @@ export default function HotelBookingSection({
   const [saving, setSaving] = useState(false);
   const [sendingId, setSendingId] = useState(null);
   const [notice, setNotice] = useState('');
+  const lockAnchorRef = useRef(null);
 
   const update = (index, patch) => {
     onChange(hotels.map((hotel, i) => (i === index ? { ...hotel, ...patch } : hotel)));
@@ -203,7 +278,8 @@ export default function HotelBookingSection({
         </p>
       )}
 
-      <div className="relative">
+      <div ref={lockAnchorRef} className="relative">
+        {locked ? <HotelMasterLockOverlay anchorRef={lockAnchorRef} lockMessage={lockMessage} /> : null}
         <div
           className={cn(
             'space-y-4 transition duration-300',
@@ -427,24 +503,6 @@ export default function HotelBookingSection({
           );
         })}
         </div>
-
-        {locked && (
-          <div className="pointer-events-none absolute inset-0 z-10">
-            <div className="sticky top-24 flex justify-center px-4 py-8 sm:top-28">
-              <div className="max-w-md rounded-2xl border border-amber-300/90 bg-white/95 px-5 py-4 text-center shadow-lg shadow-amber-900/15 backdrop-blur-sm">
-                <span className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-white shadow-md shadow-amber-500/30">
-                  <NotebookPen className="h-5 w-5" />
-                </span>
-                <p className="text-sm font-black text-slate-900">
-                  Add a hotel note explaining why you are changing the hotel
-                </p>
-                <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
-                  {lockMessage || 'Hotel Master stays locked until you save the change reason note above.'}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </section>
   );
