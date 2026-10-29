@@ -82,7 +82,15 @@ function letterFor(booking, hotel) {
   ].join('\n');
 }
 
-export default function HotelBookingSection({ bookingId, booking, hotels, onChange, onSaved }) {
+export default function HotelBookingSection({
+  bookingId,
+  booking,
+  hotels,
+  onChange,
+  onSaved,
+  locked = false,
+  lockMessage = '',
+}) {
   const [saving, setSaving] = useState(false);
   const [sendingId, setSendingId] = useState(null);
   const [notice, setNotice] = useState('');
@@ -161,7 +169,7 @@ export default function HotelBookingSection({ bookingId, booking, hotels, onChan
   };
 
   return (
-    <section className="rounded-3xl border border-teal-500/20 bg-white/90 p-4 shadow-sm sm:p-6 dark:bg-slate-900/80">
+    <section className="relative rounded-3xl border border-teal-500/20 bg-white/90 p-4 shadow-sm sm:p-6 dark:bg-slate-900/80">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-teal-600">Hotel Master</p>
@@ -173,11 +181,26 @@ export default function HotelBookingSection({ bookingId, booking, hotels, onChan
             Kids and Extra matters go on the confirmation letter.
           </p>
         </div>
-        <Button variant="teal" size="sm" className="rounded-xl gap-1.5" disabled={saving || !hotels.length} onClick={save}>
+        <Button
+          variant="teal"
+          size="sm"
+          className="rounded-xl gap-1.5"
+          disabled={locked || saving || !hotels.length}
+          onClick={save}
+        >
           {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
           Save hotel costs
         </Button>
       </div>
+
+      {locked && (
+        <div className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-bold">Hotel Master locked</p>
+          <p className="mt-0.5 text-xs text-amber-800/90">
+            {lockMessage || 'Pehle hotel change ka note save karo — uske baad master editable hoga.'}
+          </p>
+        </div>
+      )}
 
       {notice && (
         <p className="mb-4 rounded-xl border border-teal-500/20 bg-teal-500/10 px-3 py-2 text-xs text-teal-800">{notice}</p>
@@ -189,7 +212,13 @@ export default function HotelBookingSection({ bookingId, booking, hotels, onChan
         </p>
       )}
 
-      <div className="space-y-4">
+      <div
+        className={cn(
+          'space-y-4 transition duration-300',
+          locked && 'pointer-events-none select-none blur-[2.5px] opacity-60'
+        )}
+        aria-disabled={locked || undefined}
+      >
         {hotels.map((hotel, index) => {
           const internal = Number(hotel.internalPrice) || 0;
           const advance = Number(hotel.advancePaid) || 0;

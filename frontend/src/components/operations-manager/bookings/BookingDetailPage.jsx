@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import {
   ArrowLeft, Ticket, Phone, Mail, Loader2,
   FileText, ListTodo, MapPin, Users, Wallet, ExternalLink,
-  Hotel, Car, Receipt, IndianRupee, ClipboardCheck,
+  Hotel, Car, Receipt, IndianRupee, ClipboardCheck, NotebookPen,
 } from 'lucide-react';
 import API from '../../../api/axios';
 import PageHeader from '../../ui/PageHeader';
@@ -12,6 +12,7 @@ import { Button } from '../../ui/button';
 import BookingStatusBadge from './BookingStatusBadge';
 import { formatINR, formatDate, formatPax, formatTravelRange } from '../operationsUtils';
 import { cn } from '../../../lib/utils';
+import { toast } from '../../../context/ToastContext';
 import {
   QuotationSyncBanner,
   BookingTransportEditor,
@@ -380,6 +381,9 @@ export default function BookingDetailPage() {
   const [catalogCabs, setCatalogCabs] = useState([]);
   const [sendingTransportVoucher, setSendingTransportVoucher] = useState(null);
   const [addPaymentOpen, setAddPaymentOpen] = useState(false);
+  const [pendingHotelChange, setPendingHotelChange] = useState(null);
+  const [hotelChangeNote, setHotelChangeNote] = useState('');
+  const [savingHotelChangeNote, setSavingHotelChangeNote] = useState(false);
 
   const setters = { setBooking, setItinerary, setHotels, setTransport };
 
@@ -418,15 +422,68 @@ export default function BookingDetailPage() {
     }).catch(() => {});
   }, []);
 
-  // Keep Hotel Master in sync when ops changes day hotels in the itinerary.
+  // Keep Hotel Master in sync when ops changes day hotels — pause while change-note is pending.
   useEffect(() => {
-    if (!itinerary?.length) return;
+    if (!itinerary?.length || pendingHotelChange) return;
     setHotels((prev) => {
       const next = hotelsFromItinerary(itinerary, prev, catalogHotels);
       if (hotelStayKey(next) === hotelStayKey(prev)) return prev;
       return next;
     });
-  }, [itinerary, catalogHotels]);
+  }, [itinerary, catalogHotels, pendingHotelChange]);
+
+  const requestHotelChange = (payload) => {
+    setPendingHotelChange(payload);
+    setHotelChangeNote('');
+  };
+
+  const cancelPendingHotelChange = () => {
+    setPendingHotelChange(null);
+    setHotelChangeNote('');
+  };
+
+  const confirmPendingHotelChange = async () => {
+    if (!pendingHotelChange) return;
+    const text = hotelChangeNote.trim();
+    if (!text) {
+      toast.error('Pehle hotel change ka note likho');
+      return;
+    }
+    setSavingHotelChangeNote(true);
+    try {
+      const { dayKey, dayNumber, previousName, nextName, roomType, mealPlan, dayPatch } = pendingHotelChange;
+      setItinerary((prev) =>
+        prev.map((day, index) => {
+          const key = day.id || `ops-day-${day.day || index + 1}`;
+          if (key === dayKey) return { ...day, ...dayPatch };
+          if (!day.id && Number(day.day) === Number(dayNumber)) return { ...day, ...dayPatch };
+          return day;
+        })
+      );
+
+      const noteText = [
+        `Hotel change · Day ${dayNumber}`,
+        `${previousName} → ${nextName}`,
+        roomType ? `Room: ${roomType}` : null,
+        mealPlan ? `Meal: ${mealPlan}` : null,
+        text,
+      ].filter(Boolean).join('\n');
+
+      await API.post(
+        `/operations-manager/bookings/${id}/ops-notes`,
+        { scope: 'hotel', text: noteText },
+        { skipSuccessToast: true }
+      );
+
+      setPendingHotelChange(null);
+      setHotelChangeNote('');
+      toast.success('Note saved — Hotel Master unlocked');
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Could not save change note');
+    } finally {
+      setSavingHotelChangeNote(false);
+    }
+  };
 
   const syncFromQuotation = async () => {
     setSyncingQuote(true);
@@ -439,6 +496,10 @@ export default function BookingDetailPage() {
   };
 
   const saveItinerary = async () => {
+    if (pendingHotelChange) {
+      toast.error('Pehle hotel change ka note save karo, phir itinerary save hogi');
+      return;
+    }
     setSavingItinerary(true);
     try {
       const itineraryHotels = hotelsFromItinerary(itinerary, hotels, catalogHotels);
@@ -630,7 +691,61 @@ export default function BookingDetailPage() {
             quotationHotels={quoteMeta?.selectedHotels || []}
             catalogCabs={catalogCabs}
             destination={booking.destination}
+            onHotelChangeRequest={requestHotelChange}
+            hotelChangePending={Boolean(pendingHotelChange)}
           />
+
+          {pendingHotelChange && (
+            <div className="rounded-3xl border border-amber-300 bg-gradient-to-br from-amber-50 via-orange-50 to-white p-4 shadow-sm sm:p-5">
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-md shadow-amber-500/25">
+                  <NotebookPen className="h-5 w-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-700">
+                    Note required before hotel change
+                  </p>
+                  <h3 className="mt-1 text-base font-black text-slate-900">
+                    Day {pendingHotelChange.dayNumber}: {pendingHotelChange.previousName} → {pendingHotelChange.nextName}
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-600">
+                    Pehle reason note likho. Note save hone ke baad hi itinerary + Hotel Master update hoga aur master editable hoga.
+                  </p>
+                  <textarea
+                    value={hotelChangeNote}
+                    onChange={(e) => setHotelChangeNote(e.target.value)}
+                    rows={3}
+                    className="input-premium mt-3 w-full resize-y rounded-xl border-amber-200 text-sm"
+                    placeholder="Kyun hotel change kiya? (availability / upgrade / guest request…)"
+                    autoFocus
+                  />
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="teal"
+                      size="sm"
+                      className="rounded-xl gap-1.5"
+                      disabled={savingHotelChangeNote || !hotelChangeNote.trim()}
+                      onClick={confirmPendingHotelChange}
+                    >
+                      {savingHotelChangeNote ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <NotebookPen className="h-3.5 w-3.5" />}
+                      Save note & apply hotel
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl"
+                      disabled={savingHotelChangeNote}
+                      onClick={cancelPendingHotelChange}
+                    >
+                      Cancel change
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <HotelBookingSection
             bookingId={id}
@@ -638,6 +753,12 @@ export default function BookingDetailPage() {
             hotels={hotels}
             onChange={setHotels}
             onSaved={() => fetchBooking({ silent: true })}
+            locked={Boolean(pendingHotelChange)}
+            lockMessage={
+              pendingHotelChange
+                ? `Day ${pendingHotelChange.dayNumber}: ${pendingHotelChange.previousName} → ${pendingHotelChange.nextName}. Upar note save karo, phir master unlock hoga.`
+                : ''
+            }
           />
 
           <BookingTransportEditor

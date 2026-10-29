@@ -145,6 +145,8 @@ export default function OperationsItineraryBuilder({
   quotationHotels = [],
   catalogCabs = [],
   destination,
+  onHotelChangeRequest,
+  hotelChangePending = false,
 }) {
   const [picker, setPicker] = useState(null);
   const [hotelSeason, setHotelSeason] = useState('onSeason');
@@ -201,24 +203,56 @@ export default function OperationsItineraryBuilder({
     const roomType = textValue(option.room) || option.tierName || '';
     const mealPlan = textValue(option.mealPlan) || option.meals || '';
     const hotelId = String(option.hotelId || option.id || '');
+    const previousName = String(
+      picker.day.dayHotel?.hotelName || picker.day.hotelMeta?.name || picker.day.accommodation || ''
+    )
+      .split('·')[0]
+      .trim();
+    const previousId = String(picker.day.dayHotel?.hotelId || '');
+    const nextName = String(option.name || '').trim();
+    const isChange = Boolean(previousName)
+      && (
+        previousName.toLowerCase() !== nextName.toLowerCase()
+        || (previousId && hotelId && previousId !== hotelId)
+      );
+
+    const dayPatch = {
+      accommodation: [option.name, roomType, mealPlan].filter(Boolean).join(' · '),
+      meals: mealPlan || picker.day.meals,
+      dayHotel: {
+        hotelId,
+        hotelName: option.name,
+        destination: option.city || option.location || destination || '',
+        location: option.location || '',
+        roomType,
+        mealPlan,
+        source: 'catalog',
+        email: option.email || '',
+        phone: option.phone || '',
+        contactPerson: option.contactPerson || '',
+      },
+    };
+
+    // Existing stay change → require note before itinerary + Hotel Master update.
+    if (isChange && typeof onHotelChangeRequest === 'function') {
+      onHotelChangeRequest({
+        dayKey: picker.day.id || `ops-day-${picker.day.day}`,
+        dayNumber: Number(picker.day.day) || 1,
+        previousName,
+        nextName,
+        roomType,
+        mealPlan,
+        dayPatch,
+      });
+      setPicker(null);
+      return;
+    }
+
     emitChange(timelineDays.map((day) => {
       if (day.id !== picker.day.id) return day;
       return {
         ...day,
-        accommodation: [option.name, roomType, mealPlan].filter(Boolean).join(' · '),
-        meals: mealPlan || day.meals,
-        dayHotel: {
-          hotelId,
-          hotelName: option.name,
-          destination: option.city || option.location || destination || '',
-          location: option.location || '',
-          roomType,
-          mealPlan,
-          source: 'catalog',
-          email: option.email || '',
-          phone: option.phone || '',
-          contactPerson: option.contactPerson || '',
-        },
+        ...dayPatch,
         hotelMeta: {
           name: option.name,
           image: option.image,
@@ -294,7 +328,10 @@ export default function OperationsItineraryBuilder({
         dayWiseHotels={[]}
         packageCab={packageCab}
         onChange={emitChange}
-        onOpenHotelPicker={(day) => setPicker({ type: 'hotel', day })}
+        onOpenHotelPicker={(day) => {
+          if (hotelChangePending) return;
+          setPicker({ type: 'hotel', day });
+        }}
         onChangeCab={() => setPicker({ type: 'cab' })}
         destination={destination || 'Destination'}
         hotelSeason={hotelSeason}
@@ -302,7 +339,7 @@ export default function OperationsItineraryBuilder({
       />
 
       <PackageResourcePickerDrawer
-        open={picker?.type === 'hotel'}
+        open={picker?.type === 'hotel' && !hotelChangePending}
         onClose={() => setPicker(null)}
         mode="hotel"
         title={picker?.day ? `Change hotel · Day ${picker.day.day}` : 'Change hotel'}
