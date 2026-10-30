@@ -103,6 +103,8 @@ async function buildOpsSparklines(base, postponedLeadIds = []) {
     }),
     // Departures = trips starting that day
     todaysDepartures: (start, end) => ({ ...base, travelDate: { $gte: start, $lte: end } }),
+    // Arrivals = trips returning that day
+    todaysArrivals: (start, end) => ({ ...base, returnDate: { $gte: start, $lte: end } }),
     postponedBookings: (start, end) => ({
       ...base,
       lead: { $in: postponedLeadIds },
@@ -262,6 +264,8 @@ async function buildDashboard(branchId) {
     trendActiveLast,
     trendDeparturesThis,
     trendDeparturesLast,
+    trendArrivalsThis,
+    trendArrivalsLast,
     trendPostponedThis,
     trendPostponedLast,
     trendCancelledThis,
@@ -298,6 +302,8 @@ async function buildDashboard(branchId) {
     Booking.countDocuments({ ...base, status: 'in_progress', updatedAt: { $gte: lastWeek.start, $lte: lastWeek.end } }),
     Booking.countDocuments({ ...base, travelDate: { $gte: thisWeek.start, $lte: thisWeek.end } }),
     Booking.countDocuments({ ...base, travelDate: { $gte: lastWeek.start, $lte: lastWeek.end } }),
+    Booking.countDocuments({ ...base, returnDate: { $gte: thisWeek.start, $lte: thisWeek.end } }),
+    Booking.countDocuments({ ...base, returnDate: { $gte: lastWeek.start, $lte: lastWeek.end } }),
     postponedLeadIds.length
       ? Booking.countDocuments({
           ...base,
@@ -341,6 +347,7 @@ async function buildDashboard(branchId) {
     upcomingTours: pctChangeLabel(trendUpcomingThis, trendUpcomingLast),
     activeTrips: pctChangeLabel(trendActiveThis, trendActiveLast),
     todaysDepartures: pctChangeLabel(trendDeparturesThis, trendDeparturesLast),
+    todaysArrivals: pctChangeLabel(trendArrivalsThis, trendArrivalsLast),
     postponedBookings: pctChangeLabel(trendPostponedThis, trendPostponedLast),
     cancelledBookings: pctChangeLabel(trendCancelledThis, trendCancelledLast),
     completedTrips: pctChangeLabel(trendCompletedThis, trendCompletedLast),

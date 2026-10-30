@@ -3,6 +3,7 @@ import {
   CalendarClock,
   CircleCheck,
   Compass,
+  MapPin,
   PauseCircle,
   Plane,
   Ticket,
@@ -15,6 +16,7 @@ const KPI_CONFIG = [
   { key: 'upcomingTours', label: 'Upcoming Tours', icon: Compass, iconColor: 'bg-teal-500', sparkColor: '#14B8A6', to: '/operations-manager/trip-tracker' },
   { key: 'activeTrips', label: 'Active Tours (On Trip)', icon: Plane, iconColor: 'bg-emerald-500', sparkColor: '#22C55E', to: '/operations-manager/bookings/active' },
   { key: 'todaysDepartures', label: "Today's Departures", icon: CalendarClock, iconColor: 'bg-violet-500', sparkColor: '#8B5CF6', to: '/operations-manager/calendar' },
+  { key: 'todaysArrivals', label: "Today's Arrivals", icon: MapPin, iconColor: 'bg-blue-500', sparkColor: '#3B82F6', to: '/operations-manager/calendar' },
   { key: 'postponedBookings', label: 'Postponed Bookings', icon: PauseCircle, iconColor: 'bg-amber-500', sparkColor: '#F59E0B', to: '/operations-manager/bookings' },
   { key: 'cancelledBookings', label: 'Cancelled Bookings', icon: Ban, iconColor: 'bg-rose-500', sparkColor: '#EF4444', to: '/operations-manager/bookings' },
   { key: 'completedTrips', label: 'Completed Tours', icon: CircleCheck, iconColor: 'bg-slate-500', sparkColor: '#64748B', to: '/operations-manager/bookings/completed' },
@@ -28,7 +30,7 @@ export default function OperationsKpiCards({ kpis, kpiTrends, sparklines, loadin
   if (loading && !kpis) {
     return (
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4 md:gap-4">
-        {[...Array(7)].map((_, i) => (
+        {[...Array(8)].map((_, i) => (
           <div key={i} className="h-[74px] animate-pulse rounded-xl border border-slate-200 bg-white" />
         ))}
       </div>
