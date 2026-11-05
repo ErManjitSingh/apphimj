@@ -12,6 +12,8 @@ import {
   CircleCheck,
   Ticket,
   BadgeCheck,
+  Wallet,
+  ArrowUpRight,
 } from 'lucide-react';
 import KpiCard from '../../dashboard/KpiCard';
 import { buildSparkline, formatINRCompact, formatPercent } from './bookingListUtils';
@@ -66,7 +68,106 @@ function buildCompletedKpis(summary) {
   ];
 }
 
+function buildAllKpis(summary) {
+  const count = summary?.count || 0;
+  const paidInFull = summary?.paidInFull || 0;
+  const hotelsConfirmed = summary?.hotelsConfirmed || 0;
+
+  return [
+    {
+      key: 'count',
+      label: 'Total Bookings',
+      icon: Ticket,
+      iconColor: 'bg-sky-500',
+      sparkColor: '#0EA5E9',
+      change: `${summary?.statusActive || 0} on trip`,
+      changeType: 'up',
+      changeLabel: '',
+      format: (v) => v?.toLocaleString('en-IN') ?? '0',
+    },
+    {
+      key: 'totalAmount',
+      label: 'Gross Revenue',
+      icon: IndianRupee,
+      iconColor: 'bg-emerald-500',
+      sparkColor: '#22C55E',
+      change: formatINRCompact(summary?.advanceReceived),
+      changeType: 'up',
+      changeLabel: 'collected',
+      format: (v) => formatINRCompact(v),
+    },
+    {
+      key: 'pendingAmount',
+      label: 'Pending Collection',
+      icon: Wallet,
+      iconColor: 'bg-amber-500',
+      sparkColor: '#F59E0B',
+      change: `${summary?.paymentPending || 0} open`,
+      changeType: (summary?.pendingAmount || 0) > 0 ? 'down' : 'neutral',
+      changeLabel: '',
+      format: (v) => formatINRCompact(v),
+    },
+    {
+      key: 'totalPax',
+      label: 'Total Guests',
+      icon: Users,
+      iconColor: 'bg-violet-500',
+      sparkColor: '#8B5CF6',
+      change: `${summary?.statusActive || 0} traveling`,
+      changeType: 'up',
+      changeLabel: '',
+      format: (v) => v?.toLocaleString('en-IN') ?? '0',
+    },
+    {
+      key: 'todayOnTrip',
+      label: "Today's Departures",
+      icon: ArrowUpRight,
+      iconColor: 'bg-blue-500',
+      sparkColor: '#3B82F6',
+      change: `${summary?.returningToday || 0} arrivals`,
+      changeType: 'up',
+      changeLabel: '',
+      format: (v) => v?.toLocaleString('en-IN') ?? '0',
+      to: '/operations-manager/calendar?type=departure&today=1',
+    },
+    {
+      key: 'hotelsConfirmed',
+      label: 'Hotels Confirmed',
+      icon: Building2,
+      iconColor: 'bg-teal-500',
+      sparkColor: '#14B8A6',
+      change: `${formatPercent(hotelsConfirmed, count)} ready`,
+      changeType: 'up',
+      changeLabel: '',
+      format: (v) => v?.toLocaleString('en-IN') ?? '0',
+    },
+    {
+      key: 'paidInFull',
+      label: 'Paid in Full',
+      icon: BadgeCheck,
+      iconColor: 'bg-indigo-500',
+      sparkColor: '#6366F1',
+      change: `${formatPercent(paidInFull, count)} settled`,
+      changeType: 'up',
+      changeLabel: '',
+      format: (v) => v?.toLocaleString('en-IN') ?? '0',
+    },
+    {
+      key: 'hotelsPending',
+      label: 'Ops Pending',
+      icon: Hotel,
+      iconColor: 'bg-orange-500',
+      sparkColor: '#F97316',
+      change: `${summary?.cabsPending || 0} cab pending`,
+      changeType: (summary?.hotelsPending || 0) > 0 ? 'down' : 'neutral',
+      changeLabel: '',
+      format: (v) => v?.toLocaleString('en-IN') ?? '0',
+    },
+  ];
+}
+
 function resolveItems(status, summary) {
+  if (status === 'all') return buildAllKpis(summary);
   if (status === 'confirmed') return buildConfirmedKpis(summary);
   if (status === 'active') return buildActiveKpis(summary);
   if (status === 'completed') return buildCompletedKpis(summary);
@@ -76,7 +177,13 @@ function resolveItems(status, summary) {
 export default function BookingKpiStrip({ summary, status = 'pending', loading }) {
   const items = resolveItems(status, summary);
   const colClass =
-    items.length >= 6 ? 'xl:grid-cols-6' : items.length >= 5 ? 'xl:grid-cols-5' : 'xl:grid-cols-4';
+    items.length >= 8
+      ? 'xl:grid-cols-4 2xl:grid-cols-8'
+      : items.length >= 6
+        ? 'xl:grid-cols-6'
+        : items.length >= 5
+          ? 'xl:grid-cols-5'
+          : 'xl:grid-cols-4';
 
   if (loading && !summary) {
     return (
@@ -106,6 +213,7 @@ export default function BookingKpiStrip({ summary, status = 'pending', loading }
           sparkData={buildSparkline(summary[item.key])}
           index={i}
           compact
+          to={item.to}
         />
       ))}
     </div>

@@ -447,11 +447,25 @@ async function saveCommercialForm({ leadId, executiveId, branchId, body }) {
 
   await payment.save();
 
+  // Ensure ops booking exists (critical for repeated leads — conversion may have
+  // been skipped or previously attached to an older sibling booking).
+  let booking = null;
+  try {
+    const { createBookingFromPayment } = require('./operationsService');
+    if (['paid', 'partial'].includes(payment.status)) {
+      booking = await createBookingFromPayment(payment._id, { _id: executiveId });
+    }
+  } catch (err) {
+    console.error('[saveCommercialForm] createBookingFromPayment failed:', err.message);
+  }
+
   // Keep advance voucher HTML in sync with edited commercial amounts
   try {
     const { generateAndStoreReceipt } = require('./paymentReceiptService');
     const Booking = require('../models/Booking');
-    const booking = await Booking.findOne({ lead: leadId }).sort({ createdAt: -1 }).lean();
+    if (!booking) {
+      booking = await Booking.findOne({ lead: leadId }).sort({ createdAt: -1 }).lean();
+    }
     const quotation = payment.quotation
       ? await Quotation.findById(payment.quotation).lean()
       : null;

@@ -239,6 +239,23 @@ const bookingSchema = new mongoose.Schema(
     totalAmount: { type: Number, default: 0 },
     advanceReceived: { type: Number, default: 0 },
     pendingAmount: { type: Number, default: 0 },
+    /**
+     * Ops commercial snapshot — seeded from linked quotation pricing;
+     * ops can override without changing the customer quote.
+     */
+    opsCosting: {
+      hotelCost: { type: Number, default: 0 },
+      cabCost: { type: Number, default: 0 },
+      otherCost: { type: Number, default: 0 },
+      packageCost: { type: Number, default: 0 },
+      profitAmount: { type: Number, default: 0 },
+      profitMargin: { type: Number, default: 0 },
+      source: { type: String, enum: ['quotation', 'ops'], default: 'quotation' },
+      notes: { type: String, trim: true, default: '' },
+      updatedAt: { type: Date },
+      updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      updatedByName: { type: String, trim: true, default: '' },
+    },
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     archivedAt: { type: Date, index: true },
   },

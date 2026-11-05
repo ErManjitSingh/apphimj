@@ -380,12 +380,13 @@ async function aggregateExecutiveLeadCounts(userId, branchId) {
           },
           { $count: 'n' },
         ],
+        // Booked / converted / lost include repeat customers so ops handoff is visible
         converted: [
-          { $match: { ...notRepeated, status: { $in: ['converted', 'booked'] } } },
+          { $match: { status: { $in: ['converted', 'booked'] } } },
           { $count: 'n' },
         ],
         booked: [
-          { $match: { ...notRepeated, status: { $in: ['converted', 'booked'] } } },
+          { $match: { status: { $in: ['converted', 'booked'] } } },
           { $count: 'n' },
         ],
         postponed: [
@@ -395,7 +396,6 @@ async function aggregateExecutiveLeadCounts(userId, branchId) {
         lost: [
           {
             $match: {
-              ...notRepeated,
               status: { $in: ['lost', 'booked_from_another_company'] },
             },
           },

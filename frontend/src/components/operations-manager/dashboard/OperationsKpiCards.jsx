@@ -12,14 +12,70 @@ import KpiCard from '../../dashboard/KpiCard';
 import { buildSparkline } from '../bookings/bookingListUtils';
 
 const KPI_CONFIG = [
-  { key: 'totalBookings', label: 'Total Bookings', icon: Ticket, iconColor: 'bg-sky-500', sparkColor: '#0EA5E9', to: '/operations-manager/bookings' },
-  { key: 'upcomingTours', label: 'Upcoming Tours', icon: Compass, iconColor: 'bg-teal-500', sparkColor: '#14B8A6', to: '/operations-manager/trip-tracker' },
-  { key: 'activeTrips', label: 'Active Tours (On Trip)', icon: Plane, iconColor: 'bg-emerald-500', sparkColor: '#22C55E', to: '/operations-manager/bookings/active' },
-  { key: 'todaysDepartures', label: "Today's Departures", icon: CalendarClock, iconColor: 'bg-violet-500', sparkColor: '#8B5CF6', to: '/operations-manager/calendar' },
-  { key: 'todaysArrivals', label: "Today's Arrivals", icon: MapPin, iconColor: 'bg-blue-500', sparkColor: '#3B82F6', to: '/operations-manager/calendar' },
-  { key: 'postponedBookings', label: 'Postponed Bookings', icon: PauseCircle, iconColor: 'bg-amber-500', sparkColor: '#F59E0B', to: '/operations-manager/bookings' },
-  { key: 'cancelledBookings', label: 'Cancelled Bookings', icon: Ban, iconColor: 'bg-rose-500', sparkColor: '#EF4444', to: '/operations-manager/bookings' },
-  { key: 'completedTrips', label: 'Completed Tours', icon: CircleCheck, iconColor: 'bg-slate-500', sparkColor: '#64748B', to: '/operations-manager/bookings/completed' },
+  {
+    key: 'totalBookings',
+    label: 'Total Bookings',
+    icon: Ticket,
+    iconColor: 'bg-sky-500',
+    sparkColor: '#0EA5E9',
+    to: '/operations-manager/bookings/all',
+  },
+  {
+    key: 'upcomingTours',
+    label: 'Upcoming Tours',
+    icon: Compass,
+    iconColor: 'bg-teal-500',
+    sparkColor: '#14B8A6',
+    to: '/operations-manager/trip-tracker?tab=upcoming',
+  },
+  {
+    key: 'activeTrips',
+    label: 'Active Tours (On Trip)',
+    icon: Plane,
+    iconColor: 'bg-emerald-500',
+    sparkColor: '#22C55E',
+    to: '/operations-manager/bookings/active',
+  },
+  {
+    key: 'todaysDepartures',
+    label: "Today's Departures",
+    icon: CalendarClock,
+    iconColor: 'bg-violet-500',
+    sparkColor: '#8B5CF6',
+    to: '/operations-manager/calendar?type=departure&today=1',
+  },
+  {
+    key: 'todaysArrivals',
+    label: "Today's Arrivals",
+    icon: MapPin,
+    iconColor: 'bg-blue-500',
+    sparkColor: '#3B82F6',
+    to: '/operations-manager/calendar?type=return&today=1',
+  },
+  {
+    key: 'postponedBookings',
+    label: 'Postponed Bookings',
+    icon: PauseCircle,
+    iconColor: 'bg-amber-500',
+    sparkColor: '#F59E0B',
+    to: '/operations-manager/bookings/postponed',
+  },
+  {
+    key: 'cancelledBookings',
+    label: 'Cancelled Bookings',
+    icon: Ban,
+    iconColor: 'bg-rose-500',
+    sparkColor: '#EF4444',
+    to: '/operations-manager/bookings/cancelled',
+  },
+  {
+    key: 'completedTrips',
+    label: 'Completed Tours',
+    icon: CircleCheck,
+    iconColor: 'bg-slate-500',
+    sparkColor: '#64748B',
+    to: '/operations-manager/bookings/completed',
+  },
 ];
 
 const EMPTY_KPIS = Object.fromEntries(KPI_CONFIG.map((item) => [item.key, 0]));

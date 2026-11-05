@@ -20,6 +20,8 @@ import {
 import OperationsItineraryBuilder from './OperationsItineraryBuilder';
 import HotelBookingSection from './HotelBookingSection';
 import CompanyBookingVoucher from './CompanyBookingVoucher';
+import OpsCostingHeader from './OpsCostingHeader';
+import OpsQuotationPdfPanel from './OpsQuotationPdfPanel';
 import AddLeadPaymentModal from '../../leads/AddLeadPaymentModal';
 
 const DOC_TYPES = [
@@ -398,6 +400,7 @@ export default function BookingDetailPage() {
   const [savingHotelChangeNote, setSavingHotelChangeNote] = useState(false);
   const [availableQuotations, setAvailableQuotations] = useState([]);
   const [selectedQuoteId, setSelectedQuoteId] = useState('');
+  const [savingOpsCosting, setSavingOpsCosting] = useState(false);
 
   const setters = {
     setBooking,
@@ -520,6 +523,36 @@ export default function BookingDetailPage() {
       toast.error(err?.response?.data?.message || 'Could not sync quotation');
     } finally {
       setSyncingQuote(false);
+    }
+  };
+
+  const saveOpsCosting = async (payload) => {
+    setSavingOpsCosting(true);
+    try {
+      const r = await API.put(
+        `/operations-manager/bookings/${id}`,
+        { opsCosting: payload },
+        { skipSuccessToast: true }
+      );
+      setBooking((prev) => ({
+        ...prev,
+        ...r.data,
+        opsCosting: r.data.opsCosting || payload,
+        quotationMeta: prev?.quotationMeta,
+        quotationPreview: prev?.quotationPreview,
+        quoteCosting: prev?.quoteCosting || prev?.quotationMeta?.quoteCosting,
+        availableQuotations: prev?.availableQuotations,
+        paymentLedger: prev?.paymentLedger,
+        tasks: prev?.tasks,
+        documents: prev?.documents,
+        vouchers: prev?.vouchers,
+      }));
+      toast.success('Ops costing saved on file');
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Could not save ops costing');
+      throw err;
+    } finally {
+      setSavingOpsCosting(false);
     }
   };
 
@@ -646,6 +679,56 @@ export default function BookingDetailPage() {
 
   const amount = booking.totalAmount ?? booking.amount ?? 0;
   const quoteMeta = booking.quotationMeta || booking.quotationPreview?.meta;
+  const normalizeCosting = (raw) => {
+    if (!raw || typeof raw !== 'object') return null;
+    if (
+      raw.hotelCost != null ||
+      raw.cabCost != null ||
+      raw.otherCost != null ||
+      raw.packageCost != null ||
+      raw.profitAmount != null
+    ) {
+      const hotelCost = Number(raw.hotelCost) || 0;
+      const cabCost = Number(raw.cabCost) || 0;
+      const otherCost =
+        raw.otherCost != null
+          ? Number(raw.otherCost) || 0
+          : (Number(raw.flightCost) || 0) + (Number(raw.activityCost) || 0);
+      const packageCost =
+        Number(raw.packageCost) ||
+        Number(raw.total) ||
+        Number(raw.grandTotal) ||
+        hotelCost + cabCost + otherCost;
+      const markup = Number(raw.markup) || 0;
+      const discount = Number(raw.discount) || 0;
+      let profitAmount = Number(raw.profitAmount);
+      if (!Number.isFinite(profitAmount)) {
+        profitAmount = markup ? markup - discount : packageCost - (hotelCost + cabCost + otherCost);
+      }
+      const profitMargin =
+        Number(raw.profitMargin) ||
+        (packageCost > 0 ? Math.round((profitAmount / packageCost) * 1000) / 10 : 0);
+      return {
+        hotelCost,
+        cabCost,
+        otherCost,
+        packageCost,
+        profitAmount,
+        profitMargin,
+        source: raw.source || 'quotation',
+        notes: raw.notes || '',
+        updatedByName: raw.updatedByName || '',
+      };
+    }
+    return null;
+  };
+  const quoteCosting =
+    normalizeCosting(booking.quoteCosting) ||
+    normalizeCosting(quoteMeta?.quoteCosting) ||
+    normalizeCosting(quoteMeta?.pricing);
+  const opsCosting =
+    normalizeCosting(booking.opsCosting) ||
+    quoteCosting;
   const pending =
     Number(booking.pendingAmount) ||
     Math.max(0, amount - (Number(booking.advanceReceived) || 0));
@@ -692,6 +775,18 @@ export default function BookingDetailPage() {
             <p className="text-sm text-amber-600 font-semibold mt-1">Pending {formatINR(booking.pendingAmount)}</p>
           </div>
         </div>
+
+        {opsCosting && (
+          <div className="relative">
+            <OpsCostingHeader
+              costing={opsCosting}
+              quoteCosting={quoteCosting}
+              saving={savingOpsCosting}
+              onSave={saveOpsCosting}
+              onResetToQuote={saveOpsCosting}
+            />
+          </div>
+        )}
       </motion.div>
 
       <BookingSnapshot booking={booking} amount={amount} quoteMeta={quoteMeta} />
@@ -704,6 +799,11 @@ export default function BookingDetailPage() {
         selectedQuoteId={selectedQuoteId}
         onSelectQuote={setSelectedQuoteId}
         onSync={syncFromQuotation}
+      />
+
+      <OpsQuotationPdfPanel
+        bookingId={booking._id || id}
+        summary={booking.customerQuotation}
       />
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">

@@ -366,8 +366,12 @@ async function findExecutiveLeadsPaginated(userId, query = {}, options = {}) {
   const isRepeatedView = filterKey === 'duplicates' || filterKey === 'repeated';
   const isTotalView = filterKey === 'all' || !filterKey;
   const isFreshView = filterKey === 'new';
-  // Repeated leads only appear under Repeated menu — except Total / Fresh (reassign keeps full data)
-  if (!isRepeatedView && !isTotalView && !isFreshView) {
+  // Terminal lists must include repeat customers (otherwise a booked repeated lead
+  // disappears from Booked and never looks "handed to ops" from sales UI).
+  const isTerminalView = ['booked', 'converted', 'lost'].includes(filterKey);
+  // Active pipeline stages hide repeats (they live under Repeated menu) —
+  // except Total / Fresh / Booked / Lost.
+  if (!isRepeatedView && !isTotalView && !isFreshView && !isTerminalView) {
     owned.isRepeatCustomer = { $ne: true };
   }
 

@@ -279,9 +279,134 @@ async function resolveQuotationForBooking(booking) {
 async function listQuotationsForBookingLead(booking) {
   if (!booking?.lead) return [];
   return Quotation.find({ lead: booking.lead })
-    .select('quoteNumber status title pricing costing packageSnapshot createdAt updatedAt sentAt')
+    .select('quoteNumber status title pricing costing packageSnapshot createdAt updatedAt sentAt timeline')
     .sort({ updatedAt: -1 })
     .lean();
+}
+
+const CUSTOMER_QUOTE_STATUSES = new Set(['sent', 'viewed', 'negotiation', 'approved']);
+
+/** Prefer final/sent quotation for ops PDF — never drafts unless nothing else exists. */
+function pickCustomerFacingQuotation(booking, quotations = [], lead = null) {
+  const list = Array.isArray(quotations) ? quotations : [];
+  if (!list.length) return null;
+
+  const byId = (id) => list.find((q) => String(q._id) === String(id));
+
+  if (lead?.finalQuotation) {
+    const finalQ = byId(lead.finalQuotation);
+    if (finalQ) return finalQ;
+  }
+
+  const linkedId = booking?.quotation || booking?.quotationMeta?.quoteId;
+  if (linkedId) {
+    const linked = byId(linkedId);
+    if (linked && CUSTOMER_QUOTE_STATUSES.has(linked.status)) return linked;
+  }
+
+  const sent = list.find((q) => ['sent', 'viewed', 'negotiation'].includes(q.status));
+  if (sent) return sent;
+
+  const approved = list.find((q) => q.status === 'approved');
+  if (approved) return approved;
+
+  if (linkedId) {
+    const linked = byId(linkedId);
+    if (linked && linked.status !== 'draft' && linked.status !== 'rejected') return linked;
+  }
+
+  return null;
+}
+
+function roundMoney(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return 0;
+  return Math.round(x * 100) / 100;
+}
+
+/** Derive ops commercial strip from quotation pricing (hotel / cab / other / package / profit). */
+function deriveOpsCostingFromPricing(pricing = {}) {
+  const hotelCost = roundMoney(pricing.hotelCost);
+  const cabCost = roundMoney(pricing.cabCost);
+  const otherCost = roundMoney(
+    Number(pricing.flightCost || 0) + Number(pricing.activityCost || 0)
+  );
+  const costSum = hotelCost + cabCost + otherCost;
+
+  const packageCost = roundMoney(
+    pricing.total != null && pricing.total !== ''
+      ? pricing.total
+      : pricing.packageCost != null && pricing.packageCost !== ''
+        ? pricing.packageCost
+        : pricing.grandTotal != null
+          ? pricing.grandTotal
+          : costSum
+  );
+
+  const markup = Number(pricing.markup || 0);
+  const discount = Number(pricing.discount || 0);
+  let profitAmount = roundMoney(markup - discount);
+  if (!markup && packageCost > costSum) {
+    profitAmount = roundMoney(packageCost - costSum);
+  }
+  const profitMargin =
+    packageCost > 0
+      ? Math.round((profitAmount / packageCost) * 1000) / 10
+      : roundMoney(pricing.profitMargin);
+
+  return {
+    hotelCost,
+    cabCost,
+    otherCost,
+    packageCost,
+    profitAmount,
+    profitMargin,
+    source: 'quotation',
+  };
+}
+
+function resolveOpsCosting(booking, quotePricing) {
+  const fromQuote = deriveOpsCostingFromPricing(quotePricing || {});
+  const existing = booking?.opsCosting;
+  if (existing && existing.source === 'ops') {
+    return {
+      hotelCost: roundMoney(existing.hotelCost),
+      cabCost: roundMoney(existing.cabCost),
+      otherCost: roundMoney(existing.otherCost),
+      packageCost: roundMoney(existing.packageCost),
+      profitAmount: roundMoney(existing.profitAmount),
+      profitMargin: roundMoney(existing.profitMargin),
+      source: 'ops',
+      notes: existing.notes || '',
+      updatedAt: existing.updatedAt || null,
+      updatedBy: existing.updatedBy || null,
+      updatedByName: existing.updatedByName || '',
+    };
+  }
+  if (
+    existing &&
+    (Number(existing.hotelCost) ||
+      Number(existing.cabCost) ||
+      Number(existing.otherCost) ||
+      Number(existing.packageCost) ||
+      Number(existing.profitAmount))
+  ) {
+    return {
+      ...fromQuote,
+      ...Object.fromEntries(
+        ['hotelCost', 'cabCost', 'otherCost', 'packageCost', 'profitAmount', 'profitMargin'].map((k) => [
+          k,
+          existing[k] != null && existing[k] !== '' ? roundMoney(existing[k]) : fromQuote[k],
+        ])
+      ),
+      source: existing.source === 'ops' ? 'ops' : 'quotation',
+      notes: existing.notes || '',
+      updatedAt: existing.updatedAt || null,
+      updatedBy: existing.updatedBy || null,
+      updatedByName: existing.updatedByName || '',
+    };
+  }
+  return { ...fromQuote, notes: '', updatedAt: null, updatedBy: null, updatedByName: '' };
 }
 
 async function extractFulfillmentFromQuotation(quotation, booking = {}) {
@@ -294,6 +419,10 @@ async function extractFulfillmentFromQuotation(quotation, booking = {}) {
     executiveName = exec?.name || '';
   }
 
+  const pricing = quotation?.pricing || quotation?.costing || {};
+  const quoteCosting = deriveOpsCostingFromPricing(pricing);
+  const opsCosting = resolveOpsCosting(booking, pricing);
+
   return {
     itinerary: mapQuoteItinerary(quotation, travelDate, executiveName),
     hotels: mapQuoteHotels(quotation, travelDate),
@@ -304,6 +433,8 @@ async function extractFulfillmentFromQuotation(quotation, booking = {}) {
     quotationReference: quotation?.quoteNumber || booking.quotationReference || '',
     executiveName,
     totalAmount: quotation?.pricing?.total || quotation?.costing?.grandTotal || booking.totalAmount,
+    quoteCosting,
+    opsCosting,
     meta: {
       quoteNumber: quotation?.quoteNumber,
       quoteId: quotation?._id,
@@ -311,7 +442,8 @@ async function extractFulfillmentFromQuotation(quotation, booking = {}) {
       packageName: snap.name || snap.title,
       inclusions: snap.inclusions || [],
       exclusions: snap.exclusions || [],
-      pricing: quotation?.pricing || quotation?.costing || {},
+      pricing,
+      quoteCosting,
       terms: snap.terms || snap.termsAndConditions || [],
       selectedHotels: quotation?.selectedHotels || [],
       selectedCabs: quotation?.selectedCabs || [],
@@ -373,13 +505,26 @@ async function syncBookingFromQuotation(bookingId, { force = false, quotationId 
     }
   }
 
+  // Seed / refresh ops costing from quotation unless ops already customized it
+  if (booking.opsCosting?.source !== 'ops') {
+    patch.opsCosting = {
+      ...extracted.opsCosting,
+      source: 'quotation',
+      updatedAt: new Date(),
+    };
+  }
+
   let updated = booking;
   if (Object.keys(patch).length) {
     updated = await Booking.findByIdAndUpdate(bookingId, patch, { new: true }).lean();
   }
 
   return {
-    booking: updated,
+    booking: {
+      ...updated,
+      opsCosting: updated.opsCosting || extracted.opsCosting,
+      quoteCosting: extracted.quoteCosting,
+    },
     quotation,
     quotationPreview: extracted,
     synced: Object.keys(patch).length > 0,
@@ -388,13 +533,17 @@ async function syncBookingFromQuotation(bookingId, { force = false, quotationId 
 
 async function enrichBookingWithQuotation(booking) {
   const quotation = await resolveQuotationForBooking(booking);
-  if (!quotation) return booking;
+  if (!quotation) {
+    if (booking?.opsCosting) return booking;
+    return booking;
+  }
 
   const preview = await extractFulfillmentFromQuotation(quotation, booking);
   const needsAutoSync =
     !booking.itinerary?.length ||
     !booking.hotels?.length ||
-    (!booking.transport?.length && preview.transport.length > 0);
+    (!booking.transport?.length && preview.transport.length > 0) ||
+    (booking.opsCosting?.source !== 'ops' && !Number(booking.opsCosting?.packageCost));
 
   if (needsAutoSync) {
     const result = await syncBookingFromQuotation(booking._id, { force: false });
@@ -403,13 +552,24 @@ async function enrichBookingWithQuotation(booking) {
         ...result.booking,
         quotationPreview: result.quotationPreview,
         quotationMeta: result.quotationPreview?.meta,
+        opsCosting: result.booking.opsCosting || preview.opsCosting,
+        quoteCosting: preview.quoteCosting,
         autoSyncedFromQuotation: result.synced,
       };
     }
   }
 
+  // Persist quotation-seeded costing once if booking has none
+  if (booking.opsCosting?.source !== 'ops' && !Number(booking.opsCosting?.packageCost)) {
+    await Booking.findByIdAndUpdate(booking._id, {
+      opsCosting: { ...preview.opsCosting, source: 'quotation', updatedAt: new Date() },
+    });
+  }
+
   return {
     ...booking,
+    opsCosting: preview.opsCosting,
+    quoteCosting: preview.quoteCosting,
     quotationPreview: preview,
     quotationMeta: preview.meta,
   };
@@ -420,9 +580,13 @@ module.exports = {
   mapQuoteHotels,
   mapQuoteTransport,
   mapQuoteActivities,
+  deriveOpsCostingFromPricing,
+  resolveOpsCosting,
   extractFulfillmentFromQuotation,
   syncBookingFromQuotation,
   enrichBookingWithQuotation,
   resolveQuotationForBooking,
   listQuotationsForBookingLead,
+  pickCustomerFacingQuotation,
+  CUSTOMER_QUOTE_STATUSES,
 };

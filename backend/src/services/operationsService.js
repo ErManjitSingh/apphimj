@@ -51,8 +51,24 @@ function endOfDay(d = new Date()) {
 }
 
 function resolveStatusFilter(statusKey) {
-  if (!statusKey) return null;
-  return STATUS_ROUTE_MAP[statusKey] || [statusKey];
+  const key = String(statusKey || '').trim().toLowerCase();
+  // "all" / empty / unknown portfolio keys → no status constraint (show every booking)
+  if (!key || key === 'all' || key === 'total' || key === 'postponed') return null;
+  if (STATUS_ROUTE_MAP[key]) return STATUS_ROUTE_MAP[key];
+  // Only accept real booking status values — never invent filters like status:"all"
+  const knownBookingStatuses = new Set([
+    'booking_received',
+    'pending_verification',
+    'pending',
+    'confirmed',
+    'in_progress',
+    'completed',
+    'cancelled',
+    'refund_pending',
+    'refund_completed',
+  ]);
+  if (knownBookingStatuses.has(key)) return [key];
+  return null;
 }
 
 function notArchivedFilter() {
@@ -464,6 +480,8 @@ async function getDashboard(branchId) {
 async function aggregateBookingSummary(filter) {
   const todayStart = startOfDay();
   const todayEnd = endOfDay();
+  const monthStart = new Date(todayStart.getFullYear(), todayStart.getMonth(), 1);
+  const pendingStatuses = STATUS_ROUTE_MAP.pending;
 
   const [row] = await Booking.aggregate([
     { $match: filter },
@@ -472,6 +490,8 @@ async function aggregateBookingSummary(filter) {
         _id: null,
         count: { $sum: 1 },
         totalAmount: { $sum: { $ifNull: ['$totalAmount', 0] } },
+        pendingAmount: { $sum: { $ifNull: ['$pendingAmount', 0] } },
+        advanceReceived: { $sum: { $ifNull: ['$advanceReceived', 0] } },
         totalPax: {
           $sum: {
             $add: [{ $ifNull: ['$adults', 0] }, { $ifNull: ['$children', 0] }],
@@ -522,7 +542,7 @@ async function aggregateBookingSummary(filter) {
             $cond: [
               {
                 $and: [
-                  { $gte: ['$returnDate', new Date(new Date().getFullYear(), new Date().getMonth(), 1)] },
+                  { $gte: ['$returnDate', monthStart] },
                   { $lte: ['$returnDate', todayEnd] },
                 ],
               },
@@ -546,6 +566,41 @@ async function aggregateBookingSummary(filter) {
         paidInFull: {
           $sum: { $cond: [{ $eq: ['$paymentStatus', 'paid'] }, 1, 0] },
         },
+        paymentPending: {
+          $sum: {
+            $cond: [{ $in: ['$paymentStatus', ['pending', 'partial']] }, 1, 0],
+          },
+        },
+        statusPending: {
+          $sum: { $cond: [{ $in: ['$status', pendingStatuses] }, 1, 0] },
+        },
+        statusConfirmed: {
+          $sum: { $cond: [{ $eq: ['$status', 'confirmed'] }, 1, 0] },
+        },
+        statusActive: {
+          $sum: { $cond: [{ $eq: ['$status', 'in_progress'] }, 1, 0] },
+        },
+        statusCompleted: {
+          $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] },
+        },
+        statusCancelled: {
+          $sum: { $cond: [{ $eq: ['$status', 'cancelled'] }, 1, 0] },
+        },
+        todayPending: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $in: ['$status', pendingStatuses] },
+                  { $gte: ['$createdAt', todayStart] },
+                  { $lte: ['$createdAt', todayEnd] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
       },
     },
   ]);
@@ -553,6 +608,8 @@ async function aggregateBookingSummary(filter) {
   return row || {
     count: 0,
     totalAmount: 0,
+    pendingAmount: 0,
+    advanceReceived: 0,
     totalPax: 0,
     todayPending: 0,
     hotelsConfirmed: 0,
@@ -565,6 +622,12 @@ async function aggregateBookingSummary(filter) {
     vouchersIssued: 0,
     vouchersRedeemed: 0,
     paidInFull: 0,
+    paymentPending: 0,
+    statusPending: 0,
+    statusConfirmed: 0,
+    statusActive: 0,
+    statusCompleted: 0,
+    statusCancelled: 0,
   };
 }
 
@@ -992,8 +1055,16 @@ async function listBookings(query = {}, { branchId } = {}) {
   const { page, limit, skip } = parsePagination(query, { defaultLimit: 10, maxLimit: 100 });
   const filter = withBranch(notArchivedFilter(), branchId);
 
-  const statusList = resolveStatusFilter(query.status);
-  if (statusList) filter.status = { $in: statusList };
+  const statusKey = String(query.status || '').trim();
+  if (statusKey === 'postponed') {
+    const postponedLeads = await Lead.find({ status: 'postponed', isDeleted: { $ne: true } })
+      .select('_id')
+      .lean();
+    filter.lead = { $in: postponedLeads.map((l) => l._id) };
+  } else {
+    const statusList = resolveStatusFilter(statusKey);
+    if (statusList) filter.status = { $in: statusList };
+  }
 
   if (query.bookingStatus) {
     filter.status = query.bookingStatus;
@@ -1085,11 +1156,46 @@ async function updateBooking(id, payload, actor) {
     'hotelConfirmation', 'cabConfirmation', 'activityConfirmation', 'voucherStatus',
     'totalAmount', 'advanceReceived', 'assignedTo', 'travelDate', 'returnDate',
     'packageName', 'destination', 'quotationReference', 'executiveName',
-    'complimentary', 'specialNotes', 'companyVoucherUrl',
+    'complimentary', 'specialNotes', 'companyVoucherUrl', 'opsCosting',
   ];
   const patch = Object.fromEntries(
     Object.entries(payload || {}).filter(([key]) => allowed.includes(key))
   );
+
+  if (patch.opsCosting && typeof patch.opsCosting === 'object') {
+    const round = (n) => {
+      const x = Number(n);
+      return Number.isFinite(x) ? Math.round(x * 100) / 100 : 0;
+    };
+    const hotelCost = round(patch.opsCosting.hotelCost);
+    const cabCost = round(patch.opsCosting.cabCost);
+    const otherCost = round(patch.opsCosting.otherCost);
+    const packageCost = round(patch.opsCosting.packageCost);
+    const profitAmount =
+      patch.opsCosting.profitAmount != null && patch.opsCosting.profitAmount !== ''
+        ? round(patch.opsCosting.profitAmount)
+        : round(packageCost - (hotelCost + cabCost + otherCost));
+    const profitMargin =
+      patch.opsCosting.profitMargin != null && patch.opsCosting.profitMargin !== ''
+        ? round(patch.opsCosting.profitMargin)
+        : packageCost > 0
+          ? Math.round((profitAmount / packageCost) * 1000) / 10
+          : 0;
+    const resetToQuote = Boolean(patch.opsCosting.resetToQuote);
+    patch.opsCosting = {
+      hotelCost,
+      cabCost,
+      otherCost,
+      packageCost,
+      profitAmount,
+      profitMargin,
+      source: resetToQuote ? 'quotation' : 'ops',
+      notes: String(patch.opsCosting.notes || '').slice(0, 2000),
+      updatedAt: new Date(),
+      updatedBy: actor?._id,
+      updatedByName: actor?.name || actor?.email || 'Operations',
+    };
+  }
 
   if (patch.totalAmount != null || patch.advanceReceived != null) {
     const total = Number(patch.totalAmount ?? prev.totalAmount ?? 0);
@@ -1187,13 +1293,16 @@ async function createBookingFromPayment(paymentId, actor) {
   if (!payment) return null;
   if (!['paid', 'partial'].includes(payment.status)) return null;
 
+  const paymentLeadId = payment.lead ? String(payment.lead) : '';
+
   let existing = payment.booking ? await Booking.findById(payment.booking) : null;
-  if (!existing) {
-    const identities = [
-      ...(payment.lead ? [{ lead: payment.lead }] : []),
-      ...(payment.quotation ? [{ quotation: payment.quotation }] : []),
-    ];
-    if (identities.length) existing = await Booking.findOne({ $or: identities });
+  // Never reuse another lead's booking (quotation match used to attach repeat
+  // customers onto the previous trip — ops never saw a new booking).
+  if (existing && paymentLeadId && String(existing.lead || '') !== paymentLeadId) {
+    existing = null;
+  }
+  if (!existing && payment.lead) {
+    existing = await Booking.findOne({ lead: payment.lead }).sort({ createdAt: -1 });
   }
 
   if (existing) {

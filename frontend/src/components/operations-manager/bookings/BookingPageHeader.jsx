@@ -1,12 +1,15 @@
 import { motion } from 'framer-motion';
-import { Calendar, CheckCircle2, CircleCheck, MoreHorizontal, Plane } from 'lucide-react';
+import { Ban, Calendar, CheckCircle2, CircleCheck, MoreHorizontal, PauseCircle, Plane, Ticket } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { formatDateRangeLabel } from './bookingListUtils';
 
 const STATUS_ICONS = {
+  all: { icon: Ticket, className: 'text-sky-500' },
   confirmed: { icon: CheckCircle2, className: 'text-emerald-500' },
   active: { icon: Plane, className: 'text-blue-500' },
   completed: { icon: CircleCheck, className: 'text-slate-600' },
+  cancelled: { icon: Ban, className: 'text-rose-500' },
+  postponed: { icon: PauseCircle, className: 'text-amber-500' },
 };
 
 export default function BookingPageHeader({

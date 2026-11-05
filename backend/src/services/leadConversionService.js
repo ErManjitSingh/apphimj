@@ -280,8 +280,32 @@ async function onLeadConverted(lead, actor, options = {}) {
   }
 
   let booking = existingBooking;
-  if (!booking) {
+  if (!booking && payment) {
     booking = await createBookingFromPayment(payment._id, actor);
+  }
+  // Guard: payment helper must never hand back another lead's booking
+  if (booking && lead?._id && String(booking.lead || '') !== String(lead._id)) {
+    booking = null;
+    if (payment) {
+      await Payment.findByIdAndUpdate(payment._id, { $unset: { booking: 1 } });
+      booking = await createBookingFromPayment(payment._id, actor);
+    }
+  }
+  if (!booking && payment) {
+    // Last resort — create even if payment status edge-cased
+    const forced = await Payment.findByIdAndUpdate(
+      payment._id,
+      {
+        status:
+          Number(payment.paidAmount) > 0
+            ? Number(payment.paidAmount) >= Number(payment.amount) && Number(payment.amount) > 0
+              ? 'paid'
+              : 'partial'
+            : 'partial',
+      },
+      { new: true }
+    );
+    booking = await createBookingFromPayment((forced || payment)._id, actor);
   }
 
   // Ensure booking advances mirror payment when booking already existed

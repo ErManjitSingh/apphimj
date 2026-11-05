@@ -7,6 +7,8 @@ const Hotel = require('../models/Hotel');
 const Cab = require('../models/Cab');
 const Flight = require('../models/Flight');
 const Payment = require('../models/Payment');
+const Lead = require('../models/Lead');
+const Quotation = require('../models/Quotation');
 const ApiError = require('../utils/apiError');
 const asyncHandler = require('../utils/asyncHandler');
 const ops = require('../services/operationsService');
@@ -17,6 +19,7 @@ const {
   enrichBookingWithQuotation,
   syncBookingFromQuotation,
   listQuotationsForBookingLead,
+  pickCustomerFacingQuotation,
 } = require('../services/operationsQuotationSyncService');
 const { normalizeBookingAssignments } = require('../services/operationsStayService');
 const {
@@ -307,21 +310,88 @@ const getBooking = asyncHandler(async (req, res) => {
     enrichHotelContacts(booking.hotels || []),
     enrichTransportContacts(booking.transport || []),
   ]);
-  const [refreshedVouchers, availableQuotations] = await Promise.all([
+  const [refreshedVouchers, availableQuotations, lead] = await Promise.all([
     refreshVoucherDocuments(vouchers, booking, hotels, transport),
     listQuotationsForBookingLead(booking),
+    booking.lead
+      ? Lead.findById(booking.lead).select('finalQuotation finalQuotationSetAt').lean()
+      : Promise.resolve(null),
   ]);
+  const customerQuote = pickCustomerFacingQuotation(booking, availableQuotations, lead);
   res.json({
     ...booking,
     hotels,
     transport,
     availableQuotations,
+    customerQuotation: customerQuote
+      ? {
+          _id: customerQuote._id,
+          quoteNumber: customerQuote.quoteNumber,
+          status: customerQuote.status,
+          sentAt: customerQuote.sentAt || null,
+          packageName:
+            customerQuote.packageSnapshot?.name ||
+            customerQuote.packageSnapshot?.title ||
+            booking.packageName ||
+            '',
+          total:
+            customerQuote.pricing?.total ||
+            customerQuote.costing?.grandTotal ||
+            booking.totalAmount ||
+            0,
+          available: true,
+        }
+      : {
+          available: false,
+          message: 'The sales executive did not send any quotation PDF from the CRM.',
+        },
     tasks,
     documents,
     payments,
     paymentLedger: paymentLedger(payments),
     vouchers: refreshedVouchers,
     packageRouting: packageRouting(booking),
+  });
+});
+
+/** Full quotation payload for ops PDF preview (sent / final quote only). */
+const getBookingCustomerQuotation = asyncHandler(async (req, res) => {
+  const booking = await Booking.findById(req.params.id).lean();
+  if (!booking) throw new ApiError(404, 'Booking not found');
+
+  const [availableQuotations, lead] = await Promise.all([
+    listQuotationsForBookingLead(booking),
+    booking.lead
+      ? Lead.findById(booking.lead).select('finalQuotation finalQuotationSetAt').lean()
+      : Promise.resolve(null),
+  ]);
+
+  const picked = pickCustomerFacingQuotation(booking, availableQuotations, lead);
+  if (!picked) {
+    return res.json({
+      available: false,
+      message: 'The sales executive did not send any quotation PDF from the CRM.',
+      quotation: null,
+    });
+  }
+
+  const quotation = await Quotation.findById(picked._id).lean();
+  if (!quotation) {
+    return res.json({
+      available: false,
+      message: 'The sales executive did not send any quotation PDF from the CRM.',
+      quotation: null,
+    });
+  }
+
+  res.json({
+    available: true,
+    quotation,
+    meta: {
+      quoteNumber: quotation.quoteNumber,
+      status: quotation.status,
+      sentAt: quotation.sentAt || null,
+    },
   });
 });
 
@@ -1012,15 +1082,38 @@ const createCompanyVoucher = asyncHandler(async (req, res) => {
 });
 
 const getCalendar = asyncHandler(async (req, res) => {
-  const bookings = await Booking.find({ travelDate: { $exists: true }, archivedAt: { $exists: false } }).lean();
-  const events = bookings.map((b) => ({
-    _id: b._id,
-    title: `${b.customerName} — ${b.destination}`,
-    start: b.travelDate,
-    end: b.returnDate || b.travelDate,
-    type: 'travel',
-    status: b.status,
-  }));
+  const bookings = await Booking.find({
+    archivedAt: { $exists: false },
+    $or: [{ travelDate: { $exists: true, $ne: null } }, { returnDate: { $exists: true, $ne: null } }],
+  }).lean();
+
+  const events = [];
+  for (const b of bookings) {
+    const title = `${b.customerName} — ${b.destination}`;
+    if (b.travelDate) {
+      events.push({
+        _id: b._id,
+        title,
+        start: b.travelDate,
+        end: b.travelDate,
+        type: 'departure',
+        status: b.status,
+        bookingNumber: b.bookingNumber,
+      });
+    }
+    if (b.returnDate) {
+      events.push({
+        _id: b._id,
+        title,
+        start: b.returnDate,
+        end: b.returnDate,
+        type: 'return',
+        status: b.status,
+        bookingNumber: b.bookingNumber,
+      });
+    }
+  }
+
   res.json(events);
 });
 
@@ -1030,6 +1123,7 @@ module.exports = {
   createBooking,
   generateItineraryPdf,
   getBooking,
+  getBookingCustomerQuotation,
   syncBookingQuotation,
   updateBooking,
   addBookingOpsNote,

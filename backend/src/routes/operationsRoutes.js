@@ -9,6 +9,7 @@ const {
   createBooking,
   generateItineraryPdf,
   getBooking,
+  getBookingCustomerQuotation,
   syncBookingQuotation,
   updateBooking,
   addBookingOpsNote,
@@ -59,8 +60,14 @@ router.get('/trip-tracker', requirePermission('operations', 'view'), getTripTrac
 router.get('/bookings', requirePermission('operations', 'view'), listBookings);
 router.post('/bookings', requirePermission('operations', 'create'), createBooking);
 router.get('/bookings/:id', requirePermission('operations', 'view'), getBooking);
+router.get(
+  '/bookings/:id/customer-quotation',
+  requirePermission('operations', 'view'),
+  getBookingCustomerQuotation
+);
 router.post('/bookings/:id/sync-quotation', requirePermission('operations', 'edit'), syncBookingQuotation);
 router.put('/bookings/:id', requirePermission('operations', 'edit'), updateBooking);
+router.patch('/bookings/:id', requirePermission('operations', 'edit'), updateBooking);
 router.post('/bookings/:id/ops-notes', requirePermission('operations', 'edit'), addBookingOpsNote);
 router.post('/bookings/:id/record-payment', requirePermission('operations', 'edit'), recordBookingPayment);
 router.post('/bookings/:id/itinerary-pdf', requirePermission('operations', 'edit'), generateItineraryPdf);

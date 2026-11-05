@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { LayoutGrid, List } from 'lucide-react';
 import API from '../../../api/axios';
 import { cn } from '../../../lib/utils';
@@ -15,6 +16,8 @@ const TABS = [
   { key: 'cancelled', label: 'Cancelled' },
 ];
 
+const VALID_TABS = new Set(TABS.map((t) => t.key));
+
 const SORT_OPTIONS = [
   { value: 'departure', label: 'Departure Date' },
   { value: 'customer', label: 'Customer Name' },
@@ -22,11 +25,20 @@ const SORT_OPTIONS = [
 ];
 
 export default function TripTrackerPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const tab = VALID_TABS.has(tabParam) ? tabParam : 'upcoming';
+
   const [data, setData] = useState(null);
-  const [tab, setTab] = useState('upcoming');
   const [sortBy, setSortBy] = useState('departure');
   const [viewMode, setViewMode] = useState('grid');
   const [loading, setLoading] = useState(true);
+
+  const setTab = (key) => {
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', key);
+    setSearchParams(next, { replace: true });
+  };
 
   useEffect(() => {
     setLoading(true);

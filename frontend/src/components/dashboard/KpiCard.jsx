@@ -141,9 +141,10 @@ export default function KpiCard({
       {chartData.length > 0 && (
         <div
           className={cn(
-            '-mx-1 mt-auto opacity-70 group-hover:opacity-100 transition-opacity',
+            '-mx-1 mt-auto opacity-70 group-hover:opacity-100 transition-opacity pointer-events-none',
             dense ? 'h-5' : 'h-10'
           )}
+          aria-hidden
         >
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
@@ -153,7 +154,7 @@ export default function KpiCard({
                   <stop offset="100%" stopColor={sparkColor} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <Area type="monotone" dataKey="v" stroke={sparkColor} strokeWidth={1.5} fill={`url(#kpi-${index})`} dot={false} />
+              <Area type="monotone" dataKey="v" stroke={sparkColor} strokeWidth={1.5} fill={`url(#kpi-${index})`} dot={false} isAnimationActive={false} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
