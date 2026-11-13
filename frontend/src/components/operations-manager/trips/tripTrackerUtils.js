@@ -26,17 +26,32 @@ export function formatTripDateShort(dateStr) {
   }).toUpperCase();
 }
 
+function parseLocalDateInput(value) {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  const raw = String(value).trim();
+  const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) {
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 export function formatDateRangeLabel(from, to) {
   const fmt = (d) =>
     d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-  if (!from && !to) {
-    const end = new Date();
-    const start = new Date();
-    start.setDate(end.getDate() - 6);
+  if (!from && !to) return 'All dates';
+  const start = parseLocalDateInput(from);
+  const end = parseLocalDateInput(to);
+  if (start && end) {
+    if (start.getTime() === end.getTime()) return fmt(start);
     return `${fmt(start)} – ${fmt(end)}`;
   }
-  if (from && to) return `${fmt(new Date(from))} – ${fmt(new Date(to))}`;
-  return fmt(new Date());
+  if (start) return `From ${fmt(start)}`;
+  if (end) return `Until ${fmt(end)}`;
+  return 'All dates';
 }
 
 const TONE_STYLES = {

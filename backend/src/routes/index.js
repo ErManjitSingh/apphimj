@@ -93,6 +93,7 @@ router.use('/announcements', announcementRoutes);
 router.use('/lead-status-config', require('./leadStatusConfigRoutes'));
 router.use('/hr', require('./hrRoutes'));
 router.use('/payments', paymentRoutes);
+router.use('/accounts', require('./accountsRoutes'));
 router.use('/notifications', notificationRoutes);
 router.use('/team', teamRoutes);
 router.use('/teams', teamsRoutes);

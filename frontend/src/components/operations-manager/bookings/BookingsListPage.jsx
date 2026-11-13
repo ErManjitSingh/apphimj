@@ -13,6 +13,8 @@ import BookingKpiStrip from './BookingKpiStrip';
 import BookingFilterBar from './BookingFilterBar';
 import BookingRowActions from './BookingRowActions';
 import TotalBookingsOverview from './TotalBookingsOverview';
+import LifecycleBookingsBoard from './LifecycleBookingsBoard';
+import CompletedToursBoard from './CompletedToursBoard';
 import {
   countActiveBookingFilters,
   formatActiveTravelDate,
@@ -36,6 +38,7 @@ const ALL_STATUS_OPTIONS = [
   'confirmed',
   'in_progress',
   'completed',
+  'postponed',
   'cancelled',
   'refund_pending',
   'refund_completed',
@@ -75,19 +78,19 @@ const PAGE_META = {
   },
   postponed: {
     title: 'Postponed Bookings',
-    desc: 'Tours on hold — booking postponed status or linked postponed leads',
-    searchPlaceholder: 'Search customer, booking #, destination...',
+    desc: 'Tours on hold — reason, travel window, and outstanding money in one glance',
+    searchPlaceholder: 'Search customer, booking #, destination, reason...',
     paginationLabel: 'postponed bookings',
   },
   cancelled: {
     title: 'Cancelled Bookings',
-    desc: 'Cancelled / refunded tours — including archived and lost-lead bookings',
-    searchPlaceholder: 'Search customer, booking #, destination...',
+    desc: 'Closed tours — cancellation reason, refunds, and package value at a glance',
+    searchPlaceholder: 'Search customer, booking #, destination, reason...',
     paginationLabel: 'cancelled bookings',
   },
   completed: {
     title: 'Completed Trips',
-    desc: 'Successfully fulfilled bookings — review trip closure & voucher status',
+    desc: 'Closed tours — travel window, hotel/cab fulfilment, collections and profit at a glance',
     searchPlaceholder: 'Search by booking #, customer, destination, hotel...',
     paginationLabel: 'completed trips',
   },
@@ -100,6 +103,7 @@ const EMPTY_FILTERS = {
   package: '',
   dateFrom: '',
   dateTo: '',
+  dateField: '', // '' = auto (createdAt on Total Bookings, travelDate on trip lists)
 };
 
 function ConfirmationCell({ value, detail, listStatus, icon: Icon }) {
@@ -494,6 +498,46 @@ function buildColumns(listStatus, selection) {
     });
   }
 
+  if (listStatus === 'postponed') {
+    const statusIdx = cols.findIndex((c) => c.key === 'status');
+    cols.splice(statusIdx >= 0 ? statusIdx : cols.length - 1, 0, {
+      key: 'postponedReason',
+      header: 'Reason',
+      headerClassName: 'min-w-[160px]',
+      className: 'max-w-[220px]',
+      render: (b) => {
+        const reason = String(b.postponedReason || b.leadPostponedReason || '').trim();
+        return reason ? (
+          <p className="text-xs text-amber-900/90 leading-snug break-words" title={reason}>
+            {reason}
+          </p>
+        ) : (
+          <span className="text-xs text-content-muted">—</span>
+        );
+      },
+    });
+  }
+
+  if (listStatus === 'cancelled') {
+    const statusIdx = cols.findIndex((c) => c.key === 'status');
+    cols.splice(statusIdx >= 0 ? statusIdx : cols.length - 1, 0, {
+      key: 'cancelReason',
+      header: 'Reason',
+      headerClassName: 'min-w-[160px]',
+      className: 'max-w-[220px]',
+      render: (b) => {
+        const reason = String(b.cancelReason || b.leadCancelReason || '').trim();
+        return reason ? (
+          <p className="text-xs text-rose-900/90 leading-snug break-words" title={reason}>
+            {reason}
+          </p>
+        ) : (
+          <span className="text-xs text-content-muted">—</span>
+        );
+      },
+    });
+  }
+
   return cols;
 }
 
@@ -502,6 +546,8 @@ export default function BookingsListPage() {
   const { status } = useParams();
   const meta = PAGE_META[status] || PAGE_META.all;
   const isAll = status === 'all';
+  const isLifecycle = status === 'postponed' || status === 'cancelled';
+  const isCompleted = status === 'completed';
   const showKpis = ['all', 'pending', 'confirmed', 'active', 'completed'].includes(status);
 
   const [bookings, setBookings] = useState([]);
@@ -529,6 +575,9 @@ export default function BookingsListPage() {
         package: appliedFilters.package || undefined,
         dateFrom: appliedFilters.dateFrom || undefined,
         dateTo: appliedFilters.dateTo || undefined,
+        dateField:
+          appliedFilters.dateField ||
+          (status === 'all' || status === 'pending' ? 'createdAt' : 'travelDate'),
       },
       skipSuccessToast: true,
       skipErrorToast: true,
@@ -581,16 +630,38 @@ export default function BookingsListPage() {
 
   const columns = useMemo(() => buildColumns(status, selection), [status, selection]);
 
-  const handleApply = () => {
+  const applyFiltersNow = useCallback((next) => {
+    setFilters(next);
+    setAppliedFilters(next);
     setPagination((prev) => ({ ...prev, page: 1 }));
-    setAppliedFilters({ ...filters });
+  }, []);
+
+  const handleApply = () => {
+    applyFiltersNow({ ...filters });
   };
 
   const handleReset = () => {
-    setFilters(EMPTY_FILTERS);
-    setAppliedFilters(EMPTY_FILTERS);
-    setPagination((prev) => ({ ...prev, page: 1 }));
+    applyFiltersNow({ ...EMPTY_FILTERS });
   };
+
+  // Live search: debounce so Total Bookings search feels instant without hammering API.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setAppliedFilters((prev) => {
+        if (prev.search === filters.search) return prev;
+        setPagination((p) => ({ ...p, page: 1 }));
+        return { ...prev, search: filters.search };
+      });
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [filters.search]);
+
+  // Reset draft + applied filters when switching booking portfolio tabs.
+  useEffect(() => {
+    setFilters({ ...EMPTY_FILTERS });
+    setAppliedFilters({ ...EMPTY_FILTERS });
+    setPagination((prev) => ({ ...prev, page: 1 }));
+  }, [status]);
 
   return (
     <div className="space-y-1 pb-8">
@@ -607,9 +678,13 @@ export default function BookingsListPage() {
             ? 'bg-sky-100 text-sky-800'
             : status === 'confirmed' || status === 'active'
               ? 'bg-sky-100 text-sky-700'
-              : status === 'completed'
-                ? 'bg-slate-100 text-slate-700'
-                : undefined
+                : status === 'completed'
+                ? 'bg-emerald-100 text-emerald-900'
+                : status === 'postponed'
+                  ? 'bg-amber-100 text-amber-900'
+                  : status === 'cancelled'
+                    ? 'bg-rose-100 text-rose-900'
+                    : undefined
         }
       />
 
@@ -622,6 +697,7 @@ export default function BookingsListPage() {
         onChange={setFilters}
         onApply={handleApply}
         onReset={handleReset}
+        onApplyNow={applyFiltersNow}
         destinations={filterOptions.destinations}
         packages={filterOptions.packages}
         showStatusFilter={isAll || status === 'pending' || status === 'active'}
@@ -631,16 +707,23 @@ export default function BookingsListPage() {
         searchPlaceholder={meta.searchPlaceholder}
         activeCount={countActiveBookingFilters(appliedFilters)}
         singleDate={status === 'active'}
+        defaultExpanded={isAll || status === 'pending'}
       />
 
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         className={cn(
-          'rounded-3xl border border-subtle/80 bg-white overflow-hidden',
-          isAll
-            ? 'shadow-[0_1px_3px_rgba(0,0,0,0.04),0_12px_28px_rgba(14,165,233,0.08)]'
-            : 'shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_24px_rgba(13,148,136,0.06)]'
+          'rounded-3xl border overflow-hidden',
+          isLifecycle && status === 'postponed'
+            ? 'border-amber-200/70 bg-gradient-to-b from-amber-50/40 via-white to-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_12px_28px_rgba(245,158,11,0.1)]'
+            : isLifecycle && status === 'cancelled'
+              ? 'border-rose-200/70 bg-gradient-to-b from-rose-50/40 via-white to-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_12px_28px_rgba(244,63,94,0.1)]'
+              : isCompleted
+                ? 'border-emerald-200/70 bg-gradient-to-b from-emerald-50/40 via-white to-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_12px_28px_rgba(16,185,129,0.1)]'
+              : isAll
+                ? 'border-subtle/80 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_12px_28px_rgba(14,165,233,0.08)]'
+                : 'border-subtle/80 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_24px_rgba(13,148,136,0.06)]'
         )}
       >
         {isAll && !loading && bookings.length > 0 && (
@@ -659,32 +742,51 @@ export default function BookingsListPage() {
           </div>
         )}
 
-        <OperationsDataTable
-          columns={columns}
-          data={bookings}
-          loading={loading}
-          emptyIcon={ClipboardList}
-          emptyTitle={
-            isAll
-              ? 'No bookings yet'
-              : status === 'completed'
-                ? 'No completed trips yet'
-                : 'No bookings in this list'
-          }
-          emptyDescription={
-            isAll
-              ? 'Converted leads with confirmed payments will appear here across every ops status.'
-              : status === 'completed'
-                ? 'Trips appear here once bookings are marked completed after successful travel.'
+        {isLifecycle ? (
+          <LifecycleBookingsBoard
+            mode={status}
+            bookings={bookings}
+            loading={loading}
+            total={pagination.total}
+            onOpen={(b) => navigate(`/operations-manager/booking/${b._id}`)}
+          />
+        ) : isCompleted ? (
+          <CompletedToursBoard
+            bookings={bookings}
+            loading={loading}
+            total={pagination.total}
+            summary={summary}
+            onOpen={(b) => navigate(`/operations-manager/booking/${b._id}`)}
+          />
+        ) : (
+          <OperationsDataTable
+            columns={columns}
+            data={bookings}
+            loading={loading}
+            emptyIcon={ClipboardList}
+            emptyTitle={isAll ? 'No bookings yet' : 'No bookings in this list'}
+            emptyDescription={
+              isAll
+                ? 'Converted leads with confirmed payments will appear here across every ops status.'
                 : 'Bookings will appear here once leads are converted and payments confirmed.'
-          }
-          onRowClick={(b) => navigate(`/operations-manager/booking/${b._id}`)}
-          className="border-0 shadow-none rounded-none"
-        />
+            }
+            onRowClick={(b) => navigate(`/operations-manager/booking/${b._id}`)}
+            className="border-0 shadow-none rounded-none"
+          />
+        )}
 
         {!loading && bookings.length > 0 && (
           <TablePagination
-            className="border-t border-subtle/80 bg-surface-elevated/30"
+            className={cn(
+              'border-t bg-surface-elevated/30',
+              isLifecycle && status === 'postponed'
+                ? 'border-amber-100'
+                : isLifecycle && status === 'cancelled'
+                  ? 'border-rose-100'
+                  : isCompleted
+                    ? 'border-emerald-100'
+                  : 'border-subtle/80'
+            )}
             pageIndex={pagination.page - 1}
             pageSize={pagination.limit}
             pageCount={pagination.totalPages}

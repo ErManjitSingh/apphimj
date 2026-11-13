@@ -1,14 +1,16 @@
-import { Search, SlidersHorizontal, RotateCcw } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { CalendarRange, RotateCcw, Search, SlidersHorizontal, X } from 'lucide-react';
+import { cn } from '../../../lib/utils';
 import { BOOKING_STATUS_CONFIG } from '../constants';
 
 const PENDING_STATUSES = ['booking_received', 'pending_verification', 'pending'];
-const ACTIVE_STATUSES = ['in_progress'];
 
 export default function BookingFilterBar({
   filters,
   onChange,
   onApply,
   onReset,
+  onApplyNow,
   destinations = [],
   packages = [],
   showStatusFilter = true,
@@ -16,100 +18,217 @@ export default function BookingFilterBar({
   searchPlaceholder = 'Search customer, booking #, destination...',
   activeCount = 0,
   singleDate = false,
+  defaultExpanded = true,
 }) {
-  const set = (key, val) => onChange({ ...filters, [key]: val });
+  const [open, setOpen] = useState(defaultExpanded);
+
+  useEffect(() => {
+    setOpen(defaultExpanded);
+  }, [defaultExpanded]);
+
+  const patch = (partial, { apply = false } = {}) => {
+    const next = { ...filters, ...partial };
+    onChange(next);
+    if (apply) {
+      if (onApplyNow) onApplyNow(next);
+      else onApply?.();
+    }
+  };
+
+  const onSearchKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      onApply?.();
+    }
+  };
 
   return (
-    <div className="mb-4 rounded-2xl border border-subtle bg-white p-4 shadow-sm space-y-3">
-      <div className="flex flex-col lg:flex-row gap-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-content-muted" />
-          <input
-            value={filters.search}
-            onChange={(e) => set('search', e.target.value)}
-            placeholder={searchPlaceholder}
-            className="w-full h-10 pl-10 pr-4 rounded-xl border border-subtle bg-slate-50 text-sm text-content-primary placeholder:text-content-muted outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500/40 transition-all"
-          />
+    <div className="mb-4 overflow-hidden rounded-2xl border border-sky-200/70 bg-white shadow-[0_1px_3px_rgba(14,165,233,0.06),0_8px_24px_rgba(15,23,42,0.04)]">
+      <div className="border-b border-sky-100/80 bg-gradient-to-r from-sky-50/90 via-white to-teal-50/40 px-4 py-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-sky-600/70" />
+            <input
+              value={filters.search || ''}
+              onChange={(e) => patch({ search: e.target.value })}
+              onKeyDown={onSearchKeyDown}
+              placeholder={searchPlaceholder}
+              className="h-11 w-full rounded-xl border border-sky-200/80 bg-white pl-10 pr-28 text-sm text-content-primary outline-none transition placeholder:text-content-muted focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+            />
+            <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
+              {filters.search ? (
+                <button
+                  type="button"
+                  onClick={() => patch({ search: '' }, { apply: true })}
+                  className="rounded-lg p-1.5 text-content-muted hover:bg-slate-100 hover:text-content-primary"
+                  title="Clear search"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={onApply}
+                className="rounded-lg bg-sky-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-sky-700"
+              >
+                Search
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              className={cn(
+                'inline-flex h-11 items-center gap-2 rounded-xl border px-4 text-sm font-semibold transition',
+                open
+                  ? 'border-sky-300 bg-sky-50 text-sky-800'
+                  : 'border-subtle bg-white text-content-primary hover:bg-slate-50'
+              )}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              Filters
+              {activeCount > 0 ? (
+                <span className="rounded-full bg-sky-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                  {activeCount}
+                </span>
+              ) : null}
+            </button>
+            <button
+              type="button"
+              onClick={onReset}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-subtle bg-white text-content-muted transition hover:bg-slate-50 hover:text-content-primary"
+              title="Reset filters"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </button>
+          </div>
         </div>
-        <button
-          type="button"
-          className="inline-flex items-center gap-2 h-10 px-4 rounded-xl border border-subtle bg-white text-sm font-medium text-content-primary hover:bg-slate-50 transition-colors lg:w-auto"
-        >
-          <SlidersHorizontal className="w-4 h-4 text-content-muted" />
-          Filters
-          {activeCount > 0 && (
-            <span className="ml-0.5 px-1.5 py-0.5 text-[10px] bg-blue-500 text-white rounded-full font-bold">
-              {activeCount}
-            </span>
-          )}
-        </button>
+        <p className="mt-2 text-[11px] text-content-muted">
+          Search updates as you type · use Filters for status, destination, package and travel dates
+        </p>
       </div>
 
-      <div className="flex flex-col xl:flex-row gap-3">
-        {showStatusFilter && (
-          <select
-            value={filters.bookingStatus}
-            onChange={(e) => set('bookingStatus', e.target.value)}
-            className="h-10 rounded-xl border border-subtle bg-slate-50 px-3 text-sm text-content-primary outline-none focus:ring-2 focus:ring-blue-500/25 xl:w-44"
-          >
-            <option value="">All Statuses</option>
-            {statusOptions.map((s) => (
-              <option key={s} value={s}>{BOOKING_STATUS_CONFIG[s]?.label || s}</option>
-            ))}
-          </select>
-        )}
-        <select
-          value={filters.destination}
-          onChange={(e) => set('destination', e.target.value)}
-          className="h-10 rounded-xl border border-subtle bg-slate-50 px-3 text-sm text-content-primary outline-none focus:ring-2 focus:ring-blue-500/25 xl:w-44"
-        >
-          <option value="">All Destinations</option>
-          {destinations.map((d) => (
-            <option key={d} value={d}>{d}</option>
-          ))}
-        </select>
-        <select
-          value={filters.package}
-          onChange={(e) => set('package', e.target.value)}
-          className="h-10 rounded-xl border border-subtle bg-slate-50 px-3 text-sm text-content-primary outline-none focus:ring-2 focus:ring-blue-500/25 xl:flex-1"
-        >
-          <option value="">All Packages</option>
-          {packages.map((p) => (
-            <option key={p} value={p}>{p}</option>
-          ))}
-        </select>
-        <input
-          type="date"
-          value={filters.dateFrom}
-          onChange={(e) => set('dateFrom', e.target.value)}
-          className="h-10 rounded-xl border border-subtle bg-slate-50 px-3 text-sm text-content-primary outline-none focus:ring-2 focus:ring-blue-500/25 xl:w-40"
-        />
-        {!singleDate && (
-          <input
-            type="date"
-            value={filters.dateTo}
-            onChange={(e) => set('dateTo', e.target.value)}
-            className="h-10 rounded-xl border border-subtle bg-slate-50 px-3 text-sm text-content-primary outline-none focus:ring-2 focus:ring-blue-500/25 xl:w-40"
-          />
-        )}
-        <div className="flex gap-2 xl:shrink-0">
-          <button
-            type="button"
-            onClick={onApply}
-            className="h-10 px-5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold shadow-sm transition-colors"
-          >
-            Apply
-          </button>
-          <button
-            type="button"
-            onClick={onReset}
-            className="inline-flex items-center justify-center h-10 w-10 rounded-xl border border-subtle bg-white text-content-muted hover:bg-slate-50 hover:text-content-primary transition-colors"
-            title="Reset filters"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
+      {open ? (
+        <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-6 xl:items-end">
+          {showStatusFilter ? (
+            <label className="block space-y-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-content-muted">
+                Status
+              </span>
+              <select
+                value={filters.bookingStatus || ''}
+                onChange={(e) => patch({ bookingStatus: e.target.value }, { apply: true })}
+                className="h-10 w-full rounded-xl border border-subtle bg-slate-50 px-3 text-sm outline-none focus:ring-2 focus:ring-sky-500/20"
+              >
+                <option value="">All statuses</option>
+                {statusOptions.map((s) => (
+                  <option key={s} value={s}>
+                    {BOOKING_STATUS_CONFIG[s]?.label || s}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+
+          <label className="block space-y-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-content-muted">
+              Destination
+            </span>
+            <select
+              value={filters.destination || ''}
+              onChange={(e) => patch({ destination: e.target.value }, { apply: true })}
+              className="h-10 w-full rounded-xl border border-subtle bg-slate-50 px-3 text-sm outline-none focus:ring-2 focus:ring-sky-500/20"
+            >
+              <option value="">All destinations</option>
+              {destinations.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block space-y-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-content-muted">
+              Package
+            </span>
+            <select
+              value={filters.package || ''}
+              onChange={(e) => patch({ package: e.target.value }, { apply: true })}
+              className="h-10 w-full rounded-xl border border-subtle bg-slate-50 px-3 text-sm outline-none focus:ring-2 focus:ring-sky-500/20"
+            >
+              <option value="">All packages</option>
+              {packages.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block space-y-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-content-muted">
+              Date type
+            </span>
+            <select
+              value={filters.dateField || (singleDate ? 'travelDate' : 'createdAt')}
+              onChange={(e) => patch({ dateField: e.target.value }, { apply: true })}
+              className="h-10 w-full rounded-xl border border-subtle bg-slate-50 px-3 text-sm outline-none focus:ring-2 focus:ring-sky-500/20"
+            >
+              <option value="createdAt">Booking date</option>
+              <option value="travelDate">Travel date</option>
+            </select>
+          </label>
+
+          <label className="block space-y-1.5">
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.08em] text-content-muted">
+              <CalendarRange className="h-3 w-3" />
+              {singleDate ? 'Date' : 'From'}
+            </span>
+            <input
+              type="date"
+              value={filters.dateFrom || ''}
+              onChange={(e) => patch({ dateFrom: e.target.value }, { apply: true })}
+              className="h-10 w-full rounded-xl border border-subtle bg-slate-50 px-3 text-sm outline-none focus:ring-2 focus:ring-sky-500/20"
+            />
+          </label>
+
+          {!singleDate ? (
+            <label className="block space-y-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-content-muted">
+                To
+              </span>
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  value={filters.dateTo || ''}
+                  onChange={(e) => patch({ dateTo: e.target.value }, { apply: true })}
+                  className="h-10 min-w-0 flex-1 rounded-xl border border-subtle bg-slate-50 px-3 text-sm outline-none focus:ring-2 focus:ring-sky-500/20"
+                />
+                <button
+                  type="button"
+                  onClick={onApply}
+                  className="h-10 shrink-0 rounded-xl bg-sky-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-sky-700"
+                >
+                  Apply
+                </button>
+              </div>
+            </label>
+          ) : (
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={onApply}
+                className="h-10 w-full rounded-xl bg-sky-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-sky-700"
+              >
+                Apply
+              </button>
+            </div>
+          )}
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

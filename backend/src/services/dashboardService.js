@@ -1232,7 +1232,35 @@ async function buildAdminDashboard(options = {}) {
   const lastMonthEndFin = endOfDay(new Date(monthStartFin.getTime() - 1));
   const monthRevenue = await sumRevenueInRange(branchId, monthStartFin, todayEnd);
   const lastMonthRevenue = await sumRevenueInRange(branchId, lastMonthStartFin, lastMonthEndFin);
-  const grossMarginRate = 0.16;
+  const monthMarketingSpend = await sumMarketingSpendInRange(branchId, monthStartFin, todayEnd);
+  const lastMonthMarketingSpend = await sumMarketingSpendInRange(
+    branchId,
+    lastMonthStartFin,
+    lastMonthEndFin
+  );
+
+  // Real ops P&L margin (package − hotel/cab/other), not a hardcoded %.
+  let grossMarginRate = 0;
+  try {
+    const { computeOpsProfitMargin } = require('./accountsCommercialService');
+    const monthPl = await computeOpsProfitMargin(branchId, monthStartFin, todayEnd);
+    if (Number(monthPl.packageRevenue) > 0) {
+      grossMarginRate = Number(monthPl.profitAmount) / Number(monthPl.packageRevenue);
+    }
+  } catch {
+    grossMarginRate = 0;
+  }
+  const todayGrossMargin = Math.round(todayRevenue * grossMarginRate);
+  const yesterdayGrossMargin = Math.round(yesterdayRevenue * grossMarginRate);
+  const monthRoi =
+    monthMarketingSpend > 0
+      ? Math.round((monthRevenue / monthMarketingSpend) * 100) / 100
+      : 0;
+  const lastMonthRoi =
+    lastMonthMarketingSpend > 0
+      ? Math.round((lastMonthRevenue / lastMonthMarketingSpend) * 100) / 100
+      : 0;
+
   const financials = {
     marketingSpend: withValue(
       changeMeta(todayMarketingSpend, yesterdayMarketingSpend),
@@ -1240,19 +1268,11 @@ async function buildAdminDashboard(options = {}) {
     ),
     sales: withValue(changeMeta(todayRevenue, yesterdayRevenue), todayRevenue),
     grossMargin: withValue(
-      changeMeta(
-        Math.round(todayRevenue * grossMarginRate),
-        Math.round(yesterdayRevenue * grossMarginRate)
-      ),
-      Math.round(todayRevenue * grossMarginRate)
+      changeMeta(todayGrossMargin, yesterdayGrossMargin),
+      todayGrossMargin
     ),
-    roi: withValue(
-      changeMeta(
-        lastMonthRevenue ? Math.round((monthRevenue / Math.max(lastMonthRevenue, 1)) * 100) / 100 : 0,
-        1
-      ),
-      lastMonthRevenue ? Math.round((monthRevenue / Math.max(lastMonthRevenue, 1)) * 100) / 100 : 0
-    ),
+    // Marketing ROI = collections ÷ marketing spend (this month), not MoM sales ratio.
+    roi: withValue(changeMeta(monthRoi, lastMonthRoi), monthRoi),
   };
 
   const todayFollowUps = await FollowUp.find(withBranch({
@@ -1337,13 +1357,24 @@ async function buildAdminDashboard(options = {}) {
       revenue: a.revenue,
       rank: i + 1,
     })),
-    teamPerformance: topAgents.slice(0, 3).map((a) => ({
-      name: agentMap[a._id?.toString()] || 'Unknown',
-      assigned: a.conversions * 3,
-      converted: a.conversions,
-      revenue: a.revenue,
-      conversionRate: totalLeads ? Math.round((a.conversions / totalLeads) * 100) : 0,
-    })),
+    teamPerformance: await Promise.all(
+      topAgents.slice(0, 3).map(async (a) => {
+        const assigned = await Lead.countDocuments(
+          withBranch({ assignedTo: a._id, isDeleted: { $ne: true } }, branchId)
+        );
+        const packageRev = await sumConvertedPackageRevenue({
+          assigneeId: a._id,
+          branchId,
+        });
+        return {
+          name: agentMap[a._id?.toString()] || 'Unknown',
+          assigned,
+          converted: a.conversions,
+          revenue: packageRev,
+          conversionRate: assigned ? Math.round((a.conversions / assigned) * 100) : 0,
+        };
+      })
+    ),
     reactivationWidget,
     qualificationWidgets: {
       leadsWithoutBudget,
@@ -2416,9 +2447,72 @@ async function buildReportsAnalytics(options = {}) {
   const { isAllTime, periodStart, periodEnd } = resolveReportPeriod(dateFrom, dateTo);
   const leadDate = isAllTime ? {} : { createdAt: { $gte: periodStart, $lte: periodEnd } };
   const payDate = isAllTime ? {} : { paidAt: { $gte: periodStart, $lte: periodEnd } };
-  const leadScope = withBranch({ ...leadDate }, branchId);
-  const convertedScope = withBranch({ ...leadDate, status: { $in: ['converted', 'booked'] } }, branchId);
+  const leadScope = activeLeadScope(leadDate, branchId);
+  // Conversions counted on conversion day (convertedAt), not lead create day.
+  const convertedScope = convertedInPeriodScope(
+    isAllTime ? startOfDay(new Date(2018, 0, 1)) : periodStart,
+    periodEnd,
+    {},
+    branchId
+  );
   const payScope = withBranch({ status: { $in: ['paid', 'partial'] }, ...payDate }, branchId);
+
+  const leadPackageRevenueStages = [
+    {
+      $lookup: {
+        from: 'payments',
+        localField: '_id',
+        foreignField: 'lead',
+        as: 'payments',
+      },
+    },
+    {
+      $lookup: {
+        from: 'bookings',
+        localField: '_id',
+        foreignField: 'lead',
+        as: 'bookings',
+      },
+    },
+    {
+      $addFields: {
+        isConverted: { $in: ['$status', ['converted', 'booked']] },
+        packageRevenue: {
+          $let: {
+            vars: {
+              payMax: { $max: { $ifNull: ['$payments.amount', [0]] } },
+              bookMax: {
+                $max: {
+                  $map: {
+                    input: { $ifNull: ['$bookings', []] },
+                    as: 'b',
+                    in: {
+                      $cond: [
+                        { $gt: [{ $ifNull: ['$$b.opsCosting.packageCost', 0] }, 0] },
+                        '$$b.opsCosting.packageCost',
+                        { $ifNull: ['$$b.totalAmount', 0] },
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+            in: {
+              $max: [{ $ifNull: ['$$payMax', 0] }, { $ifNull: ['$$bookMax', 0] }, 0],
+            },
+          },
+        },
+        collectedCash: {
+          $reduce: {
+            input: { $ifNull: ['$payments', []] },
+            initialValue: 0,
+            in: { $add: ['$$value', { $ifNull: ['$$this.paidAmount', 0] }] },
+          },
+        },
+      },
+    },
+  ];
+
   const [
     totalLeads,
     convertedLeads,
@@ -2427,8 +2521,11 @@ async function buildReportsAnalytics(options = {}) {
     destAgg,
     statusAgg,
     executives,
-    packages,
     monthlyPayments,
+    packagePerfAgg,
+    spendByChannel,
+    upcomingBookings,
+    pipelineLeads,
   ] = await Promise.all([
     Lead.countDocuments(leadScope),
     Lead.countDocuments(convertedScope),
@@ -2438,39 +2535,35 @@ async function buildReportsAnalytics(options = {}) {
     ]),
     Lead.aggregate([
       { $match: leadScope },
+      ...leadPackageRevenueStages,
       {
         $group: {
           _id: '$source',
           leads: { $sum: 1 },
-          conversions: {
-            $sum: { $cond: [{ $in: ['$status', ['converted', 'booked']] }, 1, 0] },
-          },
-          revenue: {
-            $sum: { $cond: [{ $in: ['$status', ['converted', 'booked']] }, '$budget', 0] },
-          },
+          conversions: { $sum: { $cond: ['$isConverted', 1, 0] } },
+          revenue: { $sum: { $cond: ['$isConverted', '$packageRevenue', 0] } },
+          collected: { $sum: { $cond: ['$isConverted', '$collectedCash', 0] } },
         },
       },
       { $sort: { leads: -1 } },
     ]),
     Lead.aggregate([
       { $match: leadScope },
+      ...leadPackageRevenueStages,
       {
         $group: {
           _id: '$destination',
           leads: { $sum: 1 },
-          conversions: {
-            $sum: { $cond: [{ $in: ['$status', ['converted', 'booked']] }, 1, 0] },
-          },
-          revenue: {
-            $sum: { $cond: [{ $in: ['$status', ['converted', 'booked']] }, '$budget', 0] },
-          },
+          conversions: { $sum: { $cond: ['$isConverted', 1, 0] } },
+          revenue: { $sum: { $cond: ['$isConverted', '$packageRevenue', 0] } },
         },
       },
       { $sort: { leads: -1 } },
     ]),
     Lead.aggregate([{ $match: leadScope }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
-    User.find(withBranch({ role: 'sales_executive', status: 'active' }, branchId)).select('name email').lean(),
-    Package.find().select('name').limit(6).lean(),
+    User.find(withBranch({ role: 'sales_executive', status: 'active' }, branchId))
+      .select('name email')
+      .lean(),
     Payment.aggregate([
       { $match: payScope },
       {
@@ -2481,27 +2574,145 @@ async function buildReportsAnalytics(options = {}) {
       },
       { $sort: { '_id.year': 1, '_id.month': 1 } },
     ]),
+    Quotation.aggregate([
+      {
+        $match: withBranch(
+          isAllTime ? {} : { createdAt: { $gte: periodStart, $lte: periodEnd } },
+          branchId
+        ),
+      },
+      {
+        $lookup: {
+          from: 'leads',
+          localField: 'lead',
+          foreignField: '_id',
+          as: 'leadDoc',
+        },
+      },
+      { $unwind: { path: '$leadDoc', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'packages',
+          localField: 'package',
+          foreignField: '_id',
+          as: 'pkg',
+        },
+      },
+      { $unwind: { path: '$pkg', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'payments',
+          localField: 'lead',
+          foreignField: 'lead',
+          as: 'payments',
+        },
+      },
+      {
+        $addFields: {
+          pkgName: {
+            $ifNull: [
+              '$pkg.name',
+              { $ifNull: ['$packageSnapshot.name', { $ifNull: ['$packageSnapshot.title', 'Custom'] }] },
+            ],
+          },
+          isSold: { $in: ['$leadDoc.status', ['converted', 'booked']] },
+          packageRevenue: { $max: { $ifNull: ['$payments.amount', [0]] } },
+        },
+      },
+      {
+        $group: {
+          _id: '$pkgName',
+          quotationsSent: { $sum: 1 },
+          conversions: { $sum: { $cond: ['$isSold', 1, 0] } },
+          revenue: { $sum: { $cond: ['$isSold', { $ifNull: ['$packageRevenue', 0] }, 0] } },
+        },
+      },
+      { $sort: { revenue: -1, quotationsSent: -1 } },
+      { $limit: 8 },
+    ]),
+    require('../models/MarketingSpend')
+      .aggregate([
+        {
+          $match: withBranch(
+            {
+              isDeleted: { $ne: true },
+              ...(isAllTime ? {} : { spendDate: { $gte: periodStart, $lte: periodEnd } }),
+            },
+            branchId
+          ),
+        },
+        { $group: { _id: '$channel', total: { $sum: '$amount' } } },
+      ])
+      .catch(() => []),
+    Booking.find(
+      withBranch(
+        {
+          status: {
+            $in: ['confirmed', 'in_progress', 'booking_received', 'pending', 'pending_verification'],
+          },
+          travelDate: { $gte: startOfDay(new Date()) },
+          $or: [{ archivedAt: null }, { archivedAt: { $exists: false } }],
+        },
+        branchId
+      )
+    )
+      .select('customerName destination travelDate totalAmount pendingAmount advanceReceived opsCosting')
+      .sort({ travelDate: 1 })
+      .limit(8)
+      .lean(),
+    Lead.countDocuments(
+      activeLeadScope(
+        {
+          status: {
+            $in: ['negotiation', 'quotation_sent', 'package_sent', 'follow_up', 'interested'],
+          },
+        },
+        branchId
+      )
+    ),
   ]);
 
   const totalRevenue = revenueAgg[0]?.total || 0;
   const conversionRate = totalLeads ? Math.round((convertedLeads / totalLeads) * 1000) / 10 : 0;
   const avgBookingValue = convertedLeads ? Math.round(totalRevenue / convertedLeads) : 0;
 
+  const spendMap = Object.fromEntries(
+    (spendByChannel || []).map((r) => [String(r._id || '').trim().toLowerCase(), Number(r.total) || 0])
+  );
+
   const execStats = await Promise.all(
     executives.map(async (ex) => {
       const [assignedLeads, followUpsDone, conversions, revenue] = await Promise.all([
-        Lead.countDocuments({ assignedTo: ex._id, ...leadDate }),
-        FollowUp.countDocuments({ assignedTo: ex._id, status: 'completed' }),
-        Lead.countDocuments({ assignedTo: ex._id, status: { $in: ['converted', 'booked'] }, ...leadDate }),
-        sumConvertedPackageRevenue({ assigneeId: ex._id, branchId }),
+        Lead.countDocuments(activeLeadScope({ assignedTo: ex._id, ...leadDate }, branchId)),
+        FollowUp.countDocuments(
+          withBranch(
+            {
+              assignedTo: ex._id,
+              status: 'completed',
+              ...(isAllTime ? {} : { completedAt: { $gte: periodStart, $lte: periodEnd } }),
+            },
+            branchId
+          )
+        ),
+        Lead.countDocuments(
+          applyConvertedPeriodFilter(
+            withBranch({ assignedTo: ex._id, status: { $in: ['converted', 'booked'] } }, branchId),
+            { $gte: periodStart, $lte: periodEnd }
+          )
+        ),
+        sumConvertedPackageRevenue({
+          assigneeId: ex._id,
+          branchId,
+          start: isAllTime ? undefined : periodStart,
+          end: isAllTime ? undefined : periodEnd,
+        }),
       ]);
-      const rev = revenue;
       return {
         name: ex.name,
         assignedLeads,
         followUpsDone,
         conversions,
-        revenue: rev,
+        revenue,
         conversionRate: assignedLeads ? Math.round((conversions / assignedLeads) * 1000) / 10 : 0,
       };
     })
@@ -2553,12 +2764,6 @@ async function buildReportsAnalytics(options = {}) {
     };
   });
 
-  const quoteCounts = await Quotation.aggregate([
-    { $group: { _id: '$package', sent: { $sum: 1 }, converted: { $sum: 0 } } },
-  ]);
-  const quoteByPackage = Object.fromEntries(
-    quoteCounts.map((q) => [q._id?.toString(), q.sent])
-  );
   const reactivationWidget = await buildReactivationWidget(branchId);
 
   const destinations = await rollupCityStatsIntoStates(
@@ -2576,6 +2781,38 @@ async function buildReportsAnalytics(options = {}) {
     }
   );
 
+  let profitMargin = 0;
+  try {
+    const { computeOpsProfitMargin } = require('./accountsCommercialService');
+    const opsPl = await computeOpsProfitMargin(
+      branchId,
+      isAllTime ? null : periodStart,
+      isAllTime ? null : periodEnd
+    );
+    profitMargin = Number(opsPl.profitMargin) || 0;
+  } catch {
+    profitMargin = 0;
+  }
+
+  const monthlyRevenueSeries = monthlyPayments.map((r) => ({
+    label: MONTH_LABELS[(r._id.month || 1) - 1],
+    revenue: r.revenue,
+  }));
+  const sparkRevenue = monthlyRevenueSeries.map((m) => m.revenue);
+  const expectedFromPipeline = (upcomingBookings || []).reduce((sum, b) => {
+    const packageCost =
+      Number(b.opsCosting?.packageCost) > 0
+        ? Number(b.opsCosting.packageCost)
+        : Number(b.totalAmount) || 0;
+    const due = Math.max(
+      0,
+      Number(b.pendingAmount) != null
+        ? Number(b.pendingAmount)
+        : packageCost - (Number(b.advanceReceived) || 0)
+    );
+    return sum + due;
+  }, 0);
+
   return {
     summary: {
       totalLeads,
@@ -2583,47 +2820,68 @@ async function buildReportsAnalytics(options = {}) {
       conversionRate,
       totalRevenue,
       avgBookingValue,
-      profitMargin: 14.8,
+      profitMargin,
       sparklines: {
-        totalLeads: [totalLeads],
+        totalLeads: sparkRevenue.length ? sparkRevenue : [totalLeads],
         conversions: [convertedLeads],
         conversionRate: [conversionRate],
-        revenue: [totalRevenue],
+        revenue: sparkRevenue.length ? sparkRevenue : [totalRevenue],
         avgBooking: [avgBookingValue],
-        profitMargin: [14.8],
+        profitMargin: [profitMargin],
       },
     },
-    leadSources: sourceAgg.map((s) => ({
-      source: leadSourceLabel(s._id) || s._id || 'Other',
-      leads: s.leads,
-      conversions: s.conversions,
-      revenue: s.revenue,
-      costPerLead: 0,
-      roi: s.leads && s.conversions ? Math.round((s.conversions / s.leads) * 100) : 0,
-    })),
+    leadSources: sourceAgg.map((s) => {
+      const sourceKey = String(s._id || '').trim();
+      const label = leadSourceLabel(sourceKey) || sourceKey || 'Other';
+      const spend =
+        spendMap[sourceKey.toLowerCase()] ||
+        spendMap[label.toLowerCase()] ||
+        0;
+      const costPerLead = s.leads ? Math.round((spend / s.leads) * 100) / 100 : 0;
+      const conversionPct = s.leads ? Math.round((s.conversions / s.leads) * 1000) / 10 : 0;
+      const roi =
+        spend > 0
+          ? Math.round(((Number(s.collected) || Number(s.revenue) || 0) / spend) * 1000) / 10
+          : conversionPct;
+      return {
+        source: label,
+        leads: s.leads,
+        conversions: s.conversions,
+        revenue: s.revenue,
+        costPerLead,
+        roi,
+        conversionRate: conversionPct,
+        hasSpend: spend > 0,
+      };
+    }),
     executives: execStats,
     destinations,
-    packages: packages.map((p) => ({
-      name: p.name,
-      views: 0,
-      quotationsSent: quoteByPackage[p._id?.toString()] || 0,
-      conversions: 0,
-      revenue: 0,
+    packages: (packagePerfAgg || []).map((p) => ({
+      name: p._id || 'Custom',
+      views: null,
+      quotationsSent: p.quotationsSent || 0,
+      conversions: p.conversions || 0,
+      revenue: p.revenue || 0,
     })),
     revenue: {
       daily: [],
       weekly: [],
-      monthly: monthlyPayments.map((r) => ({
-        label: MONTH_LABELS[(r._id.month || 1) - 1],
-        revenue: r.revenue,
-      })),
+      monthly: monthlyRevenueSeries,
       yearly: [],
     },
     funnel,
     forecast: {
-      expectedRevenue: Math.round(totalRevenue * 0.4),
-      expectedConversions: Math.max(1, Math.round(convertedLeads * 0.4)),
-      upcomingBookings: [],
+      expectedRevenue: Math.round(expectedFromPipeline),
+      expectedConversions: pipelineLeads,
+      upcomingBookings: (upcomingBookings || []).map((b) => ({
+        customer: b.customerName || 'Guest',
+        destination: b.destination || '—',
+        date: b.travelDate,
+        value:
+          Number(b.opsCosting?.packageCost) > 0
+            ? Number(b.opsCosting.packageCost)
+            : Number(b.totalAmount) || 0,
+      })),
     },
     reactivationWidget,
   };

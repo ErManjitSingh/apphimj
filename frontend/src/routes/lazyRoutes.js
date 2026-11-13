@@ -23,6 +23,9 @@ export const HotelControlPage = lazy(() => import('../pages/HotelControlPage'));
 export const HotelEditPage = lazy(() => import('../pages/HotelEditPage'));
 export const Quotations = lazy(() => import('../pages/Quotations'));
 export const Reports = lazy(() => import('../pages/Reports'));
+export const AccountsCommercialReport = lazy(() =>
+  import('../components/accounts/AccountsCommercialReport')
+);
 export const Team = lazy(() => import('../pages/Team'));
 export const TeamUserProfile = lazy(() => import('../pages/TeamUserProfile'));
 export const AdminAttendancePage = lazy(() => import('../pages/AdminAttendancePage'));

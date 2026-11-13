@@ -20,6 +20,7 @@ import {
   Megaphone,
   Receipt,
   RotateCcw,
+  Wallet,
   Target,
   Percent,
   Thermometer,
@@ -217,6 +218,12 @@ export const mainNavItems = [
     roles: ["admin", "accountant"],
     permission: { module: "payments", action: "view" },
     children: [
+      {
+        path: "/accounts/commercial",
+        label: "Commercial P&L",
+        icon: Wallet,
+        permission: { module: "payments", action: "view" },
+      },
       {
         path: "/payments",
         label: "Payments",

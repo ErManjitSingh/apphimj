@@ -660,11 +660,40 @@ async function aggregateBookingSummary(filter) {
             ],
           },
         },
+        // Ops commercial file rollups (completed / P&L KPIs)
+        packageRevenue: {
+          $sum: {
+            $cond: [
+              { $gt: [{ $ifNull: ['$opsCosting.packageCost', 0] }, 0] },
+              { $ifNull: ['$opsCosting.packageCost', 0] },
+              { $ifNull: ['$totalAmount', 0] },
+            ],
+          },
+        },
+        hotelCost: { $sum: { $ifNull: ['$opsCosting.hotelCost', 0] } },
+        cabCost: { $sum: { $ifNull: ['$opsCosting.cabCost', 0] } },
+        otherCost: { $sum: { $ifNull: ['$opsCosting.otherCost', 0] } },
+        withCosting: {
+          $sum: {
+            $cond: [
+              {
+                $or: [
+                  { $gt: [{ $ifNull: ['$opsCosting.packageCost', 0] }, 0] },
+                  { $gt: [{ $ifNull: ['$opsCosting.hotelCost', 0] }, 0] },
+                  { $gt: [{ $ifNull: ['$opsCosting.cabCost', 0] }, 0] },
+                  { $gt: [{ $ifNull: ['$opsCosting.otherCost', 0] }, 0] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
       },
     },
   ]);
 
-  return row || {
+  const base = row || {
     count: 0,
     totalAmount: 0,
     pendingAmount: 0,
@@ -687,6 +716,31 @@ async function aggregateBookingSummary(filter) {
     statusActive: 0,
     statusCompleted: 0,
     statusCancelled: 0,
+    packageRevenue: 0,
+    hotelCost: 0,
+    cabCost: 0,
+    otherCost: 0,
+    withCosting: 0,
+  };
+
+  const packageRevenue = Number(base.packageRevenue) || 0;
+  const hotelCost = Number(base.hotelCost) || 0;
+  const cabCost = Number(base.cabCost) || 0;
+  const otherCost = Number(base.otherCost) || 0;
+  const costTotal = Math.round((hotelCost + cabCost + otherCost) * 100) / 100;
+  const profitAmount = Math.round((packageRevenue - costTotal) * 100) / 100;
+  const profitMargin =
+    packageRevenue > 0 ? Math.round((profitAmount / packageRevenue) * 1000) / 10 : 0;
+
+  return {
+    ...base,
+    packageRevenue,
+    hotelCost,
+    cabCost,
+    otherCost,
+    costTotal,
+    profitAmount,
+    profitMargin,
   };
 }
 
@@ -1128,37 +1182,74 @@ async function listBookings(query = {}, { branchId } = {}) {
     if (statusList) filter.status = { $in: statusList };
   }
 
+  // Dropdown options: portfolio only (not search / destination / package / date).
+  const facetFilter = { ...filter };
+
   if (query.bookingStatus) {
     filter.status = query.bookingStatus;
   }
 
   if (query.destination?.trim()) {
-    filter.destination = { $regex: query.destination.trim(), $options: 'i' };
+    const dest = query.destination.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    filter.destination = { $regex: `^${dest}$`, $options: 'i' };
   }
 
   if (query.package?.trim()) {
-    filter.packageName = { $regex: query.package.trim(), $options: 'i' };
+    const pkg = query.package.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    filter.packageName = { $regex: `^${pkg}$`, $options: 'i' };
   }
 
   if (query.dateFrom || query.dateTo) {
-    filter.travelDate = {};
-    if (query.dateFrom) filter.travelDate.$gte = new Date(query.dateFrom);
-    if (query.dateTo) {
-      const end = new Date(query.dateTo);
-      end.setHours(23, 59, 59, 999);
-      filter.travelDate.$lte = end;
-    }
+    // Total Bookings → booking created date; trip portfolios → travel date.
+    const dateFieldRaw = String(query.dateField || '').trim().toLowerCase();
+    const dateField =
+      dateFieldRaw === 'traveldate' || dateFieldRaw === 'travel'
+        ? 'travelDate'
+        : dateFieldRaw === 'createdat' || dateFieldRaw === 'created' || dateFieldRaw === 'booked'
+          ? 'createdAt'
+          : statusKey === 'all' || statusKey === '' || statusKey === 'total' || statusKey === 'pending'
+            ? 'createdAt'
+            : 'travelDate';
+
+    // Parse YYYY-MM-DD as IST calendar day so India "last month" matches ops expectation.
+    const startOfIstDay = (ymd) => {
+      const m = String(ymd).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (!m) return new Date(ymd);
+      return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0) - 5.5 * 3600 * 1000);
+    };
+    const endOfIstDay = (ymd) => {
+      const m = String(ymd).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (!m) {
+        const end = new Date(ymd);
+        end.setHours(23, 59, 59, 999);
+        return end;
+      }
+      return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 23, 59, 59, 999) - 5.5 * 3600 * 1000);
+    };
+
+    const range = {};
+    if (query.dateFrom) range.$gte = startOfIstDay(query.dateFrom);
+    if (query.dateTo) range.$lte = endOfIstDay(query.dateTo);
+    filter[dateField] = range;
   }
 
   if (query.search?.trim()) {
-    const q = query.search.trim();
+    const raw = query.search.trim();
+    const escaped = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const digits = raw.replace(/\D/g, '');
     const searchOr = [
-      { customerName: { $regex: q, $options: 'i' } },
-      { bookingNumber: { $regex: q, $options: 'i' } },
-      { destination: { $regex: q, $options: 'i' } },
-      { customerPhone: { $regex: q, $options: 'i' } },
-      { packageName: { $regex: q, $options: 'i' } },
+      { customerName: { $regex: escaped, $options: 'i' } },
+      { bookingNumber: { $regex: escaped, $options: 'i' } },
+      { destination: { $regex: escaped, $options: 'i' } },
+      { customerPhone: { $regex: escaped, $options: 'i' } },
+      { packageName: { $regex: escaped, $options: 'i' } },
+      { postponedReason: { $regex: escaped, $options: 'i' } },
+      { cancelReason: { $regex: escaped, $options: 'i' } },
+      { executiveName: { $regex: escaped, $options: 'i' } },
     ];
+    if (digits.length >= 4) {
+      searchOr.push({ customerPhone: { $regex: digits.split('').join('\\D*'), $options: 'i' } });
+    }
     // Don't clobber postponed/cancelled $or matchers.
     if (filter.$or) {
       const statusOr = filter.$or;
@@ -1173,12 +1264,39 @@ async function listBookings(query = {}, { branchId } = {}) {
     Booking.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
     Booking.countDocuments(filter),
     aggregateBookingSummary(filter),
-    Booking.distinct('destination', filter),
-    Booking.distinct('packageName', { ...filter, packageName: { $nin: [null, ''] } }),
+    Booking.distinct('destination', facetFilter),
+    Booking.distinct('packageName', { ...facetFilter, packageName: { $nin: [null, ''] } }),
   ]);
 
+  let enrichedRows = rows;
+  if ((statusKey === 'postponed' || statusKey === 'cancelled') && rows.length) {
+    const leadIds = [...new Set(rows.map((r) => r.lead).filter(Boolean).map(String))];
+    if (leadIds.length) {
+      const leads = await Lead.find({ _id: { $in: leadIds } })
+        .select('_id postponedReason postponedAt lostReason statusReason status')
+        .lean();
+      const byId = new Map(leads.map((l) => [String(l._id), l]));
+      enrichedRows = rows.map((row) => {
+        const lead = row.lead ? byId.get(String(row.lead)) : null;
+        if (!lead) return row;
+        const postponedReason =
+          String(row.postponedReason || '').trim() || String(lead.postponedReason || '').trim();
+        const cancelReason =
+          String(row.cancelReason || '').trim() ||
+          String(lead.lostReason || lead.statusReason || '').trim();
+        return {
+          ...row,
+          postponedReason: postponedReason || row.postponedReason || '',
+          cancelReason: cancelReason || row.cancelReason || '',
+          leadPostponedReason: lead.postponedReason || '',
+          leadCancelReason: lead.lostReason || lead.statusReason || '',
+        };
+      });
+    }
+  }
+
   return {
-    ...paginatedResponse(rows, { page, limit, total }),
+    ...paginatedResponse(enrichedRows, { page, limit, total }),
     summary,
     filters: {
       destinations: destinations.filter(Boolean).sort(),

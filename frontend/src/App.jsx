@@ -35,6 +35,7 @@ import {
   HotelEditPage,
   Quotations,
   Reports,
+  AccountsCommercialReport,
   Team,
   TeamUserProfile,
   AdminAttendancePage,
@@ -1027,6 +1028,14 @@ function App() {
                       <PermissionRoute module="reports">
                         <Reports />
                       </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="accounts/commercial"
+                    element={
+                      <RoleRoute roles={["admin", "accountant"]}>
+                        <AccountsCommercialReport />
+                      </RoleRoute>
                     }
                   />
                   <Route

@@ -1,16 +1,22 @@
 const { getLeadSourceShortLabel } = require('./leadSourceLabels');
+const { startOfCalendarDay, endOfCalendarDay } = require('./orgTimezone');
 
-const startOfDay = (d = new Date()) => {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-};
+/** Normalize Date / YYYY-MM-DD into a moment we can take IST calendar bounds from. */
+function parseDayInput(d = new Date()) {
+  if (d == null || d === '') return new Date();
+  if (typeof d === 'string') {
+    const m = d.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return new Date(`${m[1]}-${m[2]}-${m[3]}T12:00:00+05:30`);
+  }
+  const date = d instanceof Date ? d : new Date(d);
+  return Number.isNaN(date.getTime()) ? new Date() : date;
+}
 
-const endOfDay = (d = new Date()) => {
-  const x = new Date(d);
-  x.setHours(23, 59, 59, 999);
-  return x;
-};
+/** Start of calendar day in org TZ (IST) — reporting/analytics source of truth. */
+const startOfDay = (d = new Date()) => startOfCalendarDay(parseDayInput(d));
+
+/** End of calendar day in org TZ (IST). */
+const endOfDay = (d = new Date()) => endOfCalendarDay(parseDayInput(d));
 
 const LEAD_POPULATE = [
   { path: 'assignedTo', select: 'name email phone' },

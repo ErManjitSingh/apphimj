@@ -179,6 +179,52 @@ async function getExecutivePerformance(branchId, options = {}) {
     ...(isAllTime ? {} : { scheduledAt: { $gte: periodStart, $lte: periodEnd } }),
   };
 
+  const packageRevenueLookup = [
+    {
+      $lookup: {
+        from: 'payments',
+        localField: '_id',
+        foreignField: 'lead',
+        as: 'payments',
+      },
+    },
+    {
+      $lookup: {
+        from: 'bookings',
+        localField: '_id',
+        foreignField: 'lead',
+        as: 'bookings',
+      },
+    },
+    {
+      $addFields: {
+        packageRevenue: {
+          $let: {
+            vars: {
+              payMax: { $max: { $ifNull: ['$payments.amount', [0]] } },
+              bookMax: {
+                $max: {
+                  $map: {
+                    input: { $ifNull: ['$bookings', []] },
+                    as: 'b',
+                    in: {
+                      $cond: [
+                        { $gt: [{ $ifNull: ['$$b.opsCosting.packageCost', 0] }, 0] },
+                        '$$b.opsCosting.packageCost',
+                        { $ifNull: ['$$b.totalAmount', 0] },
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+            in: { $max: [{ $ifNull: ['$$payMax', 0] }, { $ifNull: ['$$bookMax', 0] }, 0] },
+          },
+        },
+      },
+    },
+  ];
+
   const [assignedAgg, convertedAgg, followUpAgg, hotAgg, quoteAgg] = await Promise.all([
     Lead.aggregate([
       { $match: periodLeadMatch },
@@ -189,13 +235,19 @@ async function getExecutivePerformance(branchId, options = {}) {
           pipeline: {
             $sum: { $cond: [{ $ne: ['$status', 'converted'] }, 1, 0] },
           },
-          revenue: { $sum: '$budget' },
         },
       },
     ]),
     Lead.aggregate([
       { $match: convertedMatch },
-      { $group: { _id: '$assignedTo', converted: { $sum: 1 }, revenue: { $sum: '$budget' } } },
+      ...packageRevenueLookup,
+      {
+        $group: {
+          _id: '$assignedTo',
+          converted: { $sum: 1 },
+          revenue: { $sum: '$packageRevenue' },
+        },
+      },
     ]),
     FollowUp.aggregate([
       { $match: followMatch },
@@ -252,7 +304,7 @@ async function getExecutivePerformance(branchId, options = {}) {
       bookings: converted,
       converted,
       pipeline: assignedMap[id]?.pipeline || 0,
-      revenue: convertedMap[id]?.revenue || assignedMap[id]?.revenue || 0,
+      revenue: convertedMap[id]?.revenue || 0,
       conversionRate,
       followUpCompletion,
       missedFollowUps: fu.missed || 0,

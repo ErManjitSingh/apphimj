@@ -21,12 +21,12 @@ export default function LeadSourceAnalytics({ data }) {
   const tick = isDark ? '#64748b' : '#94a3b8';
 
   return (
-    <DashboardPanel title="Lead Source Analytics" subtitle="Leads, conversions, revenue & ROI by channel" className="h-full">
+    <DashboardPanel title="Lead Source Analytics" subtitle="Leads, conversions, package value & marketing ROI by channel" className="h-full">
       <div className="overflow-x-auto mb-4">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-subtle text-left">
-              {['Source', 'Leads', 'Conversions', 'Revenue', 'Cost/Lead', 'ROI'].map((h) => (
+              {['Source', 'Leads', 'Conversions', 'Package Value', 'Cost/Lead', 'ROI / Conv%'].map((h) => (
                 <th key={h} className="pb-2 pr-4 text-[11px] uppercase font-semibold text-content-muted">{h}</th>
               ))}
             </tr>
@@ -39,7 +39,11 @@ export default function LeadSourceAnalytics({ data }) {
                 <td className="py-2.5 pr-4 metric-tabular text-emerald-600">{row.conversions}</td>
                 <td className="py-2.5 pr-4 metric-tabular font-semibold">{formatINR(row.revenue)}</td>
                 <td className="py-2.5 pr-4 metric-tabular">{row.costPerLead ? formatINR(row.costPerLead) : '—'}</td>
-                <td className="py-2.5 metric-tabular"><span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 text-xs font-bold">{row.roi}%</span></td>
+                <td className="py-2.5 metric-tabular">
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 text-xs font-bold">
+                    {row.roi}%{row.hasSpend ? ' ROI' : ' conv'}
+                  </span>
+                </td>
               </tr>
             ))}
           </tbody>

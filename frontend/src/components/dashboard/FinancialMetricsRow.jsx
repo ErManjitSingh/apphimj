@@ -92,10 +92,7 @@ export default function FinancialMetricsRow({ financials }) {
         const meta = data[card.key] || { value: 0, change: 0, changeType: 'neutral' };
         const isUp = meta.changeType === 'up';
         const isDown = meta.changeType === 'down';
-        const changeDisplay =
-          card.key === 'roi'
-            ? `${isUp || isDown ? (isUp ? '+' : '-') : ''}${Math.abs(Number(meta.change || 0) / 100).toFixed(2)}x`
-            : `${isUp ? '+' : isDown ? '-' : ''}${Math.abs(meta.change || 0)}%`;
+        const changeDisplay = `${isUp ? '+' : isDown ? '-' : ''}${Math.abs(Number(meta.change || 0))}%`;
         const Icon = card.icon;
         const isMarketingSpend = card.key === 'marketingSpend';
 
