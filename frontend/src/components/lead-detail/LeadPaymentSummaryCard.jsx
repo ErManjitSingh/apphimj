@@ -111,7 +111,7 @@ export default function LeadPaymentSummaryCard({
               className="inline-flex h-7 items-center gap-1 rounded-lg border border-white/15 bg-white/10 px-2 text-[11px] font-semibold text-white hover:bg-white/20"
             >
               <Pencil className="h-3 w-3" />
-              Edit
+              Edit Package
             </button>
           ) : null}
           {canManage && onSendVoucher ? (

@@ -50,14 +50,14 @@ const getQuotation = asyncHandler(async (req, res) => {
 });
 
 const createQuotation = asyncHandler(async (req, res) => {
-  if (req.user.role === 'admin') {
-    throw new ApiError(403, 'Admin can only view quotations');
-  }
-
   const lead = await Lead.findById(req.body.leadId || req.body.lead);
   if (!lead) throw new ApiError(404, 'Lead not found');
 
-  const status = req.body.status || 'draft';
+  // Admin may create mobile/CRM draft or approved quotes; other roles keep SOP checks.
+  let status = req.body.status || 'draft';
+  if (req.user.role === 'admin' && status !== 'draft') {
+    status = status === 'pending_approval' ? 'approved' : status;
+  }
   if (status !== 'draft') {
     const { assertQualifiedForQuotation } = require('../services/salesSopService');
     assertQualifiedForQuotation(lead);
@@ -86,17 +86,22 @@ const createQuotation = asyncHandler(async (req, res) => {
     selectedFlights: computedPayload.selectedFlights,
     selectedActivities: computedPayload.selectedActivities,
     customizations: req.body.customizations,
-    createdByExecutive: req.body.createdByExecutive,
+    createdByExecutive: req.body.createdByExecutive || lead.assignedTo || req.user._id,
     teamLeader: req.body.teamLeader,
     timeline: req.body.timeline || [
-      { type: 'created', date: new Date(), user: req.user.name, notes: 'Quote created' },
+      {
+        type: 'created',
+        date: new Date(),
+        user: req.user.name,
+        notes: req.user.role === 'admin' ? 'Quote created by admin' : 'Quote created',
+      },
     ],
     tripPlanner: tripPlannerFromUser(req.user) || undefined,
     createdBy: req.user._id,
   });
 
   const populated = await Quotation.findById(quotation._id).populate(QUOTATION_POPULATE).lean();
-  if (populated.status === 'pending_approval' || populated.status === 'sent') {
+  if (populated.status === 'pending_approval' || populated.status === 'sent' || populated.status === 'approved') {
     notifyQuotationCreated(populated, lead).catch(() => {});
   }
   res.status(201).json(populated);

@@ -14,6 +14,7 @@ const {
   updateBooking,
   addBookingOpsNote,
   recordBookingPayment,
+  updateBookingAdvance,
   confirmHotel,
   confirmCab,
   listHotels,
@@ -70,6 +71,8 @@ router.put('/bookings/:id', requirePermission('operations', 'edit'), updateBooki
 router.patch('/bookings/:id', requirePermission('operations', 'edit'), updateBooking);
 router.post('/bookings/:id/ops-notes', requirePermission('operations', 'edit'), addBookingOpsNote);
 router.post('/bookings/:id/record-payment', requirePermission('operations', 'edit'), recordBookingPayment);
+router.put('/bookings/:id/advance', requirePermission('operations', 'edit'), updateBookingAdvance);
+router.patch('/bookings/:id/advance', requirePermission('operations', 'edit'), updateBookingAdvance);
 router.post('/bookings/:id/itinerary-pdf', requirePermission('operations', 'edit'), generateItineraryPdf);
 router.post('/bookings/:id/confirm-hotel', requirePermission('operations', 'edit'), confirmHotel);
 router.post('/bookings/:id/confirm-cab', requirePermission('operations', 'edit'), confirmCab);

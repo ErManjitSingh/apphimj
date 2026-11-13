@@ -16,6 +16,7 @@ const {
   getCommercialForm,
   saveCommercialForm,
   recordLeadPayment,
+  updateLeadAdvance,
   addLeadNote,
   listFollowUps,
   getFollowUpSummary,
@@ -70,6 +71,8 @@ router.post('/leads/:id/accept', acceptLead);
 router.get('/leads/:id/commercial-form', getCommercialForm);
 router.post('/leads/:id/commercial-form', saveCommercialForm);
 router.post('/leads/:id/record-payment', recordLeadPayment);
+router.put('/leads/:id/advance', updateLeadAdvance);
+router.patch('/leads/:id/advance', updateLeadAdvance);
 router.get('/leads/:idOrFilter', (req, res, next) => {
   const seg = req.params.idOrFilter;
   if (LEAD_FILTER_KEYS.includes(seg)) {

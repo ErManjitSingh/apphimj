@@ -837,6 +837,11 @@ async function buildAdminDashboard(options = {}) {
           _id: { $toLower: '$destination' },
           name: { $first: '$destination' },
           queries: { $sum: 1 },
+          connected: {
+            $sum: {
+              $cond: [{ $in: ['$status', CONNECTED_STATUSES] }, 1, 0],
+            },
+          },
           conversions: {
             $sum: { $cond: [{ $in: ['$status', ['converted', 'booked']] }, 1, 0] },
           },
@@ -1028,14 +1033,18 @@ async function buildAdminDashboard(options = {}) {
     topDestinationAgg.map((row) => ({
       name: row.name,
       queries: row.queries || 0,
+      connected: row.connected || 0,
       conversions: row.conversions || 0,
+      connectedRate: row.queries
+        ? Math.round(((row.connected || 0) / row.queries) * 1000) / 10
+        : 0,
       conversionRate: row.queries
         ? Math.round(((row.conversions || 0) / row.queries) * 1000) / 10
         : 0,
     })),
     {
       nameField: 'name',
-      metricFields: ['queries', 'conversions'],
+      metricFields: ['queries', 'connected', 'conversions'],
       rateConfig: { field: 'conversionRate', numerator: 'conversions', denominator: 'queries' },
       sortField: 'queries',
       limit: 12,

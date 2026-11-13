@@ -75,13 +75,13 @@ const PAGE_META = {
   },
   postponed: {
     title: 'Postponed Bookings',
-    desc: 'Bookings linked to postponed leads — travel dates on hold',
+    desc: 'Tours on hold — booking postponed status or linked postponed leads',
     searchPlaceholder: 'Search customer, booking #, destination...',
     paginationLabel: 'postponed bookings',
   },
   cancelled: {
     title: 'Cancelled Bookings',
-    desc: 'Cancelled tours — review refund and closure status',
+    desc: 'Cancelled / refunded tours — including archived and lost-lead bookings',
     searchPlaceholder: 'Search customer, booking #, destination...',
     paginationLabel: 'cancelled bookings',
   },

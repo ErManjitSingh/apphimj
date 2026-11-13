@@ -143,6 +143,7 @@ export default function LeadOverviewSection({
   const [addingNote, setAddingNote] = useState(false);
   const [showNoteBox, setShowNoteBox] = useState(false);
   const [addPaymentOpen, setAddPaymentOpen] = useState(false);
+  const [editAdvanceOpen, setEditAdvanceOpen] = useState(false);
 
   const travelers = travelersSummary(lead);
   const reqs = requirementItems(lead);
@@ -155,7 +156,14 @@ export default function LeadOverviewSection({
   const canAddPayment = Boolean(summary?.paymentId) && booked && Number(balance) > 0;
   const recordPaymentEndpoint =
     leadId && contactEndpoint ? `${contactEndpoint}/${leadId}/record-payment` : null;
-  const editAdvanceHandler = onEditCommercial || (canManageVoucher ? onUpdateStatus : null);
+  const advanceEndpoint =
+    leadId && contactEndpoint ? `${contactEndpoint}/${leadId}/advance` : null;
+  // Package & Advance card Edit must open advance modal here on the lead —
+  // never route to status/follow-up (onEditCommercial was wrongly falling back to that).
+  const editAdvanceHandler =
+    canManageVoucher && advanceEndpoint
+      ? () => setEditAdvanceOpen(true)
+      : onEditCommercial || null;
   const upcoming = getUpcomingFollowUp(followups) || (lead?.nextFollowUp ? { scheduledAt: lead.nextFollowUp } : null);
   const noteItems = notes.length
     ? notes
@@ -344,7 +352,13 @@ export default function LeadOverviewSection({
           voucherLoading={voucherLoading}
         />
 
-        <LeadStatusPipeline status={lead.status} lead={lead} onUpdateStatus={onUpdateStatus} />
+        <LeadStatusPipeline
+          status={lead.status}
+          lead={lead}
+          onUpdateStatus={
+            booked && advanceEndpoint ? () => setEditAdvanceOpen(true) : onUpdateStatus
+          }
+        />
       </div>
 
       <aside className="space-y-4">
@@ -652,6 +666,22 @@ export default function LeadOverviewSection({
           balanceDue={balance}
           onSaved={() => {
             setAddPaymentOpen(false);
+            (onPaymentRecorded || onContactLogged)?.();
+          }}
+        />
+      ) : null}
+      {editAdvanceOpen && advanceEndpoint ? (
+        <AddLeadPaymentModal
+          open={editAdvanceOpen}
+          onClose={() => setEditAdvanceOpen(false)}
+          mode="editAdvance"
+          endpoint={advanceEndpoint}
+          customerName={lead?.name || ''}
+          totalAmount={packageCost}
+          advanceReceived={advance}
+          balanceDue={balance}
+          onSaved={() => {
+            setEditAdvanceOpen(false);
             (onPaymentRecorded || onContactLogged)?.();
           }}
         />

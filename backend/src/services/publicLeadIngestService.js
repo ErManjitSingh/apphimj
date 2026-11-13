@@ -10,6 +10,7 @@ const { isLeadAutoAssignmentEnabled } = require('../config/assignment');
 const { logLeadActivity } = require('./leadActivityService');
 const { invalidate: invalidateDashboardCache } = require('./dashboardCacheService');
 const { findDuplicateLeads } = require('./duplicateDetectionService');
+const { notifyLeadCreated } = require('./notificationService');
 
 let cachedSystemUserId = null;
 
@@ -302,6 +303,12 @@ async function ingestPublicLead(raw = {}) {
       externalLeadId: data.externalLeadId || undefined,
       isRepeatCustomer: Boolean(lead.isRepeatCustomer),
     },
+  });
+
+  // Website / chatbot / Facebook public ingest previously skipped CRM alerts — admins
+  // and managers never got a Notification row, so the mobile app had nothing to show.
+  notifyLeadCreated(lead, { _id: data.createdBy, name: sourceLabel || 'Website' }).catch((err) => {
+    console.error('[publicLeadIngest] notifyLeadCreated failed', err?.message || err);
   });
 
   if (!data.assignedTo && data.branchId && (await isLeadAutoAssignmentEnabled())) {

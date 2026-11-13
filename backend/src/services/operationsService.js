@@ -34,9 +34,65 @@ const STATUS_ROUTE_MAP = {
   confirmed: ['confirmed'],
   active: ['in_progress'],
   completed: ['completed'],
-  cancelled: ['cancelled'],
+  postponed: ['postponed'],
+  // Match trip-tracker: refunds are cancelled trips from a business view.
+  cancelled: ['cancelled', 'refund_pending', 'refund_completed'],
   refund: ['refund_pending', 'refund_completed'],
 };
+
+const CANCELLED_LEAD_STATUSES = ['lost', 'booked_from_another_company'];
+
+async function leadIdsForPostponedBookings(branchId) {
+  const leadFilter = withBranch(
+    {
+      isDeleted: { $ne: true },
+      $or: [
+        { status: 'postponed' },
+        { postponedAt: { $exists: true, $ne: null } },
+        { postponedReason: { $exists: true, $nin: [null, ''] } },
+      ],
+    },
+    branchId
+  );
+  const rows = await Lead.find(leadFilter).select('_id').lean();
+  return rows.map((l) => l._id);
+}
+
+async function leadIdsForCancelledBookings(branchId) {
+  const leadFilter = withBranch(
+    {
+      isDeleted: { $ne: true },
+      $or: [
+        { status: { $in: CANCELLED_LEAD_STATUSES } },
+        { lostReason: 'plan_cancelled' },
+        { statusReason: 'plan_cancelled' },
+      ],
+    },
+    branchId
+  );
+  const rows = await Lead.find(leadFilter).select('_id').lean();
+  return rows.map((l) => l._id);
+}
+
+function cancelledBookingMatch(leadIds = []) {
+  const parts = [
+    { status: { $in: STATUS_ROUTE_MAP.cancelled } },
+    { cancelledAt: { $exists: true, $ne: null } },
+    { paymentStatus: { $in: ['refund_pending', 'refund_completed'] } },
+  ];
+  if (leadIds.length) parts.push({ lead: { $in: leadIds } });
+  return { $or: parts };
+}
+
+function postponedBookingMatch(leadIds = []) {
+  const parts = [
+    { status: { $in: STATUS_ROUTE_MAP.postponed } },
+    { postponedAt: { $exists: true, $ne: null } },
+    { postponedReason: { $exists: true, $nin: [null, ''] } },
+  ];
+  if (leadIds.length) parts.push({ lead: { $in: leadIds } });
+  return { $or: parts };
+}
 
 function startOfDay(d = new Date()) {
   const x = new Date(d);
@@ -53,7 +109,8 @@ function endOfDay(d = new Date()) {
 function resolveStatusFilter(statusKey) {
   const key = String(statusKey || '').trim().toLowerCase();
   // "all" / empty / unknown portfolio keys → no status constraint (show every booking)
-  if (!key || key === 'all' || key === 'total' || key === 'postponed') return null;
+  // postponed/cancelled use dedicated lead+status matchers in listBookings / dashboard.
+  if (!key || key === 'all' || key === 'total' || key === 'postponed' || key === 'cancelled') return null;
   if (STATUS_ROUTE_MAP[key]) return STATUS_ROUTE_MAP[key];
   // Only accept real booking status values — never invent filters like status:"all"
   const knownBookingStatuses = new Set([
@@ -63,6 +120,7 @@ function resolveStatusFilter(statusKey) {
     'confirmed',
     'in_progress',
     'completed',
+    'postponed',
     'cancelled',
     'refund_pending',
     'refund_completed',
@@ -103,7 +161,7 @@ async function dailyBookingCounts(filterBuilder, days = 7) {
   return series;
 }
 
-async function buildOpsSparklines(base, postponedLeadIds = []) {
+async function buildOpsSparklines(base, postponedLeadIds = [], cancelledLeadIds = []) {
   const defs = {
     totalBookings: (start, end) => ({ ...base, createdAt: { $gte: start, $lte: end } }),
     upcomingTours: (start, end) => ({
@@ -122,14 +180,14 @@ async function buildOpsSparklines(base, postponedLeadIds = []) {
     // Arrivals = trips returning that day
     todaysArrivals: (start, end) => ({ ...base, returnDate: { $gte: start, $lte: end } }),
     postponedBookings: (start, end) => ({
-      ...base,
-      lead: { $in: postponedLeadIds },
+      ...postponedBookingMatch(postponedLeadIds),
       updatedAt: { $gte: start, $lte: end },
+      ...(base.branchId ? { branchId: base.branchId } : {}),
     }),
     cancelledBookings: (start, end) => ({
-      ...base,
-      status: 'cancelled',
+      ...cancelledBookingMatch(cancelledLeadIds),
       updatedAt: { $gte: start, $lte: end },
+      ...(base.branchId ? { branchId: base.branchId } : {}),
     }),
     completedTrips: (start, end) => ({
       ...base,
@@ -147,6 +205,8 @@ function mapStatusToCategory(status) {
   if (STATUS_ROUTE_MAP.confirmed.includes(status)) return 'confirmed';
   if (STATUS_ROUTE_MAP.active.includes(status)) return 'active';
   if (STATUS_ROUTE_MAP.completed.includes(status)) return 'completed';
+  if (STATUS_ROUTE_MAP.postponed.includes(status)) return 'postponed';
+  if (STATUS_ROUTE_MAP.cancelled.includes(status)) return 'cancelled';
   return null;
 }
 
@@ -179,10 +239,10 @@ async function buildDashboard(branchId) {
   };
   const pendingVoucher = { ...base, voucherStatus: 'pending' };
 
-  const postponedLeads = await Lead.find({ status: 'postponed', isDeleted: { $ne: true } })
-    .select('_id')
-    .lean();
-  const postponedLeadIds = postponedLeads.map((l) => l._id);
+  const [postponedLeadIds, cancelledLeadIds] = await Promise.all([
+    leadIdsForPostponedBookings(branchId),
+    leadIdsForCancelledBookings(branchId),
+  ]);
 
   const [
     todaysDepartures,
@@ -224,10 +284,9 @@ async function buildDashboard(branchId) {
     Booking.countDocuments(pendingVoucher),
     Booking.countDocuments({ ...base, status: 'in_progress' }),
     Booking.countDocuments({ ...base, status: 'completed' }),
-    postponedLeadIds.length
-      ? Booking.countDocuments({ ...base, lead: { $in: postponedLeadIds } })
-      : Promise.resolve(0),
-    Booking.countDocuments({ ...base, status: 'cancelled' }),
+    // Include archived — ops portfolio views should still show historical hold/cancel trips.
+    Booking.countDocuments(withBranch(postponedBookingMatch(postponedLeadIds), branchId)),
+    Booking.countDocuments(withBranch(cancelledBookingMatch(cancelledLeadIds), branchId)),
     SupportTicket.countDocuments({ status: { $in: ['open', 'in_progress'] } }),
     Booking.countDocuments(base),
     Booking.aggregate([
@@ -320,25 +379,25 @@ async function buildDashboard(branchId) {
     Booking.countDocuments({ ...base, travelDate: { $gte: lastWeek.start, $lte: lastWeek.end } }),
     Booking.countDocuments({ ...base, returnDate: { $gte: thisWeek.start, $lte: thisWeek.end } }),
     Booking.countDocuments({ ...base, returnDate: { $gte: lastWeek.start, $lte: lastWeek.end } }),
-    postponedLeadIds.length
-      ? Booking.countDocuments({
-          ...base,
-          lead: { $in: postponedLeadIds },
-          updatedAt: { $gte: thisWeek.start, $lte: thisWeek.end },
-        })
-      : Promise.resolve(0),
-    postponedLeadIds.length
-      ? Booking.countDocuments({
-          ...base,
-          lead: { $in: postponedLeadIds },
-          updatedAt: { $gte: lastWeek.start, $lte: lastWeek.end },
-        })
-      : Promise.resolve(0),
-    Booking.countDocuments({ ...base, status: 'cancelled', updatedAt: { $gte: thisWeek.start, $lte: thisWeek.end } }),
-    Booking.countDocuments({ ...base, status: 'cancelled', updatedAt: { $gte: lastWeek.start, $lte: lastWeek.end } }),
+    Booking.countDocuments({
+      ...withBranch(postponedBookingMatch(postponedLeadIds), branchId),
+      updatedAt: { $gte: thisWeek.start, $lte: thisWeek.end },
+    }),
+    Booking.countDocuments({
+      ...withBranch(postponedBookingMatch(postponedLeadIds), branchId),
+      updatedAt: { $gte: lastWeek.start, $lte: lastWeek.end },
+    }),
+    Booking.countDocuments({
+      ...withBranch(cancelledBookingMatch(cancelledLeadIds), branchId),
+      updatedAt: { $gte: thisWeek.start, $lte: thisWeek.end },
+    }),
+    Booking.countDocuments({
+      ...withBranch(cancelledBookingMatch(cancelledLeadIds), branchId),
+      updatedAt: { $gte: lastWeek.start, $lte: lastWeek.end },
+    }),
     Booking.countDocuments({ ...base, status: 'completed', updatedAt: { $gte: thisWeek.start, $lte: thisWeek.end } }),
     Booking.countDocuments({ ...base, status: 'completed', updatedAt: { $gte: lastWeek.start, $lte: lastWeek.end } }),
-    buildOpsSparklines(base, postponedLeadIds),
+    buildOpsSparklines(base, postponedLeadIds, cancelledLeadIds),
   ]);
 
   const branchMap = Object.fromEntries(branchDocs.map((b) => [String(b._id), b.name]));
@@ -1053,14 +1112,17 @@ async function listTransport(query = {}, { branchId } = {}) {
 
 async function listBookings(query = {}, { branchId } = {}) {
   const { page, limit, skip } = parsePagination(query, { defaultLimit: 10, maxLimit: 100 });
-  const filter = withBranch(notArchivedFilter(), branchId);
+  const statusKey = String(query.status || '').trim().toLowerCase();
+  // Cancelled / postponed portfolios include archived historical trips.
+  const includeArchived = statusKey === 'cancelled' || statusKey === 'postponed' || statusKey === 'completed';
+  const filter = withBranch(includeArchived ? {} : notArchivedFilter(), branchId);
 
-  const statusKey = String(query.status || '').trim();
   if (statusKey === 'postponed') {
-    const postponedLeads = await Lead.find({ status: 'postponed', isDeleted: { $ne: true } })
-      .select('_id')
-      .lean();
-    filter.lead = { $in: postponedLeads.map((l) => l._id) };
+    const postponedLeadIds = await leadIdsForPostponedBookings(branchId);
+    Object.assign(filter, postponedBookingMatch(postponedLeadIds));
+  } else if (statusKey === 'cancelled') {
+    const cancelledLeadIds = await leadIdsForCancelledBookings(branchId);
+    Object.assign(filter, cancelledBookingMatch(cancelledLeadIds));
   } else {
     const statusList = resolveStatusFilter(statusKey);
     if (statusList) filter.status = { $in: statusList };
@@ -1090,13 +1152,21 @@ async function listBookings(query = {}, { branchId } = {}) {
 
   if (query.search?.trim()) {
     const q = query.search.trim();
-    filter.$or = [
+    const searchOr = [
       { customerName: { $regex: q, $options: 'i' } },
       { bookingNumber: { $regex: q, $options: 'i' } },
       { destination: { $regex: q, $options: 'i' } },
       { customerPhone: { $regex: q, $options: 'i' } },
       { packageName: { $regex: q, $options: 'i' } },
     ];
+    // Don't clobber postponed/cancelled $or matchers.
+    if (filter.$or) {
+      const statusOr = filter.$or;
+      delete filter.$or;
+      filter.$and = [...(filter.$and || []), { $or: statusOr }, { $or: searchOr }];
+    } else {
+      filter.$or = searchOr;
+    }
   }
 
   const [rows, total, summary, destinations, packages] = await Promise.all([
@@ -1157,10 +1227,27 @@ async function updateBooking(id, payload, actor) {
     'totalAmount', 'advanceReceived', 'assignedTo', 'travelDate', 'returnDate',
     'packageName', 'destination', 'quotationReference', 'executiveName',
     'complimentary', 'specialNotes', 'companyVoucherUrl', 'opsCosting',
+    'postponedAt', 'postponedReason', 'cancelledAt', 'cancelReason',
   ];
   const patch = Object.fromEntries(
     Object.entries(payload || {}).filter(([key]) => allowed.includes(key))
   );
+
+  if (patch.status === 'postponed') {
+    if (!patch.postponedAt) patch.postponedAt = new Date();
+    if (patch.postponedReason == null && payload?.postponedReason != null) {
+      patch.postponedReason = String(payload.postponedReason).trim();
+    }
+  }
+  if (patch.status && STATUS_ROUTE_MAP.cancelled.includes(patch.status)) {
+    if (!patch.cancelledAt) patch.cancelledAt = new Date();
+    if (patch.cancelReason == null && payload?.cancelReason != null) {
+      patch.cancelReason = String(payload.cancelReason).trim();
+    }
+    if (patch.status === 'cancelled' && !patch.paymentStatus && prev.paymentStatus === 'paid') {
+      patch.paymentStatus = 'refund_pending';
+    }
+  }
 
   if (patch.opsCosting && typeof patch.opsCosting === 'object') {
     const round = (n) => {
@@ -1235,6 +1322,40 @@ async function updateBooking(id, payload, actor) {
 
   await cacheService.invalidate('ops:');
   return booking;
+}
+
+/**
+ * When a lead is postponed / lost (or booked lead gets a postpone reason),
+ * mirror that onto the linked ops booking so portfolio lists stay accurate.
+ */
+async function syncLinkedBookingFromLead(lead, { actor, intent } = {}) {
+  if (!lead?._id) return null;
+  const booking = await Booking.findOne({ lead: lead._id }).sort({ createdAt: -1 });
+  if (!booking) return null;
+  if (['completed'].includes(booking.status)) return booking;
+
+  const wantCancel =
+    intent === 'cancelled' ||
+    (!intent &&
+      (CANCELLED_LEAD_STATUSES.includes(String(lead.status || '')) ||
+        ['plan_cancelled'].includes(String(lead.lostReason || lead.statusReason || ''))));
+  const wantPostpone =
+    intent === 'postponed' ||
+    (!intent && !wantCancel && lead.status === 'postponed');
+
+  const patch = {};
+  if (wantCancel && !STATUS_ROUTE_MAP.cancelled.includes(booking.status)) {
+    patch.status = 'cancelled';
+    patch.cancelledAt = new Date();
+    patch.cancelReason = String(lead.lostReason || lead.statusReason || lead.postponedReason || 'Lead cancelled').trim();
+  } else if (wantPostpone && !wantCancel && booking.status !== 'postponed') {
+    patch.status = 'postponed';
+    patch.postponedAt = lead.postponedAt || new Date();
+    patch.postponedReason = String(lead.postponedReason || lead.statusReason || 'Travel postponed').trim();
+  }
+
+  if (!Object.keys(patch).length) return booking;
+  return updateBooking(booking._id, patch, actor);
 }
 
 async function buildBookingPayloadFromPayment(payment) {
@@ -1484,6 +1605,7 @@ function enrichTripRow(booking, category, now = new Date()) {
     pending: { label: 'Pending', tone: 'amber' },
     in_progress: { label: 'On Trip', tone: 'emerald' },
     completed: { label: 'Completed', tone: 'slate' },
+    postponed: { label: 'Postponed', tone: 'amber' },
     cancelled: { label: 'Cancelled', tone: 'rose' },
     refund_pending: { label: 'Refund Pending', tone: 'orange' },
     refund_completed: { label: 'Refunded', tone: 'slate' },
@@ -1640,6 +1762,7 @@ module.exports = {
   STATUS_ROUTE_MAP,
   getDashboard,
   listBookings,
+  syncLinkedBookingFromLead,
   createBooking,
   buildBookingPayloadFromPayment,
   updateBooking,

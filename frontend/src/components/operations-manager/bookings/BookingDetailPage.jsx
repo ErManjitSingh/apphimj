@@ -3,8 +3,9 @@ import { Link, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Ticket, Phone, Mail, Loader2,
-  FileText, ListTodo, MapPin, Users, Wallet, ExternalLink,
+  FileText, ListTodo, MapPin, Users, Wallet, ExternalLink, Pencil,
   Hotel, Car, Receipt, IndianRupee, ClipboardCheck, NotebookPen,
+  Ban, PauseCircle,
 } from 'lucide-react';
 import API from '../../../api/axios';
 import PageHeader from '../../ui/PageHeader';
@@ -46,7 +47,7 @@ function openReceipt(receiptHtml) {
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-function PaymentLedgerList({ booking, canAddPayment, onAddPayment }) {
+function PaymentLedgerList({ booking, canAddPayment, onAddPayment, onEditAdvance }) {
   const ledger = booking.paymentLedger || [];
   const received = ledger.filter((row) => row.status !== 'pending');
   const pending = ledger.filter((row) => row.status === 'pending');
@@ -151,17 +152,30 @@ function PaymentLedgerList({ booking, canAddPayment, onAddPayment }) {
         </p>
       ) : null}
 
-      {canAddPayment ? (
-        <Button
-          type="button"
-          variant="emerald"
-          className="mt-2 w-full rounded-xl gap-2"
-          onClick={onAddPayment}
-        >
-          <Wallet className="w-4 h-4" />
-          Add Payment
-        </Button>
-      ) : null}
+      <div className="mt-2 grid grid-cols-1 gap-2">
+        {onEditAdvance ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full rounded-xl gap-2"
+            onClick={onEditAdvance}
+          >
+            <Pencil className="w-4 h-4" />
+            Edit Advance
+          </Button>
+        ) : null}
+        {canAddPayment ? (
+          <Button
+            type="button"
+            variant="emerald"
+            className="w-full rounded-xl gap-2"
+            onClick={onAddPayment}
+          >
+            <Wallet className="w-4 h-4" />
+            Add Payment
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -395,6 +409,7 @@ export default function BookingDetailPage() {
   const [catalogCabs, setCatalogCabs] = useState([]);
   const [sendingTransportVoucher, setSendingTransportVoucher] = useState(null);
   const [addPaymentOpen, setAddPaymentOpen] = useState(false);
+  const [editAdvanceOpen, setEditAdvanceOpen] = useState(false);
   const [pendingHotelChange, setPendingHotelChange] = useState(null);
   const [hotelChangeNote, setHotelChangeNote] = useState('');
   const [savingHotelChangeNote, setSavingHotelChangeNote] = useState(false);
@@ -600,16 +615,38 @@ export default function BookingDetailPage() {
     setActionLoading(null);
   };
 
-  const updateStatus = async (status) => {
+  const updateStatus = async (status, extra = {}) => {
     setActionLoading(status);
     try {
-      await API.put(`/operations-manager/bookings/${id}`, { status });
+      await API.put(`/operations-manager/bookings/${id}`, { status, ...extra });
       await fetchBooking();
     } catch (err) {
       console.error('[BookingStatus]', err?.response?.data?.message || err.message);
     } finally {
       setActionLoading(null);
     }
+  };
+
+  const postponeBooking = async () => {
+    const reason = window.prompt('Postponed reason (required)');
+    if (reason == null) return;
+    const trimmed = String(reason).trim();
+    if (!trimmed) {
+      toast.error('Postponed reason is required');
+      return;
+    }
+    await updateStatus('postponed', { postponedReason: trimmed, postponedAt: new Date().toISOString() });
+  };
+
+  const cancelBooking = async () => {
+    const reason = window.prompt('Cancellation reason (required)');
+    if (reason == null) return;
+    const trimmed = String(reason).trim();
+    if (!trimmed) {
+      toast.error('Cancellation reason is required');
+      return;
+    }
+    await updateStatus('cancelled', { cancelReason: trimmed, cancelledAt: new Date().toISOString() });
   };
 
   const addDocument = async (e) => {
@@ -733,6 +770,7 @@ export default function BookingDetailPage() {
     Number(booking.pendingAmount) ||
     Math.max(0, amount - (Number(booking.advanceReceived) || 0));
   const canAddPayment = pending > 0;
+  const canEditAdvance = Boolean(booking.lead);
 
   return (
     <div className="space-y-6 pb-10">
@@ -984,12 +1022,24 @@ export default function BookingDetailPage() {
                 booking={booking}
                 canAddPayment={canAddPayment}
                 onAddPayment={() => setAddPaymentOpen(true)}
+                onEditAdvance={canEditAdvance ? () => setEditAdvanceOpen(true) : undefined}
               />
             </div>
           </div>
 
           <div className="rounded-3xl border border-subtle bg-surface/90 p-5 space-y-2">
             <h3 className="font-bold mb-3">Quick Actions</h3>
+            {canEditAdvance ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full rounded-xl gap-2"
+                onClick={() => setEditAdvanceOpen(true)}
+              >
+                <Pencil className="w-4 h-4" />
+                Edit Advance
+              </Button>
+            ) : null}
             {canAddPayment ? (
               <Button
                 type="button"
@@ -1045,6 +1095,51 @@ export default function BookingDetailPage() {
                 Tour marked completed
               </p>
             )}
+            {booking.status === 'postponed' && (
+              <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-center text-xs font-semibold text-amber-800">
+                Tour postponed{booking.postponedReason ? ` — ${booking.postponedReason}` : ''}
+              </p>
+            )}
+            {['cancelled', 'refund_pending', 'refund_completed'].includes(booking.status) && (
+              <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-center text-xs font-semibold text-rose-700">
+                Tour cancelled{booking.cancelReason ? ` — ${booking.cancelReason}` : ''}
+              </p>
+            )}
+            {!['completed', 'cancelled', 'refund_pending', 'refund_completed'].includes(booking.status) && (
+              <>
+                {booking.status !== 'postponed' && (
+                  <Button
+                    variant="outline"
+                    className="w-full rounded-xl gap-2 border-amber-300 text-amber-800 hover:bg-amber-50"
+                    disabled={actionLoading === 'postponed'}
+                    onClick={postponeBooking}
+                  >
+                    {actionLoading === 'postponed' ? <Loader2 className="w-4 h-4 animate-spin" /> : <PauseCircle className="w-4 h-4" />}
+                    Postpone Booking
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  className="w-full rounded-xl gap-2 border-rose-300 text-rose-700 hover:bg-rose-50"
+                  disabled={actionLoading === 'cancelled'}
+                  onClick={cancelBooking}
+                >
+                  {actionLoading === 'cancelled' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
+                  Cancel Booking
+                </Button>
+              </>
+            )}
+            {booking.status === 'postponed' && (
+              <Button
+                variant="emerald"
+                className="w-full rounded-xl gap-2"
+                disabled={actionLoading === 'confirmed'}
+                onClick={() => updateStatus('confirmed')}
+              >
+                {actionLoading === 'confirmed' ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                Reactivate Tour
+              </Button>
+            )}
             <Link to="/operations-manager/vouchers">
               <Button variant="outline" className="w-full rounded-xl gap-2">
                 <Ticket className="w-4 h-4" /> Generate Voucher
@@ -1084,6 +1179,22 @@ export default function BookingDetailPage() {
           balanceDue={pending}
           onSaved={() => {
             setAddPaymentOpen(false);
+            fetchBooking();
+          }}
+        />
+      ) : null}
+      {editAdvanceOpen ? (
+        <AddLeadPaymentModal
+          open={editAdvanceOpen}
+          onClose={() => setEditAdvanceOpen(false)}
+          mode="editAdvance"
+          endpoint={`/operations-manager/bookings/${id}/advance`}
+          customerName={booking.customerName || ''}
+          totalAmount={amount}
+          advanceReceived={booking.advanceReceived || 0}
+          balanceDue={pending}
+          onSaved={() => {
+            setEditAdvanceOpen(false);
             fetchBooking();
           }}
         />

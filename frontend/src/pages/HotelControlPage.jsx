@@ -95,7 +95,7 @@ function hotelImage(hotel) {
 }
 
 function hotelCity(hotel) {
-  return hotel.displayCity || hotel.destination || hotel.location || '—';
+  return hotel.location || hotel.displayCity || hotel.destination || '—';
 }
 
 function shortMeal(plan = '') {
@@ -465,7 +465,7 @@ function HotelCard({ hotel, onEdit, onToggleStatus, onDelete, canEdit, canDelete
   );
 }
 
-function DestinationSearchField({ value, onChange, options = [] }) {
+function LocationSearchField({ value, onChange, options = [] }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
 
@@ -495,7 +495,7 @@ function DestinationSearchField({ value, onChange, options = [] }) {
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
-        placeholder="Search destination..."
+        placeholder="Search location..."
         className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-9 text-sm text-slate-700 outline-none focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
         autoComplete="off"
       />
@@ -507,7 +507,7 @@ function DestinationSearchField({ value, onChange, options = [] }) {
             setOpen(false);
           }}
           className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-          aria-label="Clear destination"
+          aria-label="Clear location"
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -549,13 +549,13 @@ export default function HotelControlPage() {
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [searchInput, setSearchInput] = useState('');
-  const [destination, setDestination] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
   const [starFilter, setStarFilter] = useState('');
   const [mealFilter, setMealFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [applied, setApplied] = useState({
     search: '',
-    destination: '',
+    location: '',
     star: '',
     meal: '',
     status: '',
@@ -581,11 +581,11 @@ export default function HotelControlPage() {
     fetchHotels();
   }, [fetchHotels]);
 
-  const destinations = useMemo(() => {
+  const locations = useMemo(() => {
     const set = new Set();
     hotels.forEach((h) => {
-      const d = h.destination || h.displayCity;
-      if (d) set.add(d);
+      const loc = String(h.location || '').trim();
+      if (loc) set.add(loc);
     });
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [hotels]);
@@ -602,14 +602,14 @@ export default function HotelControlPage() {
     const total = hotels.length;
     const active = hotels.filter((h) => h.status !== 'inactive').length;
     const inactive = total - active;
-    const destCount = destinations.length;
+    const locationCount = locations.length;
     const rated = hotels.filter((h) => hotelStars(h) > 0);
     const avgRating =
       rated.length > 0
         ? rated.reduce((sum, h) => sum + hotelStars(h), 0) / rated.length
         : 0;
-    return { total, active, inactive, destCount, avgRating };
-  }, [hotels, destinations.length]);
+    return { total, active, inactive, locationCount, avgRating };
+  }, [hotels, locations.length]);
 
   const filteredHotels = useMemo(() => {
     let list = [...hotels];
@@ -618,9 +618,9 @@ export default function HotelControlPage() {
       list = list.filter((h) => {
         const hay = [
           h.name,
-          h.destination,
-          h.displayCity,
           h.location,
+          h.displayCity,
+          h.destination,
           h.category,
           h.mealPlan,
           h.roomType,
@@ -632,14 +632,11 @@ export default function HotelControlPage() {
         return hay.includes(q);
       });
     }
-    if (applied.destination) {
-      const destQ = applied.destination.trim().toLowerCase();
+    if (applied.location) {
+      const locQ = applied.location.trim().toLowerCase();
       list = list.filter((h) => {
-        const hay = [h.destination, h.displayCity, h.location]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
-        return hay.includes(destQ);
+        const loc = String(h.location || '').trim().toLowerCase();
+        return loc === locQ || loc.includes(locQ);
       });
     }
     if (applied.star) {
@@ -723,7 +720,7 @@ export default function HotelControlPage() {
     setPage(1);
     setApplied({
       search: searchInput,
-      destination,
+      location: locationFilter,
       star: starFilter,
       meal: mealFilter,
       status: statusFilter,
@@ -732,12 +729,12 @@ export default function HotelControlPage() {
 
   const resetFilters = () => {
     setSearchInput('');
-    setDestination('');
+    setLocationFilter('');
     setStarFilter('');
     setMealFilter('');
     setStatusFilter('');
     setPage(1);
-    setApplied({ search: '', destination: '', star: '', meal: '', status: '' });
+    setApplied({ search: '', location: '', star: '', meal: '', status: '' });
   };
 
   const toggleFavorite = (id) => {
@@ -819,7 +816,7 @@ export default function HotelControlPage() {
         <StatCard label="Total Hotels" value={stats.total} icon={Building2} tone="blue" hint="From live inventory" />
         <StatCard label="Active Hotels" value={stats.active} icon={BedDouble} tone="indigo" hint="Ready to sell" />
         <StatCard label="Inactive Hotels" value={stats.inactive} icon={Clock3} tone="orange" hint="Hidden from quotes" />
-        <StatCard label="Destinations" value={stats.destCount} icon={MapPin} tone="blue" hint="Unique cities" />
+        <StatCard label="Locations" value={stats.locationCount} icon={MapPin} tone="blue" hint="Unique locations" />
         <StatCard
           label="Avg. Rating"
           value={stats.avgRating ? stats.avgRating.toFixed(1) : '—'}
@@ -839,14 +836,14 @@ export default function HotelControlPage() {
             <input
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search by hotel name, destination, package..."
+              placeholder="Search by hotel name, location, package..."
               className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
             />
           </div>
-          <DestinationSearchField
-            value={destination}
-            onChange={setDestination}
-            options={destinations}
+          <LocationSearchField
+            value={locationFilter}
+            onChange={setLocationFilter}
+            options={locations}
           />
           <select
             value={starFilter}

@@ -293,6 +293,21 @@ const recordLeadPayment = asyncHandler(async (req, res) => {
   res.json(result);
 });
 
+const updateLeadAdvance = asyncHandler(async (req, res) => {
+  const lead = await loadAccessibleLeadCore(req, req.params.id);
+  if (!lead) throw new ApiError(404, 'Lead not found');
+
+  const { updateLeadAdvancePayment } = require('../services/conversionCommercialService');
+  const result = await updateLeadAdvancePayment({
+    leadId: lead._id,
+    userId: req.user._id,
+    branchId: req.branchId,
+    body: req.body,
+    requireAssignee: false,
+  });
+  res.json(result);
+});
+
 const getLeadFollowups = asyncHandler(async (req, res) => {
   const lead = await loadAccessibleLeadCore(req, req.params.id);
   if (!lead) throw new ApiError(404, 'Lead not found');
@@ -712,6 +727,26 @@ const updateLead = asyncHandler(async (req, res) => {
   }
   await applyLeadMetrics(lead);
   await lead.save();
+
+  // Mirror postpone / cancel onto linked booking when this request asks for it
+  // (booked leads often keep status locked, so we sync the booking instead).
+  {
+    const ops = require('../services/operationsService');
+    const requestedStatus = String(req.body.status || data.status || '').trim();
+    const requestedPostponed =
+      requestedStatus === 'postponed' || Boolean(String(req.body.postponedReason || data.postponedReason || '').trim());
+    const isCancel =
+      ['lost', 'booked_from_another_company'].includes(requestedStatus) ||
+      ['plan_cancelled'].includes(String(req.body.lostReason || data.lostReason || ''));
+    if (requestedPostponed || isCancel) {
+      await ops
+        .syncLinkedBookingFromLead(lead, {
+          actor: req.user,
+          intent: isCancel ? 'cancelled' : 'postponed',
+        })
+        .catch((err) => console.error('[BookingLifecycleSync]', err.message));
+    }
+  }
 
   const markedCold =
     data.temperature === 'cold' ||
@@ -1242,6 +1277,7 @@ module.exports = {
   getLeadPaymentReceiptDoc,
   sendLeadPaymentReceipt,
   recordLeadPayment,
+  updateLeadAdvance,
   createLead,
   seedDemoLeads,
   clearAllLeads,

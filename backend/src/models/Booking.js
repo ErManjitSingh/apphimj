@@ -6,6 +6,7 @@ const BOOKING_STATUSES = [
   'confirmed',
   'in_progress',
   'completed',
+  'postponed',
   'cancelled',
   'refund_pending',
   'refund_completed',
@@ -257,6 +258,10 @@ const bookingSchema = new mongoose.Schema(
       updatedByName: { type: String, trim: true, default: '' },
     },
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    postponedAt: { type: Date },
+    postponedReason: { type: String, trim: true, default: '' },
+    cancelledAt: { type: Date },
+    cancelReason: { type: String, trim: true, default: '' },
     archivedAt: { type: Date, index: true },
   },
   { timestamps: true }

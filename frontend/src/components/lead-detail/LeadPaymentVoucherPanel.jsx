@@ -21,6 +21,7 @@ export default function LeadPaymentVoucherPanel({
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [addPaymentOpen, setAddPaymentOpen] = useState(false);
+  const [editAdvanceOpen, setEditAdvanceOpen] = useState(false);
 
   const isBookedLead =
     lead?.status === 'converted' || lead?.status === 'booked' || isBookedStatus(lead?.status);
@@ -32,6 +33,7 @@ export default function LeadPaymentVoucherPanel({
   const recordPaymentEndpoint = lead?._id
     ? `${contactEndpoint}/${lead._id}/record-payment`
     : null;
+  const advanceEndpoint = lead?._id ? `${contactEndpoint}/${lead._id}/advance` : null;
 
   const endpoint =
     receiptEndpoint ||
@@ -116,7 +118,13 @@ export default function LeadPaymentVoucherPanel({
         receiptSentTo={summary.receiptSentTo}
         paymentScreenshots={screenshots}
         canManage={isBookedLead || Boolean(summary)}
-        onEditAdvance={isBookedLead ? onEditCommercial : undefined}
+        onEditAdvance={
+          isBookedLead
+            ? advanceEndpoint
+              ? () => setEditAdvanceOpen(true)
+              : onEditCommercial
+            : undefined
+        }
         onAddPayment={canAddPayment ? () => setAddPaymentOpen(true) : undefined}
         onSendVoucher={isBookedLead && sendEndpoint ? sendVoucherNow : undefined}
         onViewVoucher={openVoucher}
@@ -135,6 +143,22 @@ export default function LeadPaymentVoucherPanel({
           balanceDue={summary.balanceDue}
           onSaved={() => {
             setAddPaymentOpen(false);
+            onPaymentRecorded?.();
+          }}
+        />
+      ) : null}
+      {editAdvanceOpen && advanceEndpoint ? (
+        <AddLeadPaymentModal
+          open={editAdvanceOpen}
+          onClose={() => setEditAdvanceOpen(false)}
+          mode="editAdvance"
+          endpoint={advanceEndpoint}
+          customerName={lead?.name || ''}
+          totalAmount={summary.totalAmount}
+          advanceReceived={summary.advanceReceived}
+          balanceDue={summary.balanceDue}
+          onSaved={() => {
+            setEditAdvanceOpen(false);
             onPaymentRecorded?.();
           }}
         />

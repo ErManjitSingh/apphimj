@@ -73,7 +73,7 @@ export default function LeadConvertedBanner({
               className="rounded-2xl h-10 gap-1.5 border border-white/15 bg-white/10 text-white hover:bg-white/20"
             >
               <Pencil className="w-3.5 h-3.5" />
-              Edit Advance
+              Edit Package & Advance
             </Button>
           ) : null}
           {onSendVoucher ? (

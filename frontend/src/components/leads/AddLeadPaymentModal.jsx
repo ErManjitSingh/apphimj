@@ -23,8 +23,9 @@ const fieldClass =
   'mt-1.5 w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-100';
 
 /**
- * Record an additional client payment (with screenshot) against a booked lead.
+ * Record an additional client payment, or edit package + advance / token.
  * endpoint example: /sales-executive/leads/:id/record-payment or /leads/:id/record-payment
+ * mode=editAdvance uses PUT on the advance endpoint.
  */
 export default function AddLeadPaymentModal({
   open,
@@ -35,9 +36,13 @@ export default function AddLeadPaymentModal({
   totalAmount = 0,
   advanceReceived = 0,
   balanceDue = 0,
+  mode = 'add',
+  method: initialMethod = 'upi',
 }) {
+  const isEdit = mode === 'editAdvance';
+  const [packageAmount, setPackageAmount] = useState('');
   const [amount, setAmount] = useState('');
-  const [method, setMethod] = useState('upi');
+  const [method, setMethod] = useState(initialMethod || 'upi');
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
   const [shotFiles, setShotFiles] = useState([]);
@@ -45,18 +50,22 @@ export default function AddLeadPaymentModal({
   const [saving, setSaving] = useState(false);
 
   const pending = Math.max(0, Number(balanceDue) || Math.max(0, Number(totalAmount) - Number(advanceReceived)));
+  const pkgAmt = Number(packageAmount) || 0;
   const addAmt = Number(amount) || 0;
-  const nextPending = Math.max(0, pending - addAmt);
+  const nextPending = isEdit
+    ? Math.max(0, pkgAmt - addAmt)
+    : Math.max(0, pending - addAmt);
 
   useEffect(() => {
     if (!open) return;
-    setAmount(pending > 0 ? String(pending) : '');
-    setMethod('upi');
+    setPackageAmount(String(Number(totalAmount) || ''));
+    setAmount(isEdit ? String(Number(advanceReceived) || '') : pending > 0 ? String(pending) : '');
+    setMethod(initialMethod || 'upi');
     setReference('');
     setNotes('');
     setShotFiles([]);
     setShotError('');
-  }, [open, pending]);
+  }, [open, pending, isEdit, advanceReceived, totalAmount, initialMethod]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -64,13 +73,28 @@ export default function AddLeadPaymentModal({
       toast.error('Payment endpoint missing');
       return;
     }
-    if (addAmt <= 0) {
-      toast.error('Enter the amount client paid');
-      return;
-    }
-    if (addAmt > pending + 1) {
-      toast.error(`Amount exceeds pending balance (${formatINR(pending)})`);
-      return;
+    if (isEdit) {
+      if (pkgAmt <= 0) {
+        toast.error('Enter a valid package cost');
+        return;
+      }
+      if (addAmt < 0) {
+        toast.error('Enter a valid advance amount');
+        return;
+      }
+      if (addAmt > pkgAmt + 1) {
+        toast.error(`Advance cannot exceed package (${formatINR(pkgAmt)})`);
+        return;
+      }
+    } else {
+      if (addAmt <= 0) {
+        toast.error('Enter the amount client paid');
+        return;
+      }
+      if (addAmt > pending + 1) {
+        toast.error(`Amount exceeds pending balance (${formatINR(pending)})`);
+        return;
+      }
     }
 
     setSaving(true);
@@ -81,19 +105,31 @@ export default function AddLeadPaymentModal({
         reference: reference.trim() || undefined,
         notes: notes.trim() || undefined,
       };
+      if (isEdit) {
+        payload.totalAmount = pkgAmt;
+        payload.packageCost = pkgAmt;
+      }
       if (shotFiles.length) {
         payload.paymentScreenshots = shotFiles.map((f) => ({ base64: f.base64, name: f.name }));
         payload.paymentScreenshotBase64 = shotFiles[0]?.base64;
         payload.paymentScreenshotName = shotFiles[0]?.name;
       }
-      const { data } = await API.post(endpoint, payload, { skipSuccessToast: true });
+      const { data } = isEdit
+        ? await API.put(endpoint, payload, { skipSuccessToast: true })
+        : await API.post(endpoint, payload, { skipSuccessToast: true });
       toast.success(
-        `Payment saved · Pending ${formatINR(data?.balanceDue ?? nextPending)}`
+        isEdit
+          ? `Package & advance updated · Pending ${formatINR(data?.balanceDue ?? nextPending)}`
+          : `Payment saved · Pending ${formatINR(data?.balanceDue ?? nextPending)}`
       );
       onSaved?.(data);
       onClose?.();
     } catch (err) {
-      toast.error(err.response?.data?.message || err.message || 'Failed to save payment');
+      toast.error(
+        err.response?.data?.message ||
+          err.message ||
+          (isEdit ? 'Failed to update package / advance' : 'Failed to save payment')
+      );
     } finally {
       setSaving(false);
     }
@@ -103,41 +139,72 @@ export default function AddLeadPaymentModal({
     <AppModal open={open} onClose={onClose} size="lg">
       <form onSubmit={handleSubmit} className="p-6 space-y-5">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-teal-600">Client payment</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-teal-600">
+            {isEdit ? 'Package & advance' : 'Client payment'}
+          </p>
           <h3 className="mt-1 flex items-center gap-2 text-xl font-bold text-slate-900">
             <Wallet className="h-5 w-5 text-teal-600" />
-            Add Payment
+            {isEdit ? 'Edit Package & Advance' : 'Add Payment'}
           </h3>
           <p className="mt-1 text-sm text-slate-500">
             {customerName ? `${customerName} · ` : ''}
-            Record money received. Screenshot optional — pending balance updates automatically.
+            {isEdit
+              ? 'Update package cost and token amount. The advance voucher updates automatically — send it again if the customer already received the old one.'
+              : 'Record money received. Screenshot optional — pending balance updates automatically.'}
           </p>
         </div>
 
         <div className="grid grid-cols-3 gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-3">
           <div>
             <p className="text-[10px] font-semibold uppercase text-slate-500">Package</p>
-            <p className="text-sm font-bold tabular-nums text-slate-900">{formatINR(totalAmount)}</p>
+            <p className="text-sm font-bold tabular-nums text-slate-900">
+              {formatINR(isEdit ? pkgAmt || totalAmount : totalAmount)}
+            </p>
           </div>
           <div>
-            <p className="text-[10px] font-semibold uppercase text-slate-500">Received</p>
-            <p className="text-sm font-bold tabular-nums text-teal-700">{formatINR(advanceReceived)}</p>
+            <p className="text-[10px] font-semibold uppercase text-slate-500">
+              {isEdit ? 'Advance' : 'Received'}
+            </p>
+            <p className="text-sm font-bold tabular-nums text-teal-700">
+              {formatINR(isEdit ? addAmt || advanceReceived : advanceReceived)}
+            </p>
           </div>
           <div>
             <p className="text-[10px] font-semibold uppercase text-slate-500">Pending</p>
-            <p className="text-sm font-bold tabular-nums text-orange-600">{formatINR(pending)}</p>
+            <p className="text-sm font-bold tabular-nums text-orange-600">
+              {formatINR(isEdit ? nextPending : pending)}
+            </p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {isEdit ? (
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-600">Package cost</span>
+              <div className="relative">
+                <IndianRupee className="pointer-events-none absolute left-3 top-[1.35rem] h-4 w-4 text-slate-400" />
+                <input
+                  required
+                  type="number"
+                  min="1"
+                  step="1"
+                  className={cn(fieldClass, 'pl-9')}
+                  value={packageAmount}
+                  onChange={(e) => setPackageAmount(e.target.value)}
+                />
+              </div>
+            </label>
+          ) : null}
           <label className="block">
-            <span className="text-xs font-semibold text-slate-600">Amount received</span>
+            <span className="text-xs font-semibold text-slate-600">
+              {isEdit ? 'Advance / token amount' : 'Amount received'}
+            </span>
             <div className="relative">
               <IndianRupee className="pointer-events-none absolute left-3 top-[1.35rem] h-4 w-4 text-slate-400" />
               <input
                 required
                 type="number"
-                min="1"
+                min={isEdit ? '0' : '1'}
                 step="1"
                 className={cn(fieldClass, 'pl-9')}
                 value={amount}
@@ -188,7 +255,7 @@ export default function AddLeadPaymentModal({
           {shotError ? <p className="mt-1 text-xs text-rose-600">{shotError}</p> : null}
         </div>
 
-        {addAmt > 0 ? (
+        {isEdit || addAmt > 0 ? (
           <p className="rounded-xl bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-800">
             After save, pending will be {formatINR(nextPending)}
           </p>
@@ -198,8 +265,12 @@ export default function AddLeadPaymentModal({
           <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button type="submit" disabled={saving || pending <= 0} className="bg-teal-600 hover:bg-teal-500 text-white">
-            {saving ? 'Saving…' : 'Save Payment'}
+          <Button
+            type="submit"
+            disabled={saving || (!isEdit && pending <= 0)}
+            className="bg-teal-600 hover:bg-teal-500 text-white"
+          >
+            {saving ? 'Saving…' : isEdit ? 'Save Package & Advance' : 'Save Payment'}
           </Button>
         </div>
       </form>

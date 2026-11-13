@@ -14,6 +14,7 @@ import { toast } from '../../context/ToastContext';
 import { invalidateLeadDetail } from '../../lib/queryInvalidation';
 import { DETAIL_STALE_MS, GC_TIME_MS } from '../../lib/queryConfig';
 import { isBookedStatus } from '../../lib/leadPipeline';
+import AddLeadPaymentModal from '../leads/AddLeadPaymentModal';
 
 const LeadActivityTimeline = lazy(() => import('./LeadActivityTimeline'));
 const LeadFollowUpSection = lazy(() => import('./LeadFollowUpSection'));
@@ -105,7 +106,22 @@ export default function LeadDetailLayout({
   );
 
   const [sendingBannerVoucher, setSendingBannerVoucher] = useState(false);
-  const editAdvanceHandler = onEditCommercial || onChangeStatus;
+  const [editAdvanceOpen, setEditAdvanceOpen] = useState(false);
+  const advanceContactBase = contactEndpoint || relatedBasePath;
+  const advanceEndpoint =
+    leadId && advanceContactBase ? `${advanceContactBase}/${leadId}/advance` : null;
+  const summary = lead?.paymentSummary;
+  const openEditAdvanceOnLead = () => {
+    if (advanceEndpoint && isBookedStatus(lead?.status)) {
+      setEditAdvanceOpen(true);
+      return;
+    }
+    onEditCommercial?.();
+  };
+  const editAdvanceHandler =
+    isBookedStatus(lead?.status) && (advanceEndpoint || onEditCommercial)
+      ? openEditAdvanceOnLead
+      : undefined;
 
   const refreshBookingStatus = useCallback(() => {
     if (!leadId) return;
@@ -322,7 +338,7 @@ export default function LeadDetailLayout({
           onAssign={onAssign}
           onAddNote={handleAddNote}
           onUpdateStatus={onChangeStatus || onScheduleFollowUp}
-          onEditCommercial={onEditCommercial || onChangeStatus}
+          onEditCommercial={onEditCommercial || openEditAdvanceOnLead}
           onPaymentRecorded={onPaymentRecorded || onContactLogged}
           sidebarExtra={sidebarExtra}
         />
@@ -357,6 +373,10 @@ export default function LeadDetailLayout({
             quotations={quotations}
             loading={quotationsLoading}
             contactEndpoint={contactEndpoint || relatedBasePath || '/leads'}
+            lead={lead}
+            leadId={leadId}
+            onQuotationSent={onContactLogged}
+            onFinalQuotationSet={onContactLogged}
           />
         ) : null}
 
@@ -377,7 +397,7 @@ export default function LeadDetailLayout({
               paymentSummary={lead.paymentSummary}
               receiptEndpoint={paymentReceiptEndpoint}
               contactEndpoint={contactEndpoint || relatedBasePath || '/leads'}
-              onEditCommercial={onEditCommercial || onChangeStatus}
+              onEditCommercial={onEditCommercial || openEditAdvanceOnLead}
               onPaymentRecorded={onPaymentRecorded || onContactLogged}
             />
           ) : (
@@ -401,6 +421,27 @@ export default function LeadDetailLayout({
           </div>
         ) : null}
       </Suspense>
+
+      {editAdvanceOpen && advanceEndpoint ? (
+        <AddLeadPaymentModal
+          open={editAdvanceOpen}
+          onClose={() => setEditAdvanceOpen(false)}
+          mode="editAdvance"
+          endpoint={advanceEndpoint}
+          customerName={lead?.name || ''}
+          totalAmount={summary?.totalAmount ?? lead?.budget ?? 0}
+          advanceReceived={summary?.advanceReceived ?? 0}
+          balanceDue={
+            summary?.balanceDue ??
+            Math.max(0, Number(summary?.totalAmount ?? lead?.budget ?? 0) - Number(summary?.advanceReceived ?? 0))
+          }
+          onSaved={() => {
+            setEditAdvanceOpen(false);
+            invalidateLeadDetail(queryClient, leadId);
+            (onPaymentRecorded || onContactLogged)?.();
+          }}
+        />
+      ) : null}
 
       {dialogNode}
     </>

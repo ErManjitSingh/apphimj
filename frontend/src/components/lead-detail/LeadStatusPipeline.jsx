@@ -35,7 +35,7 @@ export default function LeadStatusPipeline({ status, lead, onUpdateStatus }) {
   const display = getLeadListStatusDisplay(resolved);
 
   const statusBtnLabel = booked
-    ? 'Edit Advance / Voucher'
+    ? 'Edit Package & Advance'
     : lost
       ? 'Reopen / Change Status'
       : 'Change Status';

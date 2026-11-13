@@ -6,6 +6,7 @@ export const BOOKING_STATUS_CONFIG = {
   in_progress: { label: 'In Progress', className: 'bg-emerald-500/15 text-emerald-700 ring-emerald-400/30' },
   active: { label: 'Active Trip', className: 'bg-emerald-500/15 text-emerald-700 ring-emerald-400/30' },
   completed: { label: 'Completed', className: 'bg-slate-500/15 text-slate-600 ring-slate-400/30' },
+  postponed: { label: 'Postponed', className: 'bg-amber-500/15 text-amber-800 ring-amber-400/30' },
   cancelled: { label: 'Cancelled', className: 'bg-rose-500/15 text-rose-700 ring-rose-400/30' },
   refund_pending: { label: 'Refund Pending', className: 'bg-orange-500/15 text-orange-700 ring-orange-400/30' },
   refund_completed: { label: 'Refund Completed', className: 'bg-violet-500/15 text-violet-700 ring-violet-400/30' },

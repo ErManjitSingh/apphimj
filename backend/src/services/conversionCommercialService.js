@@ -679,12 +679,190 @@ async function recordAdditionalLeadPayment({
   };
 }
 
+async function loadLeadPaymentForEdit({ leadId, userId, branchId, requireAssignee = false }) {
+  const leadFilter = {
+    _id: leadId,
+    isDeleted: { $ne: true },
+    ...(branchId ? { branchId } : {}),
+  };
+  if (requireAssignee) leadFilter.assignedTo = userId;
+
+  const lead = await Lead.findOne(leadFilter);
+  if (!lead) throw new ApiError(404, 'Lead not found');
+  if (lead.status !== 'converted' && lead.status !== 'booked') {
+    throw new ApiError(400, 'Advance can be edited after the lead is booked');
+  }
+
+  const payment = await Payment.findOne({ lead: leadId }).sort({ createdAt: -1 });
+  if (!payment) {
+    throw new ApiError(404, 'Payment record not found — save advance / commercial form first');
+  }
+  return { lead, payment };
+}
+
+async function refreshPaymentBookingAndReceipt({ lead, payment, userId }) {
+  try {
+    const { createBookingFromPayment } = require('./operationsService');
+    await createBookingFromPayment(payment._id, { _id: userId });
+  } catch (err) {
+    console.error('[updateLeadAdvancePayment] booking sync failed:', err.message);
+  }
+
+  try {
+    const { generateAndStoreReceipt } = require('./paymentReceiptService');
+    const Booking = require('../models/Booking');
+    const booking = await Booking.findOne({ lead: lead._id }).sort({ createdAt: -1 }).lean();
+    const quotation = payment.quotation
+      ? await Quotation.findById(payment.quotation).lean()
+      : null;
+    await generateAndStoreReceipt({
+      lead,
+      payment,
+      booking,
+      quotation,
+      actor: { _id: userId, name: 'Him Journey Tours' },
+    });
+  } catch (err) {
+    console.error('[updateLeadAdvancePayment] receipt refresh failed:', err.message);
+  }
+}
+
+/**
+ * Replace package total and/or original advance / token (does not add a new installment).
+ * Later received payments stay; voucher HTML is regenerated.
+ */
+async function updateLeadAdvancePayment({
+  leadId,
+  userId,
+  branchId,
+  body = {},
+  requireAssignee = false,
+}) {
+  const { lead, payment } = await loadLeadPaymentForEdit({
+    leadId,
+    userId,
+    branchId,
+    requireAssignee,
+  });
+
+  const hasPackageUpdate =
+    body.totalAmount != null || body.packageCost != null || body.packageAmount != null;
+  const packageTotal = hasPackageUpdate
+    ? Math.max(0, Math.round(Number(body.totalAmount ?? body.packageCost ?? body.packageAmount) || 0))
+    : Math.max(0, Number(payment.amount) || 0);
+  if (hasPackageUpdate && packageTotal <= 0) {
+    throw new ApiError(400, 'Enter a valid package cost');
+  }
+
+  const newAdvance = Math.round(Number(body.amount ?? body.advanceReceived) || 0);
+  if (newAdvance < 0) throw new ApiError(400, 'Enter a valid advance amount');
+
+  const method = ['cash', 'upi', 'card', 'bank_transfer', 'cheque'].includes(body.paymentMethod)
+    ? body.paymentMethod
+    : payment.method || 'upi';
+
+  const installments = Array.isArray(payment.installments) ? [...payment.installments] : [];
+  const tokenIdx = installments.findIndex((row) => /advance|token/i.test(String(row.note || '')));
+  const idx = tokenIdx >= 0 ? tokenIdx : 0;
+  const laterSum = installments.reduce(
+    (sum, row, i) => (i === idx ? sum : sum + (Number(row.amount) || 0)),
+    0
+  );
+  const maxAdvance = packageTotal > 0 ? Math.max(0, packageTotal - laterSum) : newAdvance;
+  if (packageTotal > 0 && newAdvance > maxAdvance + 1) {
+    throw new ApiError(
+      400,
+      `Advance cannot exceed remaining package after later payments (₹${maxAdvance.toLocaleString('en-IN')})`
+    );
+  }
+
+  if (!installments.length) {
+    if (newAdvance > 0) {
+      installments.push({
+        amount: newAdvance,
+        receivedAt: payment.paidAt || payment.createdAt || new Date(),
+        method,
+        reference: String(body.reference || '').trim(),
+        note: 'Advance / Token',
+        recordedBy: userId,
+      });
+    }
+  } else {
+    installments[idx] = {
+      ...(installments[idx].toObject ? installments[idx].toObject() : installments[idx]),
+      amount: newAdvance,
+      method,
+      reference: String(body.reference || installments[idx].reference || '').trim(),
+      note: installments[idx].note || 'Advance / Token',
+      recordedBy: installments[idx].recordedBy || userId,
+    };
+  }
+
+  const nextPaid = installments.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+  payment.amount = packageTotal;
+  payment.installments = installments;
+  payment.paidAmount = nextPaid;
+  payment.method = method;
+  if (body.notes) payment.notes = String(body.notes).trim();
+  payment.status =
+    packageTotal > 0 && nextPaid >= packageTotal ? 'paid' : nextPaid > 0 ? 'partial' : 'pending';
+
+  payment.scheduledInstallments = buildInstallmentSchedule({
+    total: packageTotal,
+    token: nextPaid,
+    travelDate: lead.travelDate,
+    returnDate: lead.returnDate,
+  });
+
+  const nextDue = (payment.scheduledInstallments || [])
+    .filter((r) => r.status === 'pending' && r.dueDate)
+    .map((r) => new Date(r.dueDate))
+    .filter((d) => Number.isFinite(d.getTime()))
+    .sort((a, b) => a - b)[0];
+  if (nextDue) payment.dueDate = nextDue;
+
+  if (body.paymentScreenshotBase64 || (Array.isArray(body.paymentScreenshots) && body.paymentScreenshots.length)) {
+    applyPaymentScreenshotsToPayment(payment, collectPaymentScreenshotUploads(body), leadId);
+  }
+
+  await payment.save();
+
+  if (hasPackageUpdate && Number(lead.budget || 0) !== packageTotal) {
+    lead.budget = packageTotal;
+    await lead.save();
+  }
+
+  await refreshPaymentBookingAndReceipt({ lead, payment, userId });
+
+  await syncPaymentReminders({
+    lead,
+    payment,
+    user: { _id: userId },
+    schedule: payment.scheduledInstallments,
+  }).catch((err) => {
+    console.error('[updateLeadAdvancePayment] reminders failed:', err.message);
+  });
+
+  const { getLeadPaymentSummary } = require('./paymentReceiptService');
+  const paymentSummary = await getLeadPaymentSummary(leadId);
+  return {
+    paymentId: payment._id,
+    advanceReceived: newAdvance,
+    paidAmount: payment.paidAmount,
+    totalAmount: payment.amount,
+    balanceDue: Math.max(0, Number(payment.amount || 0) - Number(payment.paidAmount || 0)),
+    status: payment.status,
+    paymentSummary,
+  };
+}
+
 module.exports = {
   buildInstallmentSchedule,
   normalizeCustomInstallments,
   getCommercialFormDraft,
   saveCommercialForm,
   recordAdditionalLeadPayment,
+  updateLeadAdvancePayment,
   applyAmountToScheduledInstallments,
   syncPaymentReminders,
   savePaymentScreenshotBase64,

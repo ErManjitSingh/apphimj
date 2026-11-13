@@ -11,16 +11,21 @@ const {
 const { protect } = require('../middleware/auth');
 const { authorize } = require('../middleware/rbac');
 
-const requireExecutiveForWrite = authorize('sales_executive');
+const requireFollowUpWrite = authorize(
+  'sales_executive',
+  'admin',
+  'sales_manager',
+  'team_leader'
+);
 
 router.use(protect);
 
 router.get('/summary', getFollowUpSummary);
-router.route('/').get(listFollowUps).post(requireExecutiveForWrite, createFollowUp);
+router.route('/').get(listFollowUps).post(requireFollowUpWrite, createFollowUp);
 router
   .route('/:id')
   .get(getFollowUp)
-  .put(requireExecutiveForWrite, updateFollowUp)
-  .delete(requireExecutiveForWrite, deleteFollowUp);
+  .put(requireFollowUpWrite, updateFollowUp)
+  .delete(requireFollowUpWrite, deleteFollowUp);
 
 module.exports = router;

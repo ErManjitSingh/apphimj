@@ -12,7 +12,8 @@ module.exports = {
   mongoUri: process.env.MONGO_URI || DEFAULT_MONGO_URI,
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '30d',
-  corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:5173')
+  corsOrigins: (process.env.CORS_ORIGINS ||
+    'http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080')
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean),

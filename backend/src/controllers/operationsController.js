@@ -493,7 +493,45 @@ const recordBookingPayment = asyncHandler(async (req, res) => {
   const result = await recordAdditionalLeadPayment({
     leadId: booking.lead,
     userId: req.user._id,
-    branchId: req.branchId || booking.branchId || null,
+    branchId: req.branchId || null,
+    body: req.body,
+    requireAssignee: false,
+  });
+
+  const refreshed = await Booking.findById(req.params.id).lean();
+  const payments = await Payment.find({
+    $or: [
+      { booking: booking._id },
+      { lead: booking.lead },
+    ],
+  })
+    .sort({ createdAt: 1 })
+    .lean();
+
+  res.json({
+    ...result,
+    balanceDue: result.balanceDue ?? refreshed?.pendingAmount ?? 0,
+    booking: {
+      ...refreshed,
+      paymentLedger: paymentLedger(payments),
+      payments,
+    },
+  });
+});
+
+/** Ops: replace original advance / token (regenerates voucher). */
+const updateBookingAdvance = asyncHandler(async (req, res) => {
+  const booking = await Booking.findById(req.params.id).lean();
+  if (!booking) throw new ApiError(404, 'Booking not found');
+  if (!booking.lead) {
+    throw new ApiError(400, 'Booking has no linked lead — cannot edit advance');
+  }
+
+  const { updateLeadAdvancePayment } = require('../services/conversionCommercialService');
+  const result = await updateLeadAdvancePayment({
+    leadId: booking.lead,
+    userId: req.user._id,
+    branchId: req.branchId || null,
     body: req.body,
     requireAssignee: false,
   });
@@ -1128,6 +1166,7 @@ module.exports = {
   updateBooking,
   addBookingOpsNote,
   recordBookingPayment,
+  updateBookingAdvance,
   confirmHotel,
   confirmCab,
   listHotels,

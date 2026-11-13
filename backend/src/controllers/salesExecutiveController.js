@@ -555,14 +555,37 @@ const updateLead = asyncHandler(async (req, res) => {
     ) {
       lead.lostReason = String(req.body.lostReason).trim();
     }
+    const requestedPostponed =
+      String(req.body.status || '').trim().toLowerCase() === 'postponed' ||
+      Boolean(String(req.body.postponedReason || '').trim());
     if (req.body.postponedReason) lead.postponedReason = String(req.body.postponedReason).trim();
     if (req.body.postponedAt) {
       const d = new Date(req.body.postponedAt);
       if (!Number.isNaN(d.getTime())) lead.postponedAt = d;
     }
-    if (nextStatus === 'postponed' && !lead.postponedAt) lead.postponedAt = new Date();
+    if ((nextStatus === 'postponed' || requestedPostponed) && !lead.postponedAt) {
+      lead.postponedAt = new Date();
+    }
 
     await lead.save();
+
+    // Booked leads stay booked, but mirror postpone/cancel onto the ops booking
+    // when this request explicitly asks for that lifecycle change.
+    const ops = require('../services/operationsService');
+    const cancelRequested =
+      nextStatus === 'lost' ||
+      nextStatus === 'booked_from_another_company' ||
+      String(req.body.lostReason || '') === 'plan_cancelled';
+    if (nextStatus === 'postponed' || requestedPostponed || cancelRequested) {
+      await ops
+        .syncLinkedBookingFromLead(lead, {
+          actor: req.user,
+          intent: cancelRequested ? 'cancelled' : 'postponed',
+        })
+        .catch((err) => {
+          console.error('[BookingLifecycleSync]', err.message);
+        });
+    }
 
     if (nextStatus !== prevStatus) {
       const typeMap = {
@@ -1416,6 +1439,18 @@ const recordLeadPayment = asyncHandler(async (req, res) => {
   res.json(result);
 });
 
+const updateLeadAdvance = asyncHandler(async (req, res) => {
+  const { updateLeadAdvancePayment } = require('../services/conversionCommercialService');
+  const result = await updateLeadAdvancePayment({
+    leadId: req.params.id,
+    userId: req.user._id,
+    branchId: req.branchId,
+    body: req.body,
+    requireAssignee: true,
+  });
+  res.json(result);
+});
+
 module.exports = {
   LEAD_FILTER_KEYS,
   getDashboard,
@@ -1432,6 +1467,7 @@ module.exports = {
   getCommercialForm,
   saveCommercialForm,
   recordLeadPayment,
+  updateLeadAdvance,
   addLeadNote,
   listFollowUps,
   getFollowUpSummary,
