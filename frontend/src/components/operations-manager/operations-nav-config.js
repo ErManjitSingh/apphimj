@@ -16,21 +16,24 @@ import {
   User,
   MapPin,
   ListTodo,
+  Sparkles,
 } from 'lucide-react';
 
 export const operationsBookingsChildren = [
   { path: '/operations-manager/bookings/pending', label: 'Pending', icon: Clock, badgeKey: 'bookings.pending' },
   { path: '/operations-manager/bookings/confirmed', label: 'Confirmed', icon: CheckCircle2, countKey: 'bookings.confirmed' },
-  { path: '/operations-manager/bookings/active', label: 'Active Trips', icon: Plane, badgeKey: 'bookings.active' },
+  { path: '/operations-manager/bookings/active-tours', label: 'Active Tours', icon: Sparkles, countKey: 'bookings.activeTours' },
+  { path: '/operations-manager/bookings/active', label: 'Live Tours', icon: Plane, badgeKey: 'bookings.active' },
   { path: '/operations-manager/bookings/completed', label: 'Completed Trips', icon: CircleCheck, countKey: 'bookings.completed' },
 ];
 
 export const operationsExecutionChildren = [
-  { path: '/operations-manager/trip-tracker', label: 'Trip Tracker', icon: MapPin },
+  { path: '/operations-manager/trip-map', label: 'Trip Map', icon: MapPin },
+  { path: '/operations-manager/trip-tracker', label: 'Trip Tracker', icon: Compass },
   { path: '/operations-manager/tasks', label: 'Tasks', icon: ListTodo, badgeKey: 'tasks.pending' },
   { path: '/operations-manager/hotels', label: 'Hotels', icon: Hotel },
   { path: '/operations-manager/transport', label: 'Transport', icon: Car },
-  { path: '/operations-manager/activities', label: 'Activities', icon: Compass },
+  { path: '/operations-manager/activities', label: 'Activities', icon: Sparkles },
 ];
 
 export const operationsResourcesChildren = [

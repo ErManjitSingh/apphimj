@@ -15,6 +15,7 @@ import {
   Mail,
   Percent,
   PhoneCall,
+  MessageCircle,
 } from 'lucide-react';
 
 /** Sales Manager sidebar — matches Command Center mockup sections */
@@ -22,10 +23,19 @@ export const salesManagerNavItems = [
   { path: '/sales-manager/dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'Lead Management' },
   {
     path: '/sales-manager/leads/all',
-    label: 'Lead Management',
+    label: 'All Leads',
     icon: Users,
     badgeKey: 'leads.all',
     countKey: 'leads.all',
+    section: 'Lead Management',
+  },
+  {
+    path: '/whatsapp',
+    label: 'WhatsApp Leads',
+    icon: MessageCircle,
+    accent: 'green',
+    badgeKey: 'leads.whatsapp',
+    countKey: 'leads.whatsapp',
     section: 'Lead Management',
   },
   { path: '/sales-manager/email-activity', label: 'Email Activity', icon: Mail, section: 'Lead Management' },

@@ -214,14 +214,17 @@ function CompletedCard({ booking, index, onOpen }) {
               <p className="text-base font-bold tabular-nums text-content-primary">
                 {formatINR(booking.totalAmount)}
               </p>
-              <p className="mt-1 inline-flex items-center gap-1 text-[11px] text-content-muted">
+              <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
                 <Wallet className="h-3 w-3" />
-                {Number(booking.pendingAmount) > 0
-                  ? `Due ${formatINR(booking.pendingAmount)}`
-                  : booking.paymentStatus === 'paid'
-                    ? 'Fully settled'
-                    : `Adv ${formatINR(booking.advanceReceived || 0)}`}
+                Adv {formatINR(booking.advanceReceived || 0)}
               </p>
+              {Number(booking.pendingAmount) > 0 ? (
+                <p className="mt-0.5 text-[11px] font-medium text-amber-700">
+                  Due {formatINR(booking.pendingAmount)}
+                </p>
+              ) : booking.paymentStatus === 'paid' ? (
+                <p className="mt-0.5 text-[11px] text-content-muted">Fully settled</p>
+              ) : null}
               {profit ? (
                 <p className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
                   <Sparkles className="h-3 w-3" />

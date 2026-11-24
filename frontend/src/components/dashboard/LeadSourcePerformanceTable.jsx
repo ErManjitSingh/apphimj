@@ -11,12 +11,13 @@ function formatSource(name) {
     portal_lead: 'Portal Lead',
     call_lead: 'Call Lead',
     dpw: 'Website',
-    dpw_wa: 'Website',
+    dpw_wa: 'WhatsApp',
     dpw_call: 'Call Lead',
     dpw2: 'Website 2',
-    dpw2_wa: 'Website 2',
+    dpw2_wa: 'WhatsApp',
     dpw2_call: 'Call Lead',
     organic: 'Website',
+    whatsapp: 'WhatsApp',
   };
   return labels[key] || String(name || 'Other').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }

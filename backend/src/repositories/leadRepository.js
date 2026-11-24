@@ -21,19 +21,12 @@ const { attachFirstCall } = require('../utils/firstCallInfo');
 const { resolveDestinationGroupValues } = require('../utils/destinationHierarchy');
 
 function parseLocalDayStart(dateStr) {
-  const parts = String(dateStr || '').split('-').map(Number);
-  if (parts.length === 3 && parts.every((n) => Number.isFinite(n))) {
-    return new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0);
-  }
-  return startOfDay(new Date(dateStr));
+  // Org calendar day (IST) — never use server-local midnight (VPS is UTC).
+  return startOfDay(dateStr || new Date());
 }
 
 function parseLocalDayEnd(dateStr) {
-  const parts = String(dateStr || '').split('-').map(Number);
-  if (parts.length === 3 && parts.every((n) => Number.isFinite(n))) {
-    return new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59, 999);
-  }
-  return endOfDay(new Date(dateStr));
+  return endOfDay(dateStr || new Date());
 }
 
 function escapeRegex(value) {
@@ -265,7 +258,17 @@ async function findLeadsPaginated(query = {}, { branchId, includeManagementField
   }
 
   let enriched = rows.map(enrichLead);
-  if (query.status === 'converted' || filter.status === 'converted') {
+  // Converted page sends status=booked (aliases booked+converted). Attach payment
+  // summaries whenever this list is the booked/converted set — otherwise UI shows ₹0 advance.
+  const statusIn = filter?.status?.$in;
+  const wantsPaymentSummary =
+    query.status === 'converted' ||
+    query.status === 'booked' ||
+    filter.status === 'converted' ||
+    filter.status === 'booked' ||
+    (Array.isArray(statusIn) &&
+      statusIn.some((s) => s === 'booked' || s === 'converted'));
+  if (wantsPaymentSummary) {
     const { attachPaymentSummariesToLeads } = require('../services/paymentReceiptService');
     enriched = await attachPaymentSummariesToLeads(enriched);
   }

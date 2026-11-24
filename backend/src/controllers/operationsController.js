@@ -1120,38 +1120,8 @@ const createCompanyVoucher = asyncHandler(async (req, res) => {
 });
 
 const getCalendar = asyncHandler(async (req, res) => {
-  const bookings = await Booking.find({
-    archivedAt: { $exists: false },
-    $or: [{ travelDate: { $exists: true, $ne: null } }, { returnDate: { $exists: true, $ne: null } }],
-  }).lean();
-
-  const events = [];
-  for (const b of bookings) {
-    const title = `${b.customerName} — ${b.destination}`;
-    if (b.travelDate) {
-      events.push({
-        _id: b._id,
-        title,
-        start: b.travelDate,
-        end: b.travelDate,
-        type: 'departure',
-        status: b.status,
-        bookingNumber: b.bookingNumber,
-      });
-    }
-    if (b.returnDate) {
-      events.push({
-        _id: b._id,
-        title,
-        start: b.returnDate,
-        end: b.returnDate,
-        type: 'return',
-        status: b.status,
-        bookingNumber: b.bookingNumber,
-      });
-    }
-  }
-
+  // Postponed / cancelled stay in their own portfolios — never on Arrivals/Departures.
+  const events = await ops.listCalendarEvents({ branchId: req.branchId });
   res.json(events);
 });
 

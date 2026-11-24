@@ -6,12 +6,10 @@ const { getOrSet, cacheKey } = require('./dashboardCacheService');
 const LIST_KPI_TTL_MS = 3 * 60 * 1000;
 const DUPLICATE_KPI_TTL_MS = 10 * 60 * 1000;
 
+const { startOfDay, endOfDay } = require('../utils/queryHelpers');
+
 function todayRange() {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const end = new Date();
-  end.setHours(23, 59, 59, 999);
-  return { start, end };
+  return { start: startOfDay(), end: endOfDay() };
 }
 
 /** Last 10 digits of phone after stripping common separators */

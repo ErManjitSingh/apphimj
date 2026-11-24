@@ -6,6 +6,7 @@ export const LEAD_SOURCE_KEYS = [
   'referral',
   'portal_lead',
   'call_lead',
+  'whatsapp',
 ];
 
 const SOURCE_SHORT = {
@@ -14,16 +15,16 @@ const SOURCE_SHORT = {
   referral: 'Referral',
   portal_lead: 'Portal Lead',
   call_lead: 'Call Lead',
+  whatsapp: 'WhatsApp',
   dpw: 'Website',
-  dpw_wa: 'Website',
+  dpw_wa: 'WhatsApp',
   dpw_call: 'Call Lead',
   dpw2: 'Website 2',
-  dpw2_wa: 'Website 2',
+  dpw2_wa: 'WhatsApp',
   dpw2_call: 'Call Lead',
   organic: 'Website',
   google_ads: 'Website',
   facebook_ads: 'Website 2',
-  whatsapp: 'Website',
   social: 'Website 2',
   phone: 'Call Lead',
   'walk-in': 'Call Lead',
@@ -38,26 +39,21 @@ const ALIASES = {
   google: 'website',
   organic: 'website',
   other: 'website',
-  dpw_wa: 'website',
-  whatsapp: 'website',
-  wa: 'website',
   website_2: 'website_2',
   website2: 'website_2',
   'website 2': 'website_2',
   dpw2: 'website_2',
   social: 'website_2',
-  dpw2_wa: 'website_2',
-  referral: 'referral',
   facebook_ads: 'website_2',
   facebook: 'website_2',
   meta: 'website_2',
   instagram: 'website_2',
+  referral: 'referral',
   portal_lead: 'portal_lead',
   potal_lead: 'portal_lead',
   'portal lead': 'portal_lead',
   'potal lead': 'portal_lead',
   portal: 'portal_lead',
-  ctwa: 'website_2',
   call_lead: 'call_lead',
   'call lead': 'call_lead',
   phone: 'call_lead',
@@ -66,6 +62,14 @@ const ALIASES = {
   dpw2_call: 'call_lead',
   'walk-in': 'call_lead',
   walk_in: 'call_lead',
+  whatsapp: 'whatsapp',
+  wa: 'whatsapp',
+  'whats app': 'whatsapp',
+  dpw_wa: 'whatsapp',
+  dpw2_wa: 'whatsapp',
+  ctwa: 'whatsapp',
+  facebook_whatsapp: 'whatsapp',
+  meta_whatsapp: 'whatsapp',
 };
 
 function normalizeSourceKey(raw) {
@@ -98,6 +102,7 @@ export function resolveLeadSourceKey(source, sourceLabel) {
  */
 export function getLeadSourceChannel(source, sourceLabel) {
   const key = resolveLeadSourceKey(source, sourceLabel);
+  if (key === 'whatsapp') return 'whatsapp';
   if (key === 'call_lead') return 'call';
   if (key === 'website' || key === 'website_2' || key === 'portal_lead') return 'form';
 
@@ -119,6 +124,7 @@ export function getLeadSourceShortLabel(source, sourceLabel) {
   if (key && SOURCE_SHORT[key]) return SOURCE_SHORT[key];
 
   const label = explicit.toLowerCase();
+  if (label.includes('whatsapp') || label === 'wa') return 'WhatsApp';
   if (label.includes('website 2') || label.includes('website_2')) return 'Website 2';
   if (label.includes('website')) return 'Website';
   if (label.includes('portal') || label.includes('potal')) return 'Portal Lead';

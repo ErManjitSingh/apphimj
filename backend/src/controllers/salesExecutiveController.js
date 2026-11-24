@@ -135,10 +135,10 @@ function assertResubmissionReasonIfNeeded(status, reason, pricing = null) {
 
 function buildExecutiveLeadFilter(filter) {
   if (filter === 'new' || filter === 'new_lead') {
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    const end = new Date();
-    end.setHours(23, 59, 59, 999);
+    // Kept for parity; list path uses roleScopedRepository (IST startOfDay/endOfDay).
+    const { startOfDay, endOfDay } = require('../utils/queryHelpers');
+    const start = startOfDay();
+    const end = endOfDay();
     return {
       $or: [
         { createdAt: { $gte: start, $lte: end } },
@@ -569,23 +569,19 @@ const updateLead = asyncHandler(async (req, res) => {
 
     await lead.save();
 
-    // Booked leads stay booked, but mirror postpone/cancel onto the ops booking
-    // when this request explicitly asks for that lifecycle change.
+    // Mirror postpone/cancel (and any trip fields present) onto the linked ops booking.
     const ops = require('../services/operationsService');
     const cancelRequested =
       nextStatus === 'lost' ||
       nextStatus === 'booked_from_another_company' ||
       String(req.body.lostReason || '') === 'plan_cancelled';
-    if (nextStatus === 'postponed' || requestedPostponed || cancelRequested) {
-      await ops
-        .syncLinkedBookingFromLead(lead, {
-          actor: req.user,
-          intent: cancelRequested ? 'cancelled' : 'postponed',
-        })
-        .catch((err) => {
-          console.error('[BookingLifecycleSync]', err.message);
-        });
-    }
+    const intent =
+      cancelRequested ? 'cancelled' : nextStatus === 'postponed' || requestedPostponed ? 'postponed' : undefined;
+    await ops
+      .syncLinkedBookingFromLead(lead, { actor: req.user, intent })
+      .catch((err) => {
+        console.error('[BookingLeadSync]', err.message);
+      });
 
     if (nextStatus !== prevStatus) {
       const typeMap = {
@@ -801,6 +797,11 @@ const updateLead = asyncHandler(async (req, res) => {
       editedKeys: Object.keys(data || {}),
     },
   });
+
+  // Keep ops booking in sync when SE edits travel date / pax / package cost / destination.
+  await require('../services/operationsService')
+    .syncLinkedBookingFromLead(lead, { actor: req.user })
+    .catch((err) => console.error('[BookingLeadSync]', err.message));
 
   const populated = await Lead.findById(lead._id).populate(LEAD_POPULATE).lean();
   const paymentSummary = await getLeadPaymentSummary(lead._id);

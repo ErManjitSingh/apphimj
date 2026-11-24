@@ -27,6 +27,39 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Mobile app WebView bridge: inject CRM session from hash BEFORE React boots
+         so Quotation Builder gets the same packages / hotels / cabs as desktop. -->
+    <script>
+      (function () {
+        try {
+          var hash = String(location.hash || '');
+          var marker = 'hj_mobile_auth=';
+          var idx = hash.indexOf(marker);
+          if (idx === -1) return;
+          var raw = decodeURIComponent(hash.slice(idx + marker.length));
+          if (!raw) return;
+          var data = JSON.parse(raw);
+          if (!data || !data.token) return;
+          localStorage.setItem('token', String(data.token));
+          if (data.user) {
+            localStorage.setItem(
+              'user',
+              typeof data.user === 'string' ? data.user : JSON.stringify(data.user)
+            );
+          }
+          if (data.role) localStorage.setItem('role', String(data.role));
+          localStorage.setItem('isAuthenticated', 'true');
+          var now = Date.now();
+          localStorage.setItem('lastActivityAt', String(now));
+          localStorage.setItem('sessionExpiresAt', String(now + 10 * 60 * 60 * 1000));
+          var clean =
+            location.pathname +
+            location.search +
+            (hash.indexOf(marker) > 1 ? hash.slice(0, idx).replace(/#$/, '') : '');
+          history.replaceState(null, '', clean || location.pathname + location.search);
+        } catch (e) {}
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

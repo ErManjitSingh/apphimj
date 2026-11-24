@@ -15,6 +15,7 @@ import BookingRowActions from './BookingRowActions';
 import TotalBookingsOverview from './TotalBookingsOverview';
 import LifecycleBookingsBoard from './LifecycleBookingsBoard';
 import CompletedToursBoard from './CompletedToursBoard';
+import ActiveToursBoard from './ActiveToursBoard';
 import {
   countActiveBookingFilters,
   formatActiveTravelDate,
@@ -71,10 +72,22 @@ const PAGE_META = {
     paginationLabel: 'bookings',
   },
   active: {
-    title: 'Active Trips',
-    desc: 'Guests currently traveling — monitor trip execution in real-time',
+    title: 'Live Tours',
+    desc: 'On-ground now — day progress, hotel/cab, return window and guest contact at a glance',
     searchPlaceholder: 'Search by booking #, customer, destination, hotel...',
-    paginationLabel: 'active trips',
+    paginationLabel: 'live tours',
+  },
+  'active-tours': {
+    title: 'Active Tours',
+    desc: 'Open portfolio — Total minus Completed, Postponed and Cancelled',
+    searchPlaceholder: 'Search customer, booking #, destination, package...',
+    paginationLabel: 'active tours',
+  },
+  active_tours: {
+    title: 'Active Tours',
+    desc: 'Open portfolio — Total minus Completed, Postponed and Cancelled',
+    searchPlaceholder: 'Search customer, booking #, destination, package...',
+    paginationLabel: 'active tours',
   },
   postponed: {
     title: 'Postponed Bookings',
@@ -126,18 +139,48 @@ function ConfirmationCell({ value, detail, listStatus, icon: Icon }) {
 function PaymentCell({ booking }) {
   const key = booking.paymentStatus || 'pending';
   const badge = PAYMENT_BADGE[key] || PAYMENT_BADGE.pending;
+  const advance = Number(booking.advanceReceived || 0);
   const pending = Number(booking.pendingAmount || 0);
 
   return (
-    <div className="min-w-[100px]">
+    <div className="min-w-[110px]">
       <span className={cn('inline-flex text-[11px] font-semibold px-2.5 py-1 rounded-md', badge.className)}>
         {badge.label}
       </span>
-      {pending > 0 && key !== 'paid' && (
-        <p className="text-[11px] text-amber-700 mt-1 font-medium tabular-nums">
+      {advance > 0 ? (
+        <p className="text-[11px] text-emerald-700 mt-1 font-medium tabular-nums">
+          Adv {formatINR(advance)}
+        </p>
+      ) : null}
+      {pending > 0 && key !== 'paid' ? (
+        <p className="text-[11px] text-amber-700 mt-0.5 font-medium tabular-nums">
           Due {formatINR(pending)}
         </p>
+      ) : null}
+    </div>
+  );
+}
+
+function AmountCell({ booking }) {
+  const total = booking.totalAmount ?? booking.amount;
+  const advance = Number(booking.advanceReceived || 0);
+  const pending = Number(booking.pendingAmount || 0);
+
+  return (
+    <div className="min-w-[120px]">
+      <span className="font-bold tabular-nums text-content-primary">{formatINR(total)}</span>
+      {advance > 0 ? (
+        <p className="text-[11px] text-emerald-700 mt-0.5 tabular-nums font-semibold">
+          Adv {formatINR(advance)}
+        </p>
+      ) : (
+        <p className="text-[11px] text-content-muted mt-0.5">No advance</p>
       )}
+      {pending > 0 ? (
+        <p className="text-[11px] text-amber-700 mt-0.5 tabular-nums font-medium">
+          Due {formatINR(pending)}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -238,16 +281,7 @@ function buildAllColumns() {
     {
       key: 'amount',
       header: 'Amount',
-      render: (b) => (
-        <div>
-          <span className="font-bold tabular-nums text-content-primary">{formatINR(b.totalAmount ?? b.amount)}</span>
-          {Number(b.advanceReceived) > 0 && (
-            <p className="text-[11px] text-emerald-700 mt-0.5 tabular-nums">
-              Adv {formatINR(b.advanceReceived)}
-            </p>
-          )}
-        </div>
-      ),
+      render: (b) => <AmountCell booking={b} />,
     },
     {
       key: 'payment',
@@ -435,9 +469,7 @@ function buildColumns(listStatus, selection) {
     {
       key: 'amount',
       header: 'Amount',
-      render: (b) => (
-        <span className="font-bold tabular-nums text-content-primary">{formatINR(b.totalAmount ?? b.amount)}</span>
-      ),
+      render: (b) => <AmountCell booking={b} />,
     },
     {
       key: 'hotel',
@@ -548,7 +580,9 @@ export default function BookingsListPage() {
   const isAll = status === 'all';
   const isLifecycle = status === 'postponed' || status === 'cancelled';
   const isCompleted = status === 'completed';
-  const showKpis = ['all', 'pending', 'confirmed', 'active', 'completed'].includes(status);
+  const isActive = status === 'active';
+  const isActivePortfolio = status === 'active-tours' || status === 'active_tours';
+  const showKpis = ['all', 'pending', 'confirmed', 'active', 'active-tours', 'active_tours', 'completed'].includes(status);
 
   const [bookings, setBookings] = useState([]);
   const [summary, setSummary] = useState(null);
@@ -700,13 +734,11 @@ export default function BookingsListPage() {
         onApplyNow={applyFiltersNow}
         destinations={filterOptions.destinations}
         packages={filterOptions.packages}
-        showStatusFilter={isAll || status === 'pending' || status === 'active'}
-        statusOptions={
-          isAll ? ALL_STATUS_OPTIONS : status === 'active' ? ['in_progress'] : undefined
-        }
+        showStatusFilter={isAll || status === 'pending'}
+        statusOptions={isAll ? ALL_STATUS_OPTIONS : undefined}
         searchPlaceholder={meta.searchPlaceholder}
         activeCount={countActiveBookingFilters(appliedFilters)}
-        singleDate={status === 'active'}
+        singleDate={isActive}
         defaultExpanded={isAll || status === 'pending'}
       />
 
@@ -721,6 +753,10 @@ export default function BookingsListPage() {
               ? 'border-rose-200/70 bg-gradient-to-b from-rose-50/40 via-white to-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_12px_28px_rgba(244,63,94,0.1)]'
               : isCompleted
                 ? 'border-emerald-200/70 bg-gradient-to-b from-emerald-50/40 via-white to-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_12px_28px_rgba(16,185,129,0.1)]'
+              : isActive
+                ? 'border-sky-200/70 bg-gradient-to-b from-sky-50/40 via-white to-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_12px_28px_rgba(14,165,233,0.12)]'
+              : isActivePortfolio
+                ? 'border-orange-200/70 bg-gradient-to-b from-orange-50/50 via-white to-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_12px_28px_rgba(249,115,22,0.12)]'
               : isAll
                 ? 'border-subtle/80 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_12px_28px_rgba(14,165,233,0.08)]'
                 : 'border-subtle/80 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_24px_rgba(13,148,136,0.06)]'
@@ -758,6 +794,14 @@ export default function BookingsListPage() {
             summary={summary}
             onOpen={(b) => navigate(`/operations-manager/booking/${b._id}`)}
           />
+        ) : isActive ? (
+          <ActiveToursBoard
+            bookings={bookings}
+            loading={loading}
+            total={pagination.total}
+            summary={summary}
+            onOpen={(b) => navigate(`/operations-manager/booking/${b._id}`)}
+          />
         ) : (
           <OperationsDataTable
             columns={columns}
@@ -785,6 +829,8 @@ export default function BookingsListPage() {
                   ? 'border-rose-100'
                   : isCompleted
                     ? 'border-emerald-100'
+                    : isActive
+                      ? 'border-sky-100'
                   : 'border-subtle/80'
             )}
             pageIndex={pagination.page - 1}

@@ -7,13 +7,13 @@ import {
   Bell,
   Flame,
   RefreshCw,
-  MessageCircle,
   Trophy,
   XCircle,
   BarChart2,
   Timer,
   Shield,
   Archive,
+  MessageCircle,
 } from 'lucide-react';
 
 const leadPerm = { module: 'leads', action: 'view' };
@@ -39,6 +39,9 @@ export const leadManagementSections = [
         path: '/whatsapp',
         label: 'WhatsApp Leads',
         icon: MessageCircle,
+        accent: 'green',
+        badgeKey: 'leads.whatsapp',
+        countKey: 'leads.whatsapp',
         permission: { module: 'whatsapp', action: 'use' },
       },
       {

@@ -728,24 +728,20 @@ const updateLead = asyncHandler(async (req, res) => {
   await applyLeadMetrics(lead);
   await lead.save();
 
-  // Mirror postpone / cancel onto linked booking when this request asks for it
-  // (booked leads often keep status locked, so we sync the booking instead).
+  // Mirror trip details (date/pax/price/destination) + postpone/cancel onto linked ops booking.
   {
     const ops = require('../services/operationsService');
     const requestedStatus = String(req.body.status || data.status || '').trim();
     const requestedPostponed =
-      requestedStatus === 'postponed' || Boolean(String(req.body.postponedReason || data.postponedReason || '').trim());
+      requestedStatus === 'postponed' ||
+      Boolean(String(req.body.postponedReason || data.postponedReason || '').trim());
     const isCancel =
       ['lost', 'booked_from_another_company'].includes(requestedStatus) ||
       ['plan_cancelled'].includes(String(req.body.lostReason || data.lostReason || ''));
-    if (requestedPostponed || isCancel) {
-      await ops
-        .syncLinkedBookingFromLead(lead, {
-          actor: req.user,
-          intent: isCancel ? 'cancelled' : 'postponed',
-        })
-        .catch((err) => console.error('[BookingLifecycleSync]', err.message));
-    }
+    const intent = isCancel ? 'cancelled' : requestedPostponed ? 'postponed' : undefined;
+    await ops
+      .syncLinkedBookingFromLead(lead, { actor: req.user, intent })
+      .catch((err) => console.error('[BookingLeadSync]', err.message));
   }
 
   const markedCold =

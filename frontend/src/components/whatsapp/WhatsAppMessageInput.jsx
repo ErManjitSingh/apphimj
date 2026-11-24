@@ -311,9 +311,9 @@ export default function WhatsAppMessageInput({ onSend, disabled, lead, user, ses
   };
 
   return (
-    <div className="shrink-0 px-3 sm:px-4 py-3 bg-white border-t border-slate-200/80">
+    <div className="shrink-0 px-2 sm:px-4 py-[10px] bg-[#f0f2f5]">
       {sessionClosed && (
-        <p className="mb-2 text-[11px] text-amber-800/90">
+        <p className="mb-2 px-1 text-[11px] text-amber-800/90">
           Session closed — free text will not deliver. Tap{' '}
           <span className="font-semibold">Meta template</span> to message this lead first.
         </p>
@@ -545,20 +545,30 @@ export default function WhatsAppMessageInput({ onSend, disabled, lead, user, ses
       )}
 
       {showAttach && (
-        <div className="flex gap-3 mb-3 px-1">
-          {ATTACH_OPTIONS.map(({ accept, label, icon: Icon }) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => openPicker(accept)}
-              className="flex flex-col items-center gap-1.5 group"
-            >
-              <div className="w-11 h-11 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center group-hover:bg-violet-50 group-hover:border-violet-200 transition-colors">
-                <Icon className="w-5 h-5 text-slate-500 group-hover:text-violet-600" />
-              </div>
-              <span className="text-[10px] text-slate-400">{label}</span>
-            </button>
-          ))}
+        <div className="flex gap-4 mb-3 px-2">
+          {ATTACH_OPTIONS.map(({ accept, label, icon: Icon, kind }) => {
+            const tone =
+              kind === 'image'
+                ? 'bg-[#bf59cf]'
+                : kind === 'video'
+                  ? 'bg-[#f15c6d]'
+                  : kind === 'audio'
+                    ? 'bg-[#f15c6d]'
+                    : 'bg-[#5157ae]';
+            return (
+              <button
+                key={label}
+                type="button"
+                onClick={() => openPicker(accept)}
+                className="flex flex-col items-center gap-1.5 group"
+              >
+                <div className={cn('w-12 h-12 rounded-full flex items-center justify-center text-white shadow-md', tone)}>
+                  <Icon className="w-5 h-5" />
+                </div>
+                <span className="text-[11px] text-[#54656f]">{label}</span>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -591,87 +601,76 @@ export default function WhatsAppMessageInput({ onSend, disabled, lead, user, ses
       )}
 
       {!templateDraft && (
-        <>
-          <div className="flex items-end gap-1.5 sm:gap-2">
-            <button
-              type="button"
-              className="mb-0.5 p-2 rounded-full hover:bg-slate-50 text-slate-400 shrink-0"
-              aria-label="Emoji"
-            >
-              <Smile className="w-5 h-5" />
-            </button>
+        <div className="flex items-end gap-1.5 sm:gap-2">
+          <button
+            type="button"
+            className="mb-[2px] p-2 rounded-full text-[#54656f] hover:bg-black/5 shrink-0"
+            aria-label="Emoji"
+          >
+            <Smile className="w-[26px] h-[26px]" strokeWidth={1.5} />
+          </button>
 
-            <button
-              type="button"
-              onClick={toggleTemplates}
-              className={cn(
-                'mb-0.5 p-2 rounded-full hover:bg-emerald-50 shrink-0 transition-colors',
-                showTemplates || sessionClosed ? 'text-[#128C7E] bg-emerald-50' : 'text-slate-400'
-              )}
-              aria-label="Select template"
-              title="Select template"
-            >
-              <LayoutTemplate className="w-5 h-5" />
-            </button>
+          <button
+            type="button"
+            onClick={toggleTemplates}
+            className={cn(
+              'mb-[2px] p-2 rounded-full shrink-0 transition-colors',
+              showTemplates || sessionClosed
+                ? 'text-[#008069] bg-[#e7fce3]'
+                : 'text-[#54656f] hover:bg-black/5'
+            )}
+            aria-label="Select template"
+            title="Select template"
+          >
+            <LayoutTemplate className="w-[22px] h-[22px]" strokeWidth={1.6} />
+          </button>
 
-            <button
-              type="button"
-              onClick={toggleAttach}
-              disabled={sessionClosed}
-              className={cn(
-                'mb-0.5 p-2 rounded-full hover:bg-slate-50 shrink-0 transition-colors',
-                showAttach ? 'text-violet-600' : 'text-slate-400',
-                sessionClosed && 'opacity-40'
-              )}
-              aria-label="Attach"
-            >
-              {showAttach ? <X className="w-5 h-5" /> : <Paperclip className="w-5 h-5" />}
-            </button>
+          <button
+            type="button"
+            onClick={toggleAttach}
+            disabled={sessionClosed}
+            className={cn(
+              'mb-[2px] p-2 rounded-full shrink-0 transition-colors',
+              showAttach ? 'text-[#008069] bg-[#e7fce3]' : 'text-[#54656f] hover:bg-black/5',
+              sessionClosed && 'opacity-40'
+            )}
+            aria-label="Attach"
+          >
+            {showAttach ? <X className="w-[22px] h-[22px]" /> : <Paperclip className="w-[22px] h-[22px]" strokeWidth={1.6} />}
+          </button>
 
-            <div className="flex-1 min-w-0">
-              <textarea
-                ref={inputRef}
-                value={text}
-                onChange={(e) => {
-                  setText(e.target.value);
-                  autoResize(e.target);
-                }}
-                onKeyDown={handleKeyDown}
-                disabled={disabled || uploading}
-                rows={1}
-                placeholder={
-                  sessionClosed
-                    ? 'Use Meta template to message new leads…'
-                    : pendingFile
-                      ? 'Add a caption...'
-                      : 'Type a message...'
-                }
-                className="w-full max-h-40 resize-none rounded-2xl px-4 py-2.5 bg-slate-50 border border-slate-200 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-300"
-              />
-            </div>
-
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={!canSend}
-              className="shrink-0 w-11 h-11 rounded-full bg-violet-600 hover:bg-violet-700 text-white flex items-center justify-center shadow-lg shadow-violet-600/30 disabled:opacity-40 transition-colors"
-              aria-label="Send"
-            >
-              <Send className="w-4 h-4 ml-0.5" />
-            </button>
+          <div className="flex-1 min-w-0">
+            <textarea
+              ref={inputRef}
+              value={text}
+              onChange={(e) => {
+                setText(e.target.value);
+                autoResize(e.target);
+              }}
+              onKeyDown={handleKeyDown}
+              disabled={disabled || uploading}
+              rows={1}
+              placeholder={
+                sessionClosed
+                  ? 'Use Meta template to message new leads…'
+                  : pendingFile
+                    ? 'Add a caption...'
+                    : 'Type a message'
+              }
+              className="w-full max-h-40 resize-none rounded-[8px] px-3 py-[9px] bg-white border-0 text-[15px] leading-[20px] text-[#111b21] placeholder:text-[#667781] focus:outline-none focus:ring-0"
+            />
           </div>
 
-          {!showTemplates && (
-            <button
-              type="button"
-              onClick={toggleTemplates}
-              className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50/80 px-3 py-1 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-100 transition-colors"
-            >
-              <LayoutTemplate className="h-3.5 w-3.5" />
-              {sessionClosed ? 'Send Meta template' : 'Select template'}
-            </button>
-          )}
-        </>
+          <button
+            type="button"
+            onClick={handleSend}
+            disabled={!canSend}
+            className="shrink-0 w-[48px] h-[48px] mb-[-2px] rounded-full bg-[#00a884] hover:bg-[#008f72] text-white flex items-center justify-center disabled:opacity-40 transition-colors"
+            aria-label="Send"
+          >
+            <Send className="w-[20px] h-[20px] ml-0.5" />
+          </button>
+        </div>
       )}
     </div>
   );

@@ -53,7 +53,7 @@ function WhatsAppLeadsPage() {
   const [creatingLead, setCreatingLead] = useState(false);
   const [sending, setSending] = useState(false);
   const [page, setPage] = useState(1);
-  const pageSize = 8;
+  const pageSize = 24;
   const debouncedSearch = useDebouncedValue(search, 280);
   const deepLinkConversationId = searchParams.get('conversationId') || '';
   const deepLinkLeadId = searchParams.get('leadId') || '';
@@ -465,11 +465,11 @@ function WhatsAppLeadsPage() {
   const canCreateLead = !isExecutive && !selected?.lead && selected?.conversationId;
 
   return (
-    <div className="-mx-4 sm:-mx-6 lg:-mx-8 -mt-2 mb-0">
+    <div className="w-full">
       <WhatsAppInboxLayout
         mobileView={mobileView}
         infoPanelOpen={infoPanelOpen}
-        className="h-[calc(100dvh-5.5rem)] lg:h-[calc(100dvh-6rem)]"
+        className="h-[calc(100dvh-3.5rem)] lg:h-[calc(100dvh-3.75rem)] lg:px-4 lg:py-3 xl:px-8"
         listPanel={
           <WhatsAppLeadList
             conversations={pagedConversations}

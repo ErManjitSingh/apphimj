@@ -23,10 +23,12 @@ function LayoutShell() {
         pathname,
       ));
   const isQuotationBuilder = pathname === "/quotations/new";
+  const isWhatsApp = pathname === "/whatsapp";
   const isMobileImmersive =
     isAdminLeadDetail ||
     isAdminLeadList ||
-    isQuotationBuilder;
+    isQuotationBuilder ||
+    isWhatsApp;
   const sidebarProps = {
     user,
     sidebarVariant: "light",
@@ -46,17 +48,23 @@ function LayoutShell() {
           <TopBar />
         </div>
         <main
-          className={`flex-1 overflow-auto ${isQuotationBuilder ? "pb-0 lg:pb-0" : "pb-20 lg:pb-0"}`}
+          className={`flex-1 overflow-auto ${isQuotationBuilder || isWhatsApp ? "pb-0 lg:pb-0" : "pb-20 lg:pb-0"}`}
         >
           <div
-            className={`${isMobileImmersive ? "p-0 lg:p-6" : "p-4 sm:p-5 lg:p-6"} max-w-[1600px] mx-auto`}
+            className={`${
+              isWhatsApp
+                ? "p-0 max-w-none"
+                : isMobileImmersive
+                  ? "p-0 lg:p-6 max-w-[1600px] mx-auto"
+                  : "p-4 sm:p-5 lg:p-6 max-w-[1600px] mx-auto"
+            }`}
           >
             <Suspense fallback={<RouteFallback />}>
               <Outlet />
             </Suspense>
           </div>
         </main>
-        {!isQuotationBuilder && <MobileNav />}
+        {!isQuotationBuilder && !isWhatsApp && <MobileNav />}
       </div>
     </div>
   );

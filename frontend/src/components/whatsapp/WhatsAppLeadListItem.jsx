@@ -1,16 +1,14 @@
 import { memo } from 'react';
-import { Phone, UserRound } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import LeadStatusBadge from '../leads/LeadStatusBadge';
 import { formatMessageTime, formatWhatsAppPhone, resolveWhatsAppDisplayName } from './whatsappUtils';
 
 const AVATAR_TONES = [
-  'from-violet-500 to-purple-600',
-  'from-fuchsia-400 to-pink-500',
-  'from-sky-400 to-blue-500',
-  'from-rose-400 to-pink-500',
-  'from-amber-400 to-orange-500',
-  'from-cyan-400 to-teal-500',
+  'bg-[#00a884]',
+  'bg-[#53bdeb]',
+  'bg-[#a855f7]',
+  'bg-[#f59e0b]',
+  'bg-[#ec4899]',
+  'bg-[#02a698]',
 ];
 
 function toneFor(seed = '') {
@@ -29,104 +27,61 @@ function WhatsAppLeadListItem({ conversation, active, onClick }) {
   const lastMessage = conversation.lastMessage;
   const unreadCount = conversation.unreadCount || 0;
   const preview =
-    lastMessage?.direction === 'outgoing' ? `You: ${lastMessage.text}` : lastMessage?.text;
+    lastMessage?.direction === 'outgoing' ? `✓ ${lastMessage.text || ''}` : lastMessage?.text;
   const initials = (name || 'W')
     .split(' ')
     .map((p) => p[0])
     .join('')
     .slice(0, 2)
     .toUpperCase();
-  const assigneeName = lead?.assignedTo?.name?.trim() || '';
 
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        'w-full flex items-start gap-3 px-3 py-3 text-left rounded-xl transition-all border',
-        active
-          ? 'bg-violet-50 border-violet-200 shadow-sm'
-          : 'bg-transparent border-transparent hover:bg-slate-50'
+        'w-full flex items-stretch gap-[13px] px-[13px] text-left transition-colors',
+        active ? 'bg-[#f0f2f5]' : 'bg-white hover:bg-[#f5f6f6]'
       )}
     >
-      <div className="relative shrink-0 mt-0.5">
+      <div className="shrink-0 self-center py-3">
         <div
           className={cn(
-            'w-11 h-11 rounded-full bg-gradient-to-br flex items-center justify-center text-white font-semibold text-sm shadow-sm',
+            'w-[49px] h-[49px] rounded-full flex items-center justify-center text-white font-medium text-[16px]',
             toneFor(name + (conversation.phone || ''))
           )}
         >
           {initials}
         </div>
-        {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white">
-            {unreadCount}
-          </span>
-        )}
       </div>
 
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between gap-2">
-          <span className={cn('font-semibold truncate text-[13px] text-slate-900', unreadCount > 0 && 'font-bold')}>
-            {name}
-          </span>
+      <div className="flex-1 min-w-0 py-3 pr-1 border-b border-[#e9edef]">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="truncate text-[17px] leading-tight text-[#111b21]">{name}</span>
           <span
             className={cn(
-              'text-[11px] shrink-0',
-              unreadCount > 0 ? 'text-emerald-600 font-semibold' : 'text-slate-400'
+              'text-[12px] shrink-0 leading-none',
+              unreadCount > 0 ? 'text-[#00a884]' : 'text-[#667781]'
             )}
           >
             {formatMessageTime(lastMessage?.timestamp || conversation.updatedAt)}
           </span>
         </div>
 
-        <p
-          className={cn(
-            'text-[12px] truncate mt-0.5',
-            unreadCount > 0 ? 'text-slate-700 font-medium' : 'text-slate-500'
-          )}
-        >
-          {preview || 'No messages yet'}
-        </p>
-
-        <div
-          className={cn(
-            'mt-1.5 inline-flex items-center gap-1.5 max-w-full rounded-full px-2 py-0.5 border',
-            assigneeName
-              ? 'bg-violet-50 border-violet-100 text-violet-700'
-              : 'bg-slate-50 border-slate-100 text-slate-500'
-          )}
-        >
-          <UserRound className="w-3 h-3 shrink-0 opacity-80" />
-          <span className="text-[10px] font-medium truncate">
-            {assigneeName ? (
-              <>
-                <span className="text-violet-500/80">Assigned to </span>
-                <span className="font-semibold">{assigneeName}</span>
-              </>
-            ) : (
-              'Not assigned yet'
+        <div className="mt-[3px] flex items-center justify-between gap-2">
+          <p
+            className={cn(
+              'truncate text-[14px] leading-snug',
+              unreadCount > 0 ? 'text-[#111b21]' : 'text-[#667781]'
             )}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-          <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 tabular-nums">
-            <Phone className="w-3 h-3" />
-            {phoneLabel}
-          </span>
-          {lead ? (
-            <>
-              <LeadStatusBadge status={lead.status} size="sm" />
-              {lead.destination && lead.destination !== 'Not specified' && (
-                <span className="text-[10px] text-slate-400 truncate">{lead.destination}</span>
-              )}
-            </>
-          ) : (
-            <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded-full">
-              New chat
+          >
+            {preview || phoneLabel || 'Click to view chat'}
+          </p>
+          {unreadCount > 0 ? (
+            <span className="min-w-[20px] h-[20px] px-1.5 rounded-full bg-[#25d366] text-white text-[11.5px] font-semibold flex items-center justify-center shrink-0">
+              {unreadCount > 99 ? '99+' : unreadCount}
             </span>
-          )}
+          ) : null}
         </div>
       </div>
     </button>

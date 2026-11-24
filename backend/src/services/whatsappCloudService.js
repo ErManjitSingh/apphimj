@@ -543,10 +543,6 @@ async function createLeadFromConversation(conversationId, extras = {}, actor = n
     inbound === 'google_ad' ||
     (!isFbWa && (inbound === 'ad' || !inbound));
 
-  // Meta CTWA → Portal Lead. Google / other WhatsApp → Website.
-  let sourceKey = 'website';
-  if (isFbWa) sourceKey = 'portal_lead';
-  else if (isGoogleWa) sourceKey = 'website';
   const lead = await ingestPublicLead({
     name: extras.name || conversation.profileName || `WhatsApp ${conversation.phone.slice(-4)}`,
     phone: conversation.phone,
@@ -566,9 +562,9 @@ async function createLeadFromConversation(conversationId, extras = {}, actor = n
       ? `Best time to call: ${answers.bestTimeToCall}`
       : '',
     channel: 'whatsapp',
-    source: sourceKey,
-    sourceLabel: sourceKey === 'portal_lead' ? 'Portal Lead' : 'Website',
-    sourceKey,
+    source: 'whatsapp',
+    sourceLabel: 'WhatsApp',
+    sourceKey: 'whatsapp',
     inboundAdSource: conversation.inboundAdSource || '',
     waAdSource: conversation.inboundAdSource || '',
     captureType: isFbWa ? 'whatsapp_ctwa' : isGoogleWa ? 'whatsapp_google' : 'whatsapp_chat',

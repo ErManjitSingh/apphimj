@@ -36,13 +36,16 @@ function buildConfirmedKpis(summary) {
 }
 
 function buildActiveKpis(summary) {
+  const count = summary?.count || 0;
+  const hotelsOk = summary?.hotelsConfirmed || 0;
+  const cabsOk = summary?.cabsConfirmed || 0;
   return [
-    { key: 'count', label: 'Active Trips', icon: Plane, iconColor: 'bg-blue-500', sparkColor: '#3B82F6', change: `${summary?.todayOnTrip || 0} on trip today`, changeType: 'up', changeLabel: '', format: (v) => v?.toLocaleString('en-IN') ?? '0' },
-    { key: 'totalPax', label: 'Total Guests', icon: Users, iconColor: 'bg-emerald-500', sparkColor: '#22C55E', change: 'Traveling now', changeType: 'up', changeLabel: '', format: (v) => v?.toLocaleString('en-IN') ?? '0' },
-    { key: 'todayOnTrip', label: 'On Trip Today', icon: MapPin, iconColor: 'bg-violet-500', sparkColor: '#8B5CF6', change: 'On today', changeType: 'up', changeLabel: '', format: (v) => v?.toLocaleString('en-IN') ?? '0' },
-    { key: 'hotelsPending', label: 'Hotels Pending', icon: Hotel, iconColor: 'bg-orange-500', sparkColor: '#F97316', change: 'Pending', changeType: (summary?.hotelsPending || 0) > 0 ? 'down' : 'neutral', changeLabel: '', format: (v) => v?.toLocaleString('en-IN') ?? '0' },
-    { key: 'cabsPending', label: 'Cabs Pending', icon: Car, iconColor: 'bg-cyan-500', sparkColor: '#06B6D4', change: 'Pending', changeType: (summary?.cabsPending || 0) > 0 ? 'down' : 'neutral', changeLabel: '', format: (v) => v?.toLocaleString('en-IN') ?? '0' },
-    { key: 'returningToday', label: 'Returning Today', icon: CalendarDays, iconColor: 'bg-rose-500', sparkColor: '#F43F5E', change: 'Departures', changeType: 'up', changeLabel: '', format: (v) => v?.toLocaleString('en-IN') ?? '0' },
+    { key: 'count', label: 'Active Tours', icon: Plane, iconColor: 'bg-sky-500', sparkColor: '#0EA5E9', change: `${summary?.todayOnTrip || 0} started today`, changeType: 'up', changeLabel: '', format: (v) => v?.toLocaleString('en-IN') ?? '0' },
+    { key: 'totalPax', label: 'Guests on ground', icon: Users, iconColor: 'bg-emerald-500', sparkColor: '#22C55E', change: 'Traveling now', changeType: 'up', changeLabel: '', format: (v) => v?.toLocaleString('en-IN') ?? '0' },
+    { key: 'todayOnTrip', label: 'Arrivals Today', icon: MapPin, iconColor: 'bg-violet-500', sparkColor: '#8B5CF6', change: 'Travel start', changeType: 'up', changeLabel: '', format: (v) => v?.toLocaleString('en-IN') ?? '0' },
+    { key: 'hotelsConfirmed', label: 'Hotels Ready', icon: Hotel, iconColor: 'bg-teal-500', sparkColor: '#14B8A6', change: `${formatPercent(hotelsOk, count)} confirmed`, changeType: 'up', changeLabel: '', format: (v) => v?.toLocaleString('en-IN') ?? '0' },
+    { key: 'cabsConfirmed', label: 'Cabs Ready', icon: Car, iconColor: 'bg-cyan-500', sparkColor: '#06B6D4', change: `${formatPercent(cabsOk, count)} confirmed`, changeType: 'up', changeLabel: '', format: (v) => v?.toLocaleString('en-IN') ?? '0' },
+    { key: 'returningToday', label: 'Returning Today', icon: CalendarDays, iconColor: 'bg-rose-500', sparkColor: '#F43F5E', change: 'Checkout / return', changeType: 'up', changeLabel: '', format: (v) => v?.toLocaleString('en-IN') ?? '0' },
   ];
 }
 
@@ -246,15 +249,15 @@ function buildAllKpis(summary) {
     },
     {
       key: 'todayOnTrip',
-      label: "Today's Departures",
+      label: "Today's Arrivals",
       icon: ArrowUpRight,
       iconColor: 'bg-blue-500',
       sparkColor: '#3B82F6',
-      change: `${summary?.returningToday || 0} arrivals`,
+      change: `${summary?.returningToday || 0} departures`,
       changeType: 'up',
       changeLabel: '',
       format: (v) => v?.toLocaleString('en-IN') ?? '0',
-      to: '/operations-manager/calendar?type=departure&today=1',
+      to: '/operations-manager/calendar?type=return&today=1',
     },
     {
       key: 'hotelsConfirmed',

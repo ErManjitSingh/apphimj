@@ -642,6 +642,10 @@ const updateWhatsAppLead = asyncHandler(async (req, res) => {
     }).catch(() => {});
   }
 
+  await require('../services/operationsService')
+    .syncLinkedBookingFromLead(lead, { actor: req.user })
+    .catch((err) => console.error('[BookingLeadSync]', err.message));
+
   // Sync bot answers only when assigning (or if travel fields empty)
   const needsSync =
     body.assignedTo ||

@@ -37,6 +37,7 @@ const receiveWebhook = asyncHandler(async (req, res) => {
 
 const webhookStatus = asyncHandler(async (_req, res) => {
   const cfg = getConfig();
+  const callbackUrl = 'https://crm.himjourneytours.in/api/webhooks/whatsapp';
   res.json({
     ok: true,
     configured: isConfigured(),
@@ -44,14 +45,16 @@ const webhookStatus = asyncHandler(async (_req, res) => {
     hasAccessToken: Boolean(cfg.accessToken),
     hasPhoneNumberId: Boolean(cfg.phoneNumberId),
     hasAppSecret: Boolean(cfg.appSecret),
-    callbackUrl: 'http://localhost:5000/api/webhooks/whatsapp',
+    callbackUrl,
+    alternateCallbackUrl: callbackUrl,
     defaultDestination: cfg.defaultDestination,
     instructions: [
       '1. Meta App → WhatsApp → Configuration → Webhook',
-      '2. Callback URL: http://localhost:5000/api/webhooks/whatsapp',
-      '3. Verify token = WHATSAPP_VERIFY_TOKEN',
-      '4. Subscribe: messages',
-      '5. Set WHATSAPP_ACCESS_TOKEN + WHATSAPP_PHONE_NUMBER_ID in backend .env',
+      `2. Callback URL: ${callbackUrl}`,
+      '3. Verify token = WHATSAPP_VERIFY_TOKEN (must match backend .env exactly)',
+      '4. Subscribe webhook fields: messages',
+      '5. After number connect, paste WHATSAPP_ACCESS_TOKEN + WHATSAPP_PHONE_NUMBER_ID + WHATSAPP_BUSINESS_ACCOUNT_ID + WHATSAPP_APP_SECRET in backend .env',
+      '6. Set WHATSAPP_ENABLED=true then pm2 restart himjourney-crm-api',
     ],
   });
 });

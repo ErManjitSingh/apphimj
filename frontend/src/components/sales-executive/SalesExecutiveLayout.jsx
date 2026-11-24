@@ -98,7 +98,13 @@ function SalesExecutiveShell() {
           data-workspace-main
           className={`flex-1 min-h-0 overflow-y-auto overscroll-y-contain ${isQuotationBuilder ? 'pb-0' : 'pb-20 lg:pb-0'}`}
         >
-          <div className={`mx-auto max-w-[1600px] ${isMobileImmersive ? 'p-0 lg:p-6' : 'p-4 sm:p-5 lg:p-6'}`}>
+          <div
+            className={
+              isWhatsApp
+                ? 'p-0 max-w-none'
+                : `mx-auto max-w-[1600px] ${isMobileImmersive ? 'p-0 lg:p-6' : 'p-4 sm:p-5 lg:p-6'}`
+            }
+          >
             <div className={isMobileImmersive ? 'hidden lg:block' : ''}>
               <MissedFollowUpAlert />
             </div>
@@ -107,7 +113,7 @@ function SalesExecutiveShell() {
             </Suspense>
           </div>
         </main>
-        {!isQuotationBuilder && <SalesExecutiveMobileNav />}
+        {!isQuotationBuilder && !isWhatsApp && <SalesExecutiveMobileNav />}
       </div>
     </div>
   );

@@ -12,6 +12,7 @@ import { APP_BRAND_NAME } from '../../config/branding';
 import SidebarNavItem from './SidebarNavItem';
 import SidebarNavGroup from './SidebarNavGroup';
 import SidebarNavSection from './SidebarNavSection';
+import SidebarWhatsAppCard from './SidebarWhatsAppCard';
 import SidebarQuickActions from './SidebarQuickActions';
 import SidebarCollectionTarget from './SidebarCollectionTarget';
 import SidebarSparkles from './SidebarSparkles';
@@ -143,6 +144,14 @@ export default function AppSidebar({
               {navItems.map((item) => {
                 if (item.type === 'section') {
                   return <SidebarNavSection key={`section-${item.label}`} label={item.label} />;
+                }
+                if (item.type === 'whatsappFeature' || item.featured === 'whatsapp') {
+                  return (
+                    <SidebarWhatsAppCard
+                      key={item.path || item.id || 'whatsapp-feature'}
+                      item={item}
+                    />
+                  );
                 }
                 if (item.children || item.sections) {
                   return <SidebarNavGroup key={item.id} group={item} defaultOpen={!!searchQuery} />;

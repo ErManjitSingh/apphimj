@@ -810,7 +810,16 @@ export default function BookingDetailPage() {
           <div className="text-left lg:text-right shrink-0">
             <p className="text-3xl sm:text-4xl font-black text-teal-600 tabular-nums">{formatINR(amount)}</p>
             <p className="text-xs text-content-muted capitalize mt-1">Payment: {booking.paymentStatus || 'pending'}</p>
-            <p className="text-sm text-amber-600 font-semibold mt-1">Pending {formatINR(booking.pendingAmount)}</p>
+            <p className="text-sm text-emerald-700 font-bold mt-1 tabular-nums">
+              Advance {formatINR(booking.advanceReceived)}
+            </p>
+            {Number(booking.pendingAmount) > 0 ? (
+              <p className="text-sm text-amber-600 font-semibold mt-0.5 tabular-nums">
+                Pending {formatINR(booking.pendingAmount)}
+              </p>
+            ) : (
+              <p className="text-sm text-content-muted mt-0.5">Fully settled</p>
+            )}
           </div>
         </div>
 

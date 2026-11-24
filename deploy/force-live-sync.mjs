@@ -129,6 +129,7 @@ cd "\$APP/backend" && node src/scripts/backfillClosedLeadTempNa.js
 cd "\$APP/backend" && node src/scripts/backfillBookedLeadPayments.js
 cd "\$APP/backend" && node src/scripts/backfillRevertExecutiveLeadSources.js
 cd "\$APP/backend" && node src/scripts/backfillConfirmOpsBookings.js
+cd "\$APP/backend" && node src/scripts/backfillMissingOpsBookings.js || true
 cd "\$APP/backend" && node src/scripts/backfillBookingLifecycleFromLeads.js || true
 pm2 restart himjourney-crm-api --update-env
 nginx -s reload || true

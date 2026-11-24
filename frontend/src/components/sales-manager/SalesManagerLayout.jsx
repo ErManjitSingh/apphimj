@@ -16,7 +16,9 @@ function SalesManagerShell() {
   const { user } = useAuth();
   const { pathname } = useLocation();
   const isQuotationBuilder = pathname === '/sales-manager/quotations/new';
+  const isWhatsApp = pathname === '/whatsapp';
   const isCommandCenter = pathname === '/sales-manager/dashboard' || pathname === '/sales-manager';
+  const isImmersive = isQuotationBuilder || isWhatsApp;
 
   const sidebarProps = {
     user,
@@ -36,24 +38,26 @@ function SalesManagerShell() {
       <MobileSidebarDrawer sidebarProps={sidebarProps} />
 
       <div className="flex-1 flex flex-col min-w-0">
-        <div className={isQuotationBuilder ? 'hidden lg:block' : ''}>
+        <div className={isImmersive ? 'hidden lg:block' : ''}>
           {isCommandCenter ? <ManagerCommandTopBar /> : <TopBar />}
         </div>
-        <main className={`flex-1 overflow-auto ${isQuotationBuilder ? 'pb-0' : 'pb-20 lg:pb-0'}`}>
+        <main className={`flex-1 overflow-auto ${isImmersive ? 'pb-0' : 'pb-20 lg:pb-0'}`}>
           <div
             className={`${
-              isQuotationBuilder
-                ? 'p-0 lg:p-6'
-                : 'p-4 sm:p-5 lg:p-6'
-            } max-w-[1600px] mx-auto`}
+              isWhatsApp
+                ? 'p-0 max-w-none'
+                : isQuotationBuilder
+                  ? 'p-0 lg:p-6 max-w-[1600px] mx-auto'
+                  : 'p-4 sm:p-5 lg:p-6 max-w-[1600px] mx-auto'
+            }`}
           >
-            {!isQuotationBuilder && <MissedFollowUpAlert />}
+            {!isImmersive && <MissedFollowUpAlert />}
             <Suspense fallback={<RouteFallback />}>
               <Outlet />
             </Suspense>
           </div>
         </main>
-        {!isQuotationBuilder && <PanelMobileNav />}
+        {!isImmersive && <PanelMobileNav />}
       </div>
     </div>
   );

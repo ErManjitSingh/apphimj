@@ -144,37 +144,37 @@ function WhatsAppMessageBubble({ message }) {
     <div className={cn('flex', isOutgoing ? 'justify-end' : 'justify-start')}>
       <div
         className={cn(
-          'relative max-w-[75%] sm:max-w-[65%] px-3 py-2 rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.06)]',
+          'relative max-w-[85%] sm:max-w-[65%] px-[9px] pt-[6px] pb-[8px] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]',
           isOutgoing
-            ? 'bg-[#d9fdd3] text-slate-900 rounded-tr-md'
-            : 'bg-white text-slate-900 rounded-tl-md border border-white/80'
+            ? 'bg-[#d9fdd3] text-[#111b21] rounded-lg rounded-tr-none'
+            : 'bg-white text-[#111b21] rounded-lg rounded-tl-none'
         )}
       >
         {hasMedia ? (
           <AttachmentPreview type={message.type} text={message.text} attachment={message.attachment} />
         ) : (
-          <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap break-words">{message.text}</p>
+          <p className="text-[14.2px] leading-[19px] whitespace-pre-wrap break-words pr-1">{message.text}</p>
         )}
 
         {isOutgoing && message.status === 'failed' && (
           <p className="mt-1 text-[11px] leading-snug text-red-600/90">
             {message.errorMessage ||
-              'Not delivered — customer must message our WhatsApp first (or within last 24h), or use a Meta template.'}
+              'Not delivered — customer must message first (24h window) or use a Meta template.'}
           </p>
         )}
 
         <div
           className={cn(
-            'flex items-center gap-1 justify-end mt-1',
-            isOutgoing ? 'text-emerald-700/50' : 'text-slate-400'
+            'flex items-center gap-[3px] justify-end mt-[2px] -mb-[2px]',
+            isOutgoing ? 'text-[#667781]' : 'text-[#667781]'
           )}
         >
-          <span className="text-[10px]">{formatMessageTime(message.timestamp)}</span>
+          <span className="text-[11px] leading-none">{formatMessageTime(message.timestamp)}</span>
           {isOutgoing && (
             <span
               className={cn(
-                'text-[11px] leading-none',
-                message.status === 'read' && 'text-sky-500',
+                'text-[14px] leading-none ml-[2px]',
+                message.status === 'read' && 'text-[#53bdeb]',
                 message.status === 'failed' && 'font-bold text-red-500'
               )}
               title={message.errorMessage || message.status}

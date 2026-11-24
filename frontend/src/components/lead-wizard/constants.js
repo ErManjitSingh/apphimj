@@ -16,6 +16,7 @@ export const LEAD_SOURCES = [
   { value: 'referral', label: 'Referral' },
   { value: 'portal_lead', label: 'Portal Lead' },
   { value: 'call_lead', label: 'Call Lead' },
+  { value: 'whatsapp', label: 'WhatsApp' },
 ];
 
 /** Hidden for sales executive when creating / picking a source */

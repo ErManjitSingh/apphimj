@@ -16,6 +16,7 @@ const {
   buildFollowUpTabFilter,
   buildFollowUpCategoryFilter,
   startOfDay,
+  endOfDay,
   isConvertedListQuery,
   applyConvertedPeriodFilter,
 } = require('../utils/queryHelpers');
@@ -38,21 +39,12 @@ const { applyPhoneVisibilityGate } = require('../utils/leadPhoneVisibility');
 const LIST_PAGINATION = { defaultLimit: 20, maxLimit: 200 };
 
 function parseLocalDayStart(dateStr) {
-  const parts = String(dateStr || '').split('-').map(Number);
-  if (parts.length === 3 && parts.every((n) => Number.isFinite(n))) {
-    return new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0);
-  }
-  return startOfDay(new Date(dateStr));
+  // Org calendar day (IST) — never use server-local midnight (VPS is UTC).
+  return startOfDay(dateStr || new Date());
 }
 
 function parseLocalDayEnd(dateStr) {
-  const parts = String(dateStr || '').split('-').map(Number);
-  if (parts.length === 3 && parts.every((n) => Number.isFinite(n))) {
-    return new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59, 999);
-  }
-  const end = new Date(dateStr);
-  end.setHours(23, 59, 59, 999);
-  return end;
+  return endOfDay(dateStr || new Date());
 }
 
 function buildDateRange(query = {}) {
@@ -173,13 +165,11 @@ function parseValidObjectId(value) {
 
 function buildExecutiveLeadFilter(filterKey, query = {}) {
   if (filterKey === 'new') {
+    // Fresh / Today = IST calendar day (created or assigned). setHours on startOfDay
+    // breaks on UTC servers and returns an empty window after ~5:30 AM IST.
     const range = buildDateRange(query) || {
       $gte: startOfDay(),
-      $lte: (() => {
-        const end = startOfDay();
-        end.setHours(23, 59, 59, 999);
-        return end;
-      })(),
+      $lte: endOfDay(),
     };
     return {
       $or: [
@@ -455,7 +445,12 @@ async function findExecutiveLeadsPaginated(userId, query = {}, options = {}) {
   ]);
 
   let enriched = rows.map((row) => maskReturnedLeadForExecutive(enrichLead(row), userId));
-  if (filterKey === 'converted' || filter.status === 'converted') {
+  if (
+    filterKey === 'converted' ||
+    filterKey === 'booked' ||
+    filter.status === 'converted' ||
+    filter.status === 'booked'
+  ) {
     const { attachPaymentSummariesToLeads } = require('../services/paymentReceiptService');
     enriched = await attachPaymentSummariesToLeads(enriched);
   }
@@ -623,8 +618,7 @@ async function findScopedQuotationsPaginated(baseFilter, query = {}, { mapRow, b
 async function getFollowUpSummary(baseFilter = {}, options = {}) {
   const scopedBase = withBranch(baseFilter, options.branchId);
   const todayStart = startOfDay();
-  const todayEnd = new Date(todayStart);
-  todayEnd.setHours(23, 59, 59, 999);
+  const todayEnd = endOfDay();
 
   const [row] = await FollowUp.aggregate([
     { $match: scopedBase },

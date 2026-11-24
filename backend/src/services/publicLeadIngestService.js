@@ -120,46 +120,9 @@ function resolvePublicLeadSource(raw = {}) {
     String(raw.channel || '').toLowerCase() === 'whatsapp';
 
   if (isWhatsApp) {
-    const inbound = String(raw.waAdSource || raw.inboundAdSource || '').toLowerCase();
-    const isGoogleWa =
-      hint.includes('dpw_wa') ||
-      hint.includes('google_whatsapp') ||
-      hint.includes('landing_whatsapp') ||
-      inbound === 'google' ||
-      inbound === 'google_ad' ||
-      (/\bgoogle\b|\bgads\b|\bgclid\b/.test(hint) &&
-        /\bwhatsapp\b|\bwa\b/.test(hint));
-
-    const isFbWa =
-      hint.includes('dpw2_wa') ||
-      hint.includes('ctwa') ||
-      hint.includes('facebook_whatsapp') ||
-      hint.includes('fb_wa') ||
-      hint.includes('meta_whatsapp') ||
-      inbound === 'facebook_ad' ||
-      ((/\bfacebook\b|\bmeta\b|\binstagram\b|\bfb\b/.test(hint) &&
-        /\bwhatsapp\b|\bwa\b|\bctwa\b/.test(hint)));
-
-    // Explicit Google → DPW WA; Meta CTWA → DPW2 WA; bare WhatsApp defaults to Google Ads WA (DPW WA)
-    if (isFbWa && !isGoogleWa) {
-      return {
-        source: 'website_2',
-        sourceLabel: 'Website 2',
-        channel: 'whatsapp',
-      };
-    }
-
-    if (isGoogleWa) {
-      return {
-        source: 'website',
-        sourceLabel: 'Website',
-        channel: 'whatsapp',
-      };
-    }
-
     return {
-      source: 'website',
-      sourceLabel: 'Website',
+      source: 'whatsapp',
+      sourceLabel: 'WhatsApp',
       channel: 'whatsapp',
     };
   }

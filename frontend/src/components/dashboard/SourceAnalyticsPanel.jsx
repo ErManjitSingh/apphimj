@@ -14,6 +14,14 @@ const SOURCE_COLORS = [
   'bg-teal-500',
 ];
 
+function formatINRCompact(n) {
+  const amount = Number(n || 0);
+  if (amount >= 100000) return `₹${(amount / 100000).toFixed(2).replace(/\.00$/, '')}L`;
+  if (amount >= 1000) return `₹${(amount / 1000).toFixed(1).replace(/\.0$/, '')}k`;
+  if (!amount) return '—';
+  return `₹${amount.toLocaleString('en-IN')}`;
+}
+
 export default function SourceAnalyticsPanel({ data }) {
   const sources = data?.sources || [];
   if (!sources.length) {
@@ -25,9 +33,13 @@ export default function SourceAnalyticsPanel({ data }) {
   }
 
   const maxTotal = Math.max(...sources.map((s) => s.total), 1);
+  const overall =
+    data?.overallConversionRate != null
+      ? `${data.overallConversionRate}% overall · ${data.totalBooked || 0} booked`
+      : 'Leads, booked rate & package value by source';
 
   return (
-    <DashboardPanel title="Source Analytics" subtitle="Leads, conversion rate & pipeline by source">
+    <DashboardPanel title="Source Analytics" subtitle={overall}>
       <div
         className="space-y-4 overflow-y-auto scrollbar-thin pr-1"
         style={{ maxHeight: `${VISIBLE_ROWS * 6.25}rem` }}
@@ -40,28 +52,29 @@ export default function SourceAnalyticsPanel({ data }) {
             transition={{ delay: i * 0.04 }}
             className="group"
           >
-            <div className="flex items-center justify-between gap-3 mb-1.5">
+            <div className="mb-1.5 flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-content-primary truncate">{src.label}</p>
+                <p className="truncate text-sm font-semibold text-content-primary">{src.label}</p>
                 <p className="text-xs text-content-muted">
                   {src.total} leads · {src.sharePct}% share
                 </p>
               </div>
-              <div className="text-right shrink-0">
+              <div className="shrink-0 text-right">
                 <p className="text-sm font-bold text-emerald-600">{src.conversionRate}%</p>
-                <p className="text-[10px] text-content-muted">{src.converted} converted</p>
+                <p className="text-[10px] text-content-muted">{src.converted} booked</p>
               </div>
             </div>
-            <div className="h-2 rounded-full bg-surface-elevated overflow-hidden">
+            <div className="h-2 overflow-hidden rounded-full bg-surface-elevated">
               <div
                 className={`h-full rounded-full ${SOURCE_COLORS[i % SOURCE_COLORS.length]} transition-all`}
                 style={{ width: `${(src.total / maxTotal) * 100}%` }}
               />
             </div>
-            <div className="flex gap-3 mt-1 text-[10px] text-content-muted">
-              <span>{src.pipeline} in pipeline</span>
+            <div className="mt-1 flex flex-wrap gap-3 text-[10px] text-content-muted">
+              <span>{src.pipeline} open</span>
               <span>{src.lost} lost</span>
-              <span>Avg score {src.avgScore}</span>
+              <span>{src.connected} connected</span>
+              <span className="font-semibold text-amber-700">{formatINRCompact(src.revenue)}</span>
             </div>
           </motion.div>
         ))}

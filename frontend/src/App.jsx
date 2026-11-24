@@ -105,6 +105,7 @@ import {
   OperationsCalendarPage,
   OperationsProfilePage,
   TripTrackerPage,
+  TripExecutionMapPage,
   OperationsTasksPage,
   PaymentsPage,
   InvoicesPage,
@@ -339,6 +340,7 @@ function App() {
                     element={<BookingsListPage />}
                   />
                   <Route path="booking/:id" element={<BookingDetailPage />} />
+                  <Route path="trip-map" element={<TripExecutionMapPage />} />
                   <Route path="trip-tracker" element={<TripTrackerPage />} />
                   <Route path="tasks" element={<OperationsTasksPage />} />
                   <Route path="hotels" element={<OperationsHotelsPage />} />

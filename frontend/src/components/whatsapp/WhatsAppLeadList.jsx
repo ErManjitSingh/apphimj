@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Search, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, MoreVertical } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { STATUS_FILTERS } from './constants';
 import WhatsAppLeadListItem from './WhatsAppLeadListItem';
@@ -24,36 +24,34 @@ function WhatsAppLeadList({
   const to = Math.min(page * pageSize, total || conversations.length);
 
   return (
-    <div className="flex flex-col h-full bg-white border-r border-slate-200/80">
-      <div className="shrink-0 p-4 space-y-3 border-b border-slate-100">
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <h2 className="text-[17px] font-semibold text-slate-900 tracking-tight">WhatsApp Leads</h2>
-            <p className="text-[11px] font-medium text-emerald-600 mt-0.5">
-              {activeCount} chats active
-            </p>
+    <div className="flex flex-col h-full bg-white">
+      <div className="shrink-0 flex items-center justify-between px-4 h-[60px] bg-[#f0f2f5] border-b border-[#e9edef]">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="h-10 w-10 rounded-full bg-[#dfe5e7] flex items-center justify-center text-[#54656f] text-sm font-semibold">
+            HJ
           </div>
-          <button
-            type="button"
-            className="p-2 rounded-xl border border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
-            aria-label="Filters"
-          >
-            <SlidersHorizontal className="w-4 h-4" />
-          </button>
+          <div className="min-w-0">
+            <p className="text-[16px] font-medium text-[#111b21] leading-tight">WhatsApp Leads</p>
+            <p className="text-[12px] text-[#667781]">{activeCount} chats</p>
+          </div>
         </div>
+        <button type="button" className="p-2 rounded-full text-[#54656f] hover:bg-black/5" aria-label="Menu">
+          <MoreVertical className="w-5 h-5" />
+        </button>
+      </div>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+      <div className="shrink-0 px-3 py-2 bg-white">
+        <div className="relative mb-2">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-[15px] h-[15px] text-[#54656f]" />
           <input
             type="search"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search leads..."
-            className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-300"
+            placeholder="Search or start new chat"
+            className="w-full h-[35px] pl-9 pr-3 rounded-lg bg-[#f0f2f5] text-[14px] text-[#111b21] placeholder:text-[#667781] outline-none"
           />
         </div>
-
-        <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-1">
           {STATUS_FILTERS.map((f) => {
             const active = statusFilter === f.key;
             return (
@@ -62,10 +60,8 @@ function WhatsAppLeadList({
                 type="button"
                 onClick={() => onStatusFilterChange(f.key)}
                 className={cn(
-                  'shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all border',
-                  active
-                    ? 'bg-violet-600 text-white border-violet-600 shadow-sm shadow-violet-600/25'
-                    : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                  'shrink-0 h-7 px-3 rounded-full text-[12.5px] font-medium',
+                  active ? 'bg-[#e7fce3] text-[#008069]' : 'bg-[#f0f2f5] text-[#54656f]'
                 )}
               >
                 {f.label}
@@ -75,35 +71,34 @@ function WhatsAppLeadList({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto overscroll-contain px-2 py-2 space-y-1">
+      <div className="flex-1 overflow-y-auto border-t border-[#e9edef]">
         {loading ? (
-          <div className="p-2 space-y-2">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="flex gap-3 animate-pulse rounded-xl p-3">
-                <div className="w-11 h-11 rounded-full bg-slate-100" />
-                <div className="flex-1 space-y-2 py-1">
-                  <div className="h-3 bg-slate-100 rounded w-2/3" />
-                  <div className="h-2.5 bg-slate-100 rounded w-full" />
+          <div className="p-2 space-y-1">
+            {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+              <div key={i} className="flex gap-3 px-3 py-3 animate-pulse">
+                <div className="w-[49px] h-[49px] rounded-full bg-[#e9edef]" />
+                <div className="flex-1 border-b border-[#f0f2f5] pb-3 space-y-2">
+                  <div className="h-3.5 bg-[#e9edef] rounded w-1/2" />
+                  <div className="h-3 bg-[#f0f2f5] rounded w-4/5" />
                 </div>
               </div>
             ))}
           </div>
         ) : conversations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-            <div className="w-14 h-14 rounded-full bg-slate-50 flex items-center justify-center mb-3 border border-slate-100">
-              <Search className="w-6 h-6 text-slate-300" />
-            </div>
-            <p className="text-sm font-medium text-slate-700">No conversations found</p>
-            <p className="text-xs text-slate-400 mt-1">Try adjusting your filters</p>
+          <div className="flex flex-col items-center justify-center h-full px-8 text-center">
+            <p className="text-[16px] text-[#41525d]">No chats yet</p>
+            <p className="mt-1 text-[13px] text-[#8696a0]">
+              Messages to your WhatsApp Business number will appear here.
+            </p>
           </div>
         ) : (
           conversations.map((conv) => {
-            const id = conv.conversationId || conv._id;
+            const id = conv.conversationId || conv.leadId || conv._id;
             return (
               <WhatsAppLeadListItem
                 key={id}
                 conversation={conv}
-                active={selectedId === id || selectedId === conv.leadId}
+                active={selectedId === id}
                 onClick={() => onSelect(conv)}
               />
             );
@@ -111,65 +106,21 @@ function WhatsAppLeadList({
         )}
       </div>
 
-      <div className="shrink-0 px-3 py-2.5 border-t border-slate-100 flex items-center justify-between gap-2 bg-white">
-        <p className="text-[11px] text-slate-400">
-          Showing {from} to {to} of {total || conversations.length}
-        </p>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            disabled={page <= 1}
-            onClick={() => onPageChange?.(page - 1)}
-            className="p-1 rounded-md text-slate-400 hover:bg-slate-50 disabled:opacity-30"
-            aria-label="Previous page"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
-            const p = Math.min(Math.max(page - 1, 1), Math.max(totalPages - 2, 1)) + i;
-            if (p > totalPages) return null;
-            return (
-              <button
-                key={p}
-                type="button"
-                onClick={() => onPageChange?.(p)}
-                className={cn(
-                  'min-w-[28px] h-7 px-1.5 rounded-lg text-[11px] font-semibold',
-                  p === page
-                    ? 'bg-violet-600 text-white'
-                    : 'text-slate-500 hover:bg-slate-50'
-                )}
-              >
-                {p}
-              </button>
-            );
-          })}
-          {totalPages > 3 && (
-            <>
-              <span className="text-slate-300 text-xs px-0.5">…</span>
-              <button
-                type="button"
-                onClick={() => onPageChange?.(totalPages)}
-                className={cn(
-                  'min-w-[28px] h-7 px-1.5 rounded-lg text-[11px] font-semibold',
-                  page === totalPages ? 'bg-violet-600 text-white' : 'text-slate-500 hover:bg-slate-50'
-                )}
-              >
-                {totalPages}
-              </button>
-            </>
-          )}
-          <button
-            type="button"
-            disabled={page >= totalPages}
-            onClick={() => onPageChange?.(page + 1)}
-            className="p-1 rounded-md text-slate-400 hover:bg-slate-50 disabled:opacity-30"
-            aria-label="Next page"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
+      {totalPages > 1 && (
+        <div className="shrink-0 flex items-center justify-between px-3 h-10 border-t border-[#e9edef] bg-[#f0f2f5] text-[12px] text-[#667781]">
+          <span>
+            {from}–{to}
+          </span>
+          <div className="flex gap-1">
+            <button type="button" disabled={page <= 1} onClick={() => onPageChange?.(page - 1)} className="p-1 disabled:opacity-40">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button type="button" disabled={page >= totalPages} onClick={() => onPageChange?.(page + 1)} className="p-1 disabled:opacity-40">
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -99,6 +99,7 @@ export const OperationsReportsPage = lazy(() => import('../components/operations
 export const OperationsCalendarPage = lazy(() => import('../components/operations-manager/OperationsCalendarPage'));
 export const OperationsProfilePage = lazy(() => import('../components/operations-manager/OperationsProfilePage'));
 export const TripTrackerPage = lazy(() => import('../components/operations-manager/trips/TripTrackerPage'));
+export const TripExecutionMapPage = lazy(() => import('../components/operations-manager/trips/TripExecutionMapPage'));
 export const OperationsTasksPage = lazy(() => import('../components/operations-manager/tasks/TasksPage'));
 export const PaymentsPage = lazy(() => import('../components/payments/PaymentsPage'));
 export const InvoicesPage = lazy(() => import('../components/payments/InvoicesPage'));

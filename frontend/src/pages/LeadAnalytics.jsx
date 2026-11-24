@@ -45,7 +45,9 @@ export default function LeadAnalytics() {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-content-primary">Lead Analytics</h1>
-          <p className="text-sm text-content-muted">Source conversion, executive performance & pipeline health</p>
+          <p className="text-sm text-content-muted">
+            Booked conversions, package value, source mix & executive performance
+          </p>
         </div>
       </div>
 

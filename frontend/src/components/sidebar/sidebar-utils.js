@@ -36,6 +36,13 @@ export function filterNavItemsBySearch(items, query) {
       return acc;
     }
 
+    if (item.type === 'whatsappFeature' || item.featured === 'whatsapp') {
+      if (matchesQuery(item.label, q) || matchesQuery(item.subtitle, q) || q.includes('whatsapp')) {
+        acc.push(item);
+      }
+      return acc;
+    }
+
     if (item.sections) {
       const groupMatch = matchesQuery(item.label, q);
       const sections = item.sections

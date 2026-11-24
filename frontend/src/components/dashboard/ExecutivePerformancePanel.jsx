@@ -58,6 +58,7 @@ function normalizeExecutive(exec) {
     converted,
     conversionRate,
     revenue: Number(exec.revenue || 0),
+    pipeline: Number(exec.pipeline || 0),
   };
 }
 

@@ -1,7 +1,7 @@
 const FollowUp = require('../models/FollowUp');
 const User = require('../models/User');
 const { getFollowUpSummary } = require('../repositories/roleScopedRepository');
-const { buildFollowUpTabFilter, startOfDay } = require('../utils/queryHelpers');
+const { buildFollowUpTabFilter, startOfDay, endOfDay } = require('../utils/queryHelpers');
 const { withBranch } = require('../utils/branchScope');
 
 async function getAdminFollowUpSummary({ branchId = null } = {}) {
@@ -37,8 +37,7 @@ async function getMissedFollowUpsPreview(baseFilter = {}, limit = 8) {
 
 async function getTeamFollowUpReport(branchId = null) {
   const todayStart = startOfDay();
-  const todayEnd = new Date(todayStart);
-  todayEnd.setHours(23, 59, 59, 999);
+  const todayEnd = endOfDay();
 
   const rows = await FollowUp.aggregate([
     { $match: withBranch({}, branchId) },

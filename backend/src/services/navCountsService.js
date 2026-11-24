@@ -13,13 +13,11 @@ const { getExecutiveIdsForLeader } = require('./teamScopeService');
 const { buildExecutiveStallQuery } = require('./leadExecutiveStallService');
 const { withBranch } = require('../utils/branchScope');
 const { getReminderCounts } = require('./reminderService');
+const { startOfDay, endOfDay } = require('../utils/queryHelpers');
 
 function todayRange() {
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const endOfToday = new Date();
-  endOfToday.setHours(23, 59, 59, 999);
-  return { startOfToday, endOfToday };
+  // Sidebar Fresh/Today badges must use IST calendar day (same as lead list).
+  return { startOfToday: startOfDay(), endOfToday: endOfDay() };
 }
 
 async function countHotLeads(extra = {}, branchId = null) {
@@ -633,18 +631,85 @@ async function buildTeamLeaderNavCounts(userId, { branchId } = {}) {
 }
 
 async function buildOperationsNavCounts(userId, { branchId } = {}) {
+  const Lead = require('../models/Lead');
+  const CANCELLED_LEAD_STATUSES = ['lost', 'booked_from_another_company'];
+
+  const [postponedLeadIds, cancelledLeadIds] = await Promise.all([
+    Lead.find(
+      withBranch(
+        {
+          isDeleted: { $ne: true },
+          $or: [
+            { status: 'postponed' },
+            { postponedAt: { $exists: true, $ne: null } },
+            { postponedReason: { $exists: true, $nin: [null, ''] } },
+          ],
+        },
+        branchId
+      )
+    )
+      .select('_id')
+      .lean()
+      .then((rows) => rows.map((r) => r._id)),
+    Lead.find(
+      withBranch(
+        {
+          isDeleted: { $ne: true },
+          $or: [
+            { status: { $in: CANCELLED_LEAD_STATUSES } },
+            { lostReason: 'plan_cancelled' },
+            { statusReason: 'plan_cancelled' },
+          ],
+        },
+        branchId
+      )
+    )
+      .select('_id')
+      .lean()
+      .then((rows) => rows.map((r) => r._id)),
+  ]);
+
+  const activeToursMatch = {
+    archivedAt: { $exists: false },
+    status: {
+      $nin: ['completed', 'postponed', 'cancelled', 'refund_pending', 'refund_completed'],
+    },
+    $nor: [
+      {
+        $or: [
+          { status: 'postponed' },
+          { postponedAt: { $exists: true, $ne: null } },
+          { postponedReason: { $exists: true, $nin: [null, ''] } },
+          ...(postponedLeadIds.length ? [{ lead: { $in: postponedLeadIds } }] : []),
+        ],
+      },
+      {
+        $or: [
+          { status: { $in: ['cancelled', 'refund_pending', 'refund_completed'] } },
+          { cancelledAt: { $exists: true, $ne: null } },
+          { paymentStatus: { $in: ['refund_pending', 'refund_completed'] } },
+          ...(cancelledLeadIds.length ? [{ lead: { $in: cancelledLeadIds } }] : []),
+        ],
+      },
+    ],
+  };
+
   const [
     bookingsPending,
     bookingsConfirmed,
     bookingsActive,
+    bookingsActiveTours,
     bookingsCompleted,
     supportOpen,
     tasksPending,
     notificationsUnread,
   ] = await Promise.all([
-    Booking.countDocuments(withBranch({ status: 'pending' }, branchId)),
+    Booking.countDocuments(
+      withBranch({ status: { $in: ['booking_received', 'pending_verification', 'pending'] } }, branchId)
+    ),
     Booking.countDocuments(withBranch({ status: 'confirmed' }, branchId)),
     Booking.countDocuments(withBranch({ status: 'in_progress' }, branchId)),
+    Booking.countDocuments(withBranch(activeToursMatch, branchId)),
     Booking.countDocuments(withBranch({ status: 'completed' }, branchId)),
     SupportTicket.countDocuments({ status: { $in: ['open', 'in_progress'] } }),
     TripTask.countDocuments({ status: 'pending' }),
@@ -656,6 +721,7 @@ async function buildOperationsNavCounts(userId, { branchId } = {}) {
       pending: bookingsPending,
       confirmed: bookingsConfirmed,
       active: bookingsActive,
+      activeTours: bookingsActiveTours,
       completed: bookingsCompleted,
     },
     support: { open: supportOpen },

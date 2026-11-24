@@ -26,8 +26,28 @@ const {
 } = require('./operationsQuotationSyncService');
 const { notifyBookingConfirmed } = require('./notificationService');
 const cacheService = require('./cacheService');
+const {
+  startOfDay: istStartOfDay,
+  endOfDay: istEndOfDay,
+} = require('../utils/queryHelpers');
 
 const OPS_DASHBOARD_TTL = 30_000;
+
+/** Guests currently traveling: in_progress, or confirmed within travel→return window (IST). */
+function activeOnTripMatch(now = new Date()) {
+  const todayStart = istStartOfDay(now);
+  const todayEnd = istEndOfDay(now);
+  return {
+    $or: [
+      { status: 'in_progress' },
+      {
+        status: 'confirmed',
+        travelDate: { $lte: todayEnd },
+        returnDate: { $gte: todayStart },
+      },
+    ],
+  };
+}
 
 const STATUS_ROUTE_MAP = {
   pending: ['booking_received', 'pending_verification', 'pending'],
@@ -94,6 +114,39 @@ function postponedBookingMatch(leadIds = []) {
   return { $or: parts };
 }
 
+/** Arrivals / departures / live calendar — never include postponed or cancelled portfolios. */
+function excludeHeldOrClosedMatch(postponedLeadIds = [], cancelledLeadIds = []) {
+  return {
+    status: {
+      $nin: [...STATUS_ROUTE_MAP.postponed, ...STATUS_ROUTE_MAP.cancelled],
+    },
+    $nor: [
+      postponedBookingMatch(postponedLeadIds),
+      cancelledBookingMatch(cancelledLeadIds),
+    ],
+  };
+}
+
+/**
+ * Active Tour portfolio = Total − Completed − Postponed − Cancelled
+ * (pending + confirmed + live/on-trip still open for ops).
+ */
+function activeToursPortfolioMatch(postponedLeadIds = [], cancelledLeadIds = []) {
+  return {
+    status: {
+      $nin: [
+        'completed',
+        ...STATUS_ROUTE_MAP.postponed,
+        ...STATUS_ROUTE_MAP.cancelled,
+      ],
+    },
+    $nor: [
+      postponedBookingMatch(postponedLeadIds),
+      cancelledBookingMatch(cancelledLeadIds),
+    ],
+  };
+}
+
 function startOfDay(d = new Date()) {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
@@ -109,8 +162,20 @@ function endOfDay(d = new Date()) {
 function resolveStatusFilter(statusKey) {
   const key = String(statusKey || '').trim().toLowerCase();
   // "all" / empty / unknown portfolio keys → no status constraint (show every booking)
-  // postponed/cancelled use dedicated lead+status matchers in listBookings / dashboard.
-  if (!key || key === 'all' || key === 'total' || key === 'postponed' || key === 'cancelled') return null;
+  // postponed/cancelled/active-tours use dedicated matchers in listBookings / dashboard.
+  if (
+    !key ||
+    key === 'all' ||
+    key === 'total' ||
+    key === 'postponed' ||
+    key === 'cancelled' ||
+    key === 'active-tours' ||
+    key === 'active_tours' ||
+    key === 'opentours' ||
+    key === 'open'
+  ) {
+    return null;
+  }
   if (STATUS_ROUTE_MAP[key]) return STATUS_ROUTE_MAP[key];
   // Only accept real booking status values — never invent filters like status:"all"
   const knownBookingStatuses = new Set([
@@ -175,10 +240,18 @@ async function buildOpsSparklines(base, postponedLeadIds = [], cancelledLeadIds 
       status: 'in_progress',
       updatedAt: { $gte: start, $lte: end },
     }),
-    // Departures = trips starting that day
-    todaysDepartures: (start, end) => ({ ...base, travelDate: { $gte: start, $lte: end } }),
-    // Arrivals = trips returning that day
-    todaysArrivals: (start, end) => ({ ...base, returnDate: { $gte: start, $lte: end } }),
+    // Arrivals = guests starting trip / arriving that day (skip postponed/cancelled)
+    todaysArrivals: (start, end) => ({
+      ...base,
+      ...excludeHeldOrClosedMatch(postponedLeadIds, cancelledLeadIds),
+      travelDate: { $gte: start, $lte: end },
+    }),
+    // Departures = guests returning / leaving destination that day
+    todaysDepartures: (start, end) => ({
+      ...base,
+      ...excludeHeldOrClosedMatch(postponedLeadIds, cancelledLeadIds),
+      returnDate: { $gte: start, $lte: end },
+    }),
     postponedBookings: (start, end) => ({
       ...postponedBookingMatch(postponedLeadIds),
       updatedAt: { $gte: start, $lte: end },
@@ -212,13 +285,23 @@ function mapStatusToCategory(status) {
 
 async function nextBookingNumber() {
   const year = new Date().getFullYear();
-  const count = await Booking.countDocuments({
-    bookingNumber: new RegExp(`^BK-${year}-`),
-  });
-  return `BK-${year}-${String(count + 1).padStart(4, '0')}`;
+  const prefix = `BK-${year}-`;
+  // Use max sequence (not count) so gaps / deleted rows never reuse an existing number.
+  const latest = await Booking.find({ bookingNumber: new RegExp(`^${prefix}`) })
+    .select('bookingNumber')
+    .sort({ bookingNumber: -1 })
+    .limit(1)
+    .lean();
+  const last = latest[0]?.bookingNumber || '';
+  const match = String(last).match(new RegExp(`^${prefix}(\\d+)$`));
+  const next = (match ? Number(match[1]) : 0) + 1;
+  return `${prefix}${String(next).padStart(4, '0')}`;
 }
 
 async function buildDashboard(branchId) {
+  // Live trip portfolios hide archived clutter; Total Bookings KPI includes all
+  // so it matches converted/booked lead counts.
+  const allBase = withBranch({}, branchId);
   const base = withBranch(notArchivedFilter(), branchId);
   const todayStart = startOfDay();
   const todayEnd = endOfDay();
@@ -257,6 +340,7 @@ async function buildDashboard(branchId) {
     completedTrips,
     postponedBookings,
     cancelledBookings,
+    activeTours,
     openTickets,
     totalBookings,
     branchStats,
@@ -266,11 +350,21 @@ async function buildDashboard(branchId) {
     openTicketsList,
     operationsTasksList,
   ] = await Promise.all([
-    // Departures today = travel start date today
-    Booking.countDocuments({ ...base, travelDate: { $gte: todayStart, $lte: todayEnd } }),
-    Booking.countDocuments({ ...base, returnDate: { $gte: todayStart, $lte: todayEnd } }),
+    // Departures today = return / checkout; Arrivals today = travel start
+    // Postponed / cancelled never count as live arrivals or departures.
     Booking.countDocuments({
       ...base,
+      ...excludeHeldOrClosedMatch(postponedLeadIds, cancelledLeadIds),
+      returnDate: { $gte: todayStart, $lte: todayEnd },
+    }),
+    Booking.countDocuments({
+      ...base,
+      ...excludeHeldOrClosedMatch(postponedLeadIds, cancelledLeadIds),
+      travelDate: { $gte: todayStart, $lte: todayEnd },
+    }),
+    Booking.countDocuments({
+      ...base,
+      ...excludeHeldOrClosedMatch(postponedLeadIds, cancelledLeadIds),
       travelDate: { $gt: todayEnd },
       status: { $in: ['confirmed', 'in_progress', 'booking_received', 'pending_verification'] },
     }),
@@ -282,19 +376,23 @@ async function buildDashboard(branchId) {
     Booking.countDocuments(pendingCab),
     Booking.countDocuments(pendingActivity),
     Booking.countDocuments(pendingVoucher),
-    Booking.countDocuments({ ...base, status: 'in_progress' }),
+    Booking.countDocuments({ ...base, ...activeOnTripMatch() }),
     Booking.countDocuments({ ...base, status: 'completed' }),
     // Include archived — ops portfolio views should still show historical hold/cancel trips.
     Booking.countDocuments(withBranch(postponedBookingMatch(postponedLeadIds), branchId)),
     Booking.countDocuments(withBranch(cancelledBookingMatch(cancelledLeadIds), branchId)),
+    // Active Tour = Total − Completed − Postponed − Cancelled (open ops portfolio).
+    Booking.countDocuments(
+      withBranch(activeToursPortfolioMatch(postponedLeadIds, cancelledLeadIds), branchId)
+    ),
     SupportTicket.countDocuments({ status: { $in: ['open', 'in_progress'] } }),
-    Booking.countDocuments(base),
+    Booking.countDocuments(allBase),
     Booking.aggregate([
-      { $match: base },
+      { $match: allBase },
       { $group: { _id: '$branchId', count: { $sum: 1 } } },
     ]),
     Booking.find(base).sort({ createdAt: -1 }).limit(8).select(
-      'bookingNumber customerName destination packageName travelDate returnDate status totalAmount hotelConfirmation cabConfirmation adults children'
+      'bookingNumber customerName destination packageName travelDate returnDate status totalAmount advanceReceived hotelConfirmation cabConfirmation adults children'
     ).lean(),
     TripTask.countDocuments({ status: { $in: ['pending', 'in_progress'] } }),
     Booking.find({
@@ -351,7 +449,7 @@ async function buildDashboard(branchId) {
   ] = await Promise.all([
     Booking.aggregate([{ $match: base }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
     Booking.aggregate([
-      { $match: { ...base, status: 'in_progress' } },
+      { $match: { ...base, ...activeOnTripMatch() } },
       {
         $group: {
           _id: null,
@@ -375,10 +473,26 @@ async function buildDashboard(branchId) {
     }),
     Booking.countDocuments({ ...base, status: 'in_progress', updatedAt: { $gte: thisWeek.start, $lte: thisWeek.end } }),
     Booking.countDocuments({ ...base, status: 'in_progress', updatedAt: { $gte: lastWeek.start, $lte: lastWeek.end } }),
-    Booking.countDocuments({ ...base, travelDate: { $gte: thisWeek.start, $lte: thisWeek.end } }),
-    Booking.countDocuments({ ...base, travelDate: { $gte: lastWeek.start, $lte: lastWeek.end } }),
-    Booking.countDocuments({ ...base, returnDate: { $gte: thisWeek.start, $lte: thisWeek.end } }),
-    Booking.countDocuments({ ...base, returnDate: { $gte: lastWeek.start, $lte: lastWeek.end } }),
+    Booking.countDocuments({
+      ...base,
+      ...excludeHeldOrClosedMatch(postponedLeadIds, cancelledLeadIds),
+      travelDate: { $gte: thisWeek.start, $lte: thisWeek.end },
+    }),
+    Booking.countDocuments({
+      ...base,
+      ...excludeHeldOrClosedMatch(postponedLeadIds, cancelledLeadIds),
+      travelDate: { $gte: lastWeek.start, $lte: lastWeek.end },
+    }),
+    Booking.countDocuments({
+      ...base,
+      ...excludeHeldOrClosedMatch(postponedLeadIds, cancelledLeadIds),
+      returnDate: { $gte: thisWeek.start, $lte: thisWeek.end },
+    }),
+    Booking.countDocuments({
+      ...base,
+      ...excludeHeldOrClosedMatch(postponedLeadIds, cancelledLeadIds),
+      returnDate: { $gte: lastWeek.start, $lte: lastWeek.end },
+    }),
     Booking.countDocuments({
       ...withBranch(postponedBookingMatch(postponedLeadIds), branchId),
       updatedAt: { $gte: thisWeek.start, $lte: thisWeek.end },
@@ -417,10 +531,33 @@ async function buildDashboard(branchId) {
 
   const guestsOnTrip = guestsOnTripAgg[0] || { guests: 0, bookings: 0 };
 
+  const activeToursSafe = Math.max(
+    0,
+    Number(activeTours) ||
+      Math.max(
+        0,
+        Number(totalBookings || 0) -
+          Number(completedTrips || 0) -
+          Number(postponedBookings || 0) -
+          Number(cancelledBookings || 0)
+      )
+  );
+
   const kpiTrends = {
     totalBookings: pctChangeLabel(trendTotalThis, trendTotalLast),
     upcomingTours: pctChangeLabel(trendUpcomingThis, trendUpcomingLast),
     activeTrips: pctChangeLabel(trendActiveThis, trendActiveLast),
+    liveTours: pctChangeLabel(trendActiveThis, trendActiveLast),
+    activeTours: pctChangeLabel(
+      Math.max(
+        0,
+        trendTotalThis - trendCompletedThis - trendPostponedThis - trendCancelledThis
+      ),
+      Math.max(
+        0,
+        trendTotalLast - trendCompletedLast - trendPostponedLast - trendCancelledLast
+      )
+    ),
     todaysDepartures: pctChangeLabel(trendDeparturesThis, trendDeparturesLast),
     todaysArrivals: pctChangeLabel(trendArrivalsThis, trendArrivalsLast),
     postponedBookings: pctChangeLabel(trendPostponedThis, trendPostponedLast),
@@ -433,6 +570,8 @@ async function buildDashboard(branchId) {
       totalBookings,
       upcomingTours,
       activeTrips,
+      liveTours: activeTrips,
+      activeTours: activeToursSafe,
       todaysDepartures,
       postponedBookings,
       cancelledBookings,
@@ -460,6 +599,7 @@ async function buildDashboard(branchId) {
       onTripBookings: guestsOnTrip.bookings,
       departuresToday: todaysDepartures,
       arrivalsToday: todaysArrivals,
+      activeTours: activeToursSafe,
     },
     kpiTrends,
     sparklines,
@@ -524,7 +664,27 @@ async function buildDashboard(branchId) {
       .sort({ travelDate: 1 })
       .limit(8)
       .select(
-        'bookingNumber customerName destination packageName travelDate returnDate status adults children'
+        'bookingNumber customerName destination packageName travelDate returnDate status adults children hotelConfirmation cabConfirmation totalAmount advanceReceived'
+      )
+      .lean(),
+    completedTripsList: await Booking.find({
+      ...base,
+      status: 'completed',
+    })
+      .sort({ returnDate: -1, updatedAt: -1 })
+      .limit(12)
+      .select(
+        'bookingNumber customerName destination packageName travelDate returnDate status adults children hotelConfirmation cabConfirmation totalAmount advanceReceived'
+      )
+      .lean(),
+    liveTripsList: await Booking.find({
+      ...base,
+      ...activeOnTripMatch(),
+    })
+      .sort({ returnDate: 1, travelDate: 1 })
+      .limit(12)
+      .select(
+        'bookingNumber customerName customerPhone destination packageName travelDate returnDate status adults children hotelConfirmation cabConfirmation totalAmount advanceReceived itinerary hotels transport'
       )
       .lean(),
     generatedAt: new Date().toISOString(),
@@ -532,7 +692,7 @@ async function buildDashboard(branchId) {
 }
 
 async function getDashboard(branchId) {
-  const key = `ops:dashboard-v2:${branchId || 'all'}`;
+  const key = `ops:dashboard-v4:${branchId || 'all'}`;
   return cacheService.getOrSet(key, () => buildDashboard(branchId), OPS_DASHBOARD_TTL);
 }
 
@@ -1167,8 +1327,15 @@ async function listTransport(query = {}, { branchId } = {}) {
 async function listBookings(query = {}, { branchId } = {}) {
   const { page, limit, skip } = parsePagination(query, { defaultLimit: 10, maxLimit: 100 });
   const statusKey = String(query.status || '').trim().toLowerCase();
-  // Cancelled / postponed portfolios include archived historical trips.
-  const includeArchived = statusKey === 'cancelled' || statusKey === 'postponed' || statusKey === 'completed';
+  // Total / cancelled / postponed / completed include archived historical trips so
+  // ops Total Bookings stays aligned with converted-lead counts.
+  const includeArchived =
+    !statusKey ||
+    statusKey === 'all' ||
+    statusKey === 'total' ||
+    statusKey === 'cancelled' ||
+    statusKey === 'postponed' ||
+    statusKey === 'completed';
   const filter = withBranch(includeArchived ? {} : notArchivedFilter(), branchId);
 
   if (statusKey === 'postponed') {
@@ -1177,6 +1344,19 @@ async function listBookings(query = {}, { branchId } = {}) {
   } else if (statusKey === 'cancelled') {
     const cancelledLeadIds = await leadIdsForCancelledBookings(branchId);
     Object.assign(filter, cancelledBookingMatch(cancelledLeadIds));
+  } else if (statusKey === 'active') {
+    Object.assign(filter, activeOnTripMatch());
+  } else if (
+    statusKey === 'active-tours' ||
+    statusKey === 'active_tours' ||
+    statusKey === 'open' ||
+    statusKey === 'opentours'
+  ) {
+    const [postponedLeadIds, cancelledLeadIds] = await Promise.all([
+      leadIdsForPostponedBookings(branchId),
+      leadIdsForCancelledBookings(branchId),
+    ]);
+    Object.assign(filter, activeToursPortfolioMatch(postponedLeadIds, cancelledLeadIds));
   } else {
     const statusList = resolveStatusFilter(statusKey);
     if (statusList) filter.status = { $in: statusList };
@@ -1250,7 +1430,7 @@ async function listBookings(query = {}, { branchId } = {}) {
     if (digits.length >= 4) {
       searchOr.push({ customerPhone: { $regex: digits.split('').join('\\D*'), $options: 'i' } });
     }
-    // Don't clobber postponed/cancelled $or matchers.
+    // Don't clobber postponed/cancelled/active $or matchers.
     if (filter.$or) {
       const statusOr = filter.$or;
       delete filter.$or;
@@ -1260,8 +1440,13 @@ async function listBookings(query = {}, { branchId } = {}) {
     }
   }
 
+  const sortSpec =
+    statusKey === 'active'
+      ? { returnDate: 1, travelDate: 1 }
+      : { createdAt: -1 };
+
   const [rows, total, summary, destinations, packages] = await Promise.all([
-    Booking.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+    Booking.find(filter).sort(sortSpec).skip(skip).limit(limit).lean(),
     Booking.countDocuments(filter),
     aggregateBookingSummary(filter),
     Booking.distinct('destination', facetFilter),
@@ -1346,6 +1531,7 @@ async function updateBooking(id, payload, actor) {
     'packageName', 'destination', 'quotationReference', 'executiveName',
     'complimentary', 'specialNotes', 'companyVoucherUrl', 'opsCosting',
     'postponedAt', 'postponedReason', 'cancelledAt', 'cancelReason',
+    'adults', 'children', 'customerName', 'customerPhone', 'customerEmail',
   ];
   const patch = Object.fromEntries(
     Object.entries(payload || {}).filter(([key]) => allowed.includes(key))
@@ -1442,9 +1628,25 @@ async function updateBooking(id, payload, actor) {
   return booking;
 }
 
+function sameDayTs(a, b) {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  const da = new Date(a);
+  const db = new Date(b);
+  if (Number.isNaN(da.getTime()) || Number.isNaN(db.getTime())) return false;
+  return da.toISOString().slice(0, 10) === db.toISOString().slice(0, 10);
+}
+
+function shiftDateByMs(value, deltaMs) {
+  if (!value || !deltaMs) return value;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return new Date(d.getTime() + deltaMs);
+}
+
 /**
- * When a lead is postponed / lost (or booked lead gets a postpone reason),
- * mirror that onto the linked ops booking so portfolio lists stay accurate.
+ * Mirror lead trip / customer / lifecycle fields onto the linked ops booking.
+ * Used when sales edits travel date, pax, price, destination, or postpone/cancel.
  */
 async function syncLinkedBookingFromLead(lead, { actor, intent } = {}) {
   if (!lead?._id) return null;
@@ -1465,11 +1667,89 @@ async function syncLinkedBookingFromLead(lead, { actor, intent } = {}) {
   if (wantCancel && !STATUS_ROUTE_MAP.cancelled.includes(booking.status)) {
     patch.status = 'cancelled';
     patch.cancelledAt = new Date();
-    patch.cancelReason = String(lead.lostReason || lead.statusReason || lead.postponedReason || 'Lead cancelled').trim();
+    patch.cancelReason = String(
+      lead.lostReason || lead.statusReason || lead.postponedReason || 'Lead cancelled'
+    ).trim();
   } else if (wantPostpone && !wantCancel && booking.status !== 'postponed') {
     patch.status = 'postponed';
     patch.postponedAt = lead.postponedAt || new Date();
-    patch.postponedReason = String(lead.postponedReason || lead.statusReason || 'Travel postponed').trim();
+    patch.postponedReason = String(
+      lead.postponedReason || lead.statusReason || 'Travel postponed'
+    ).trim();
+  }
+
+  const leadName = String(lead.name || '').trim();
+  if (leadName && leadName !== String(booking.customerName || '').trim()) {
+    patch.customerName = leadName;
+  }
+  const leadPhone = String(lead.phone || lead.whatsapp || '').trim();
+  if (leadPhone && leadPhone !== String(booking.customerPhone || '').trim()) {
+    patch.customerPhone = leadPhone;
+  }
+  const leadEmail = String(lead.email || '').trim();
+  if (leadEmail && leadEmail !== String(booking.customerEmail || '').trim()) {
+    patch.customerEmail = leadEmail;
+  }
+  const leadDestination = String(lead.destination || '').trim();
+  if (
+    leadDestination &&
+    leadDestination !== 'Not specified' &&
+    leadDestination !== String(booking.destination || '').trim()
+  ) {
+    patch.destination = leadDestination;
+  }
+
+  if (lead.travelDate && !sameDayTs(lead.travelDate, booking.travelDate)) {
+    patch.travelDate = new Date(lead.travelDate);
+  }
+  if (lead.returnDate && !sameDayTs(lead.returnDate, booking.returnDate)) {
+    patch.returnDate = new Date(lead.returnDate);
+  }
+
+  const adults = Number(lead.adults ?? lead.travelers);
+  if (Number.isFinite(adults) && adults >= 0 && adults !== Number(booking.adults || 0)) {
+    patch.adults = adults;
+  }
+  const children = Number(lead.children);
+  if (Number.isFinite(children) && children >= 0 && children !== Number(booking.children || 0)) {
+    patch.children = children;
+  }
+
+  // Lead form "Package Cost / Budget" → ops booking total (keep advance, recalc pending)
+  const packageCost = Number(lead.budget);
+  if (Number.isFinite(packageCost) && packageCost > 0 && packageCost !== Number(booking.totalAmount || 0)) {
+    patch.totalAmount = packageCost;
+    patch.advanceReceived = Number(booking.advanceReceived || 0);
+  }
+
+  // When travel start moves, shift hotel / cab dates by the same delta so ops stays aligned.
+  if (patch.travelDate && booking.travelDate) {
+    const prev = new Date(booking.travelDate);
+    const next = new Date(patch.travelDate);
+    if (!Number.isNaN(prev.getTime()) && !Number.isNaN(next.getTime())) {
+      const deltaMs = next.getTime() - prev.getTime();
+      if (deltaMs !== 0) {
+        if (Array.isArray(booking.hotels) && booking.hotels.length) {
+          patch.hotels = booking.hotels.map((h) => ({
+            ...(typeof h.toObject === 'function' ? h.toObject() : h),
+            checkIn: shiftDateByMs(h.checkIn, deltaMs),
+            checkOut: shiftDateByMs(h.checkOut, deltaMs),
+          }));
+        }
+        if (Array.isArray(booking.transport) && booking.transport.length) {
+          patch.transport = booking.transport.map((t) => ({
+            ...(typeof t.toObject === 'function' ? t.toObject() : t),
+            pickupDate: shiftDateByMs(t.pickupDate, deltaMs),
+          }));
+        }
+        if (Array.isArray(booking.itinerary) && booking.itinerary.length) {
+          patch.itinerary = booking.itinerary.map((day) => ({
+            ...(typeof day.toObject === 'function' ? day.toObject() : day),
+            date: shiftDateByMs(day.date, deltaMs),
+          }));
+        }
+      }
+    }
   }
 
   if (!Object.keys(patch).length) return booking;
@@ -1562,7 +1842,18 @@ async function createBookingFromPayment(paymentId, actor) {
     if (payment.quotation) {
       patch.quotation = payment.quotation;
     }
-    // Backfill trip details if booking was created before hotel/cab mapping.
+    // Always refresh trip header from current lead so payment re-saves heal drift.
+    const fresh = await buildBookingPayloadFromPayment(payment);
+    if (fresh.travelDate) patch.travelDate = fresh.travelDate;
+    if (fresh.returnDate) patch.returnDate = fresh.returnDate;
+    if (fresh.destination) patch.destination = fresh.destination;
+    if (fresh.adults != null) patch.adults = fresh.adults;
+    if (fresh.children != null) patch.children = fresh.children;
+    if (fresh.customerName) patch.customerName = fresh.customerName;
+    if (fresh.customerPhone) patch.customerPhone = fresh.customerPhone;
+    if (fresh.customerEmail) patch.customerEmail = fresh.customerEmail;
+
+    // Backfill hotels/cabs/itinerary if booking was created before mapping, or quote changed.
     const needsFulfillment =
       !(existing.hotels || []).length ||
       !(existing.transport || []).length ||
@@ -1570,9 +1861,7 @@ async function createBookingFromPayment(paymentId, actor) {
       !existing.packageName ||
       (payment.quotation && String(existing.quotation || '') !== String(payment.quotation));
     if (needsFulfillment) {
-      const fresh = await buildBookingPayloadFromPayment(payment);
       if (fresh.packageName) patch.packageName = fresh.packageName;
-      if (fresh.destination) patch.destination = fresh.destination;
       if (fresh.quotationReference) patch.quotationReference = fresh.quotationReference;
       if (fresh.hotels?.length) patch.hotels = fresh.hotels;
       if (fresh.transport?.length) patch.transport = fresh.transport;
@@ -1664,10 +1953,11 @@ async function buildReports(branchId) {
   const totalBookings = Object.values(statusMap).reduce((a, b) => a + b, 0);
   const completedTrips = statusMap.completed || 0;
   const revenue = monthlyTrips.reduce((s, r) => s + (r.revenue || 0), 0);
+  const activeOnTrip = await Booking.countDocuments({ ...base, ...activeOnTripMatch() });
 
   const summary = {
     totalBookings,
-    activeTrips: statusMap.in_progress || 0,
+    activeTrips: activeOnTrip,
     completedTrips,
     pendingBookings:
       (statusMap.booking_received || 0) +
@@ -1876,10 +2166,99 @@ async function getTripTracker(branchId) {
   };
 }
 
+async function listCalendarEvents({ branchId } = {}) {
+  const [postponedLeadIds, cancelledLeadIds] = await Promise.all([
+    leadIdsForPostponedBookings(branchId),
+    leadIdsForCancelledBookings(branchId),
+  ]);
+
+  const filter = withBranch(
+    {
+      ...notArchivedFilter(),
+      ...excludeHeldOrClosedMatch(postponedLeadIds, cancelledLeadIds),
+      $and: [
+        {
+          $or: [
+            { travelDate: { $exists: true, $ne: null } },
+            { returnDate: { $exists: true, $ne: null } },
+          ],
+        },
+      ],
+    },
+    branchId
+  );
+
+  const bookings = await Booking.find(filter)
+    .select(
+      'bookingNumber customerName customerPhone destination packageName travelDate returnDate status paymentStatus totalAmount advanceReceived pendingAmount adults children hotelConfirmation cabConfirmation hotels transport voucherStatus executiveName'
+    )
+    .lean();
+
+  const events = [];
+  for (const b of bookings) {
+    const guests = (Number(b.adults) || 0) + (Number(b.children) || 0);
+    const hotelName = b.hotels?.[0]?.hotelName || '';
+    const cabLabel = (() => {
+      const t = b.transport?.[0];
+      if (!t) return '';
+      const vehicle = t.vehicleType ? String(t.vehicleType).replace(/_/g, ' ') : '';
+      if (vehicle && t.vendorName) return `${vehicle} · ${t.vendorName}`;
+      return vehicle || t.vendorName || '';
+    })();
+    const base = {
+      _id: b._id,
+      bookingNumber: b.bookingNumber,
+      customerName: b.customerName || 'Guest',
+      customerPhone: b.customerPhone || '',
+      destination: b.destination || '—',
+      packageName: b.packageName || '',
+      status: b.status,
+      paymentStatus: b.paymentStatus,
+      totalAmount: b.totalAmount || 0,
+      advanceReceived: b.advanceReceived || 0,
+      pendingAmount: b.pendingAmount || 0,
+      adults: b.adults || 0,
+      children: b.children || 0,
+      guests,
+      hotelConfirmation: b.hotelConfirmation || 'pending',
+      cabConfirmation: b.cabConfirmation || 'pending',
+      hotelName,
+      cabLabel,
+      voucherStatus: b.voucherStatus || '',
+      executiveName: b.executiveName || '',
+      travelDate: b.travelDate || null,
+      returnDate: b.returnDate || null,
+      title: `${b.customerName || 'Guest'} — ${b.destination || 'Trip'}`,
+    };
+    // Destination ops: Arrival = travel start; Departure = return / checkout.
+    if (b.travelDate) {
+      events.push({
+        ...base,
+        start: b.travelDate,
+        end: b.travelDate,
+        type: 'return',
+        eventLabel: 'Arrival',
+      });
+    }
+    if (b.returnDate) {
+      events.push({
+        ...base,
+        start: b.returnDate,
+        end: b.returnDate,
+        type: 'departure',
+        eventLabel: 'Departure',
+      });
+    }
+  }
+
+  return events;
+}
+
 module.exports = {
   STATUS_ROUTE_MAP,
   getDashboard,
   listBookings,
+  listCalendarEvents,
   syncLinkedBookingFromLead,
   createBooking,
   buildBookingPayloadFromPayment,

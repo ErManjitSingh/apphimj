@@ -461,9 +461,20 @@ async function sendReceiptToCustomer({ lead, payment, actor }) {
 
 function summarizePayment(payment, booking) {
   if (!payment && !booking) return null;
-  const total = Number(payment?.amount ?? booking?.totalAmount) || 0;
-  const advance = Number(payment?.paidAmount ?? booking?.advanceReceived) || 0;
-  const balance = Math.max(0, Number(booking?.pendingAmount ?? total - advance) || 0);
+  // Prefer the higher of payment vs booking — a Payment with paidAmount:0 must not
+  // hide a real booking.advanceReceived (and vice versa).
+  const total = Math.max(
+    Number(payment?.amount) || 0,
+    Number(booking?.totalAmount) || 0
+  );
+  const advance = Math.max(
+    Number(payment?.paidAmount) || 0,
+    Number(booking?.advanceReceived) || 0
+  );
+  const balance = Math.max(
+    0,
+    Number(booking?.pendingAmount) || Math.max(0, total - advance)
+  );
   return {
     paymentId: payment?._id || null,
     bookingId: booking?._id || null,

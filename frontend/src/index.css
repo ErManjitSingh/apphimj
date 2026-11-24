@@ -134,35 +134,35 @@
 
   .wa-inbox {
     background: #ffffff;
-    /* Keep WhatsApp surface light even when CRM is in dark mode */
+    /* WhatsApp Web light palette */
     --wa-panel: #ffffff;
-    --wa-header: #ffffff;
-    --wa-chat-bg: #e5ddd5;
-    --wa-input: #f3f4f6;
-    --wa-border: #e8ecf1;
-    --wa-divider: #eef1f5;
-    --wa-list-hover: #f8fafc;
-    --wa-list-active: #f3eeff;
-    --wa-text-primary: #0f172a;
-    --wa-text-secondary: #64748b;
-    --wa-text-muted: #94a3b8;
+    --wa-header: #f0f2f5;
+    --wa-chat-bg: #efeae2;
+    --wa-input: #f0f2f5;
+    --wa-border: #d1d7db;
+    --wa-divider: #e9edef;
+    --wa-list-hover: #f5f6f6;
+    --wa-list-active: #f0f2f5;
+    --wa-text-primary: #111b21;
+    --wa-text-secondary: #667781;
+    --wa-text-muted: #8696a0;
     --wa-bubble-out: #d9fdd3;
-    --wa-bubble-out-text: #0f172a;
+    --wa-bubble-out-text: #111b21;
     --wa-bubble-in: #ffffff;
-    --wa-bubble-in-text: #0f172a;
+    --wa-bubble-in-text: #111b21;
   }
 
   /* Classic WhatsApp chat wallpaper (beige + doodle tile) */
   .wa-chat-pattern {
-    background-color: #e5ddd5;
+    background-color: #efeae2;
     background-image: url('/whatsapp-chat-bg.svg');
     background-repeat: repeat;
-    background-size: 360px 360px;
+    background-size: 412.5px 749.25px;
     background-position: center top;
   }
 
   .dark .wa-chat-pattern {
-    background-color: #e5ddd5;
+    background-color: #efeae2;
     background-image: url('/whatsapp-chat-bg.svg');
   }
 
