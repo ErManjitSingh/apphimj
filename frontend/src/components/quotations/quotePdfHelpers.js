@@ -17,10 +17,15 @@ export function resolveQuotePackage(quote) {
   const snap = quote?.packageSnapshot && typeof quote.packageSnapshot === 'object' ? quote.packageSnapshot : {};
   const pop = quote?.package && typeof quote.package === 'object' ? quote.package : {};
   const raw = { ...pop, ...snap };
-  const travelYmd = toYmd(raw.travelDate || snap.travelDate);
+  const leadObj = quote?.lead && typeof quote.lead === 'object' && !Array.isArray(quote.lead) ? quote.lead : {};
+  // Lead travel date wins — never keep stale package / day.date stamps on the PDF
+  const travelYmd =
+    toYmd(leadObj.travelDate) ||
+    toYmd(quote?.travelDate) ||
+    toYmd(raw.travelDate || snap.travelDate);
   const itinerary = (raw.itinerary || []).map((day, i) => {
     const dayNum = Number(day.day) || i + 1;
-    const stamped = toYmd(day.date) || (travelYmd ? shiftYmd(travelYmd, dayNum - 1) : '');
+    const stamped = travelYmd ? shiftYmd(travelYmd, dayNum - 1) : toYmd(day.date) || '';
     return {
       ...day,
       id: day.id || day._id || `day-${i}`,
@@ -124,8 +129,15 @@ export function resolveQuoteLead(quote) {
       snap.travelDate ||
       pkg.travelDate ||
       '',
-    adults: lead.adults ?? quote?.adults ?? snap.adults ?? quote?.pricing?.party?.adults,
-    children: lead.children ?? quote?.children ?? snap.children ?? quote?.pricing?.party?.children,
+    // Prefer lead pax fields; ignore empty package/pricing fallbacks that hide real counts
+    adults:
+      lead.adults != null && lead.adults !== ''
+        ? lead.adults
+        : (quote?.adults ?? snap.adults ?? quote?.pricing?.party?.adults),
+    children:
+      lead.children != null && lead.children !== ''
+        ? lead.children
+        : (quote?.children ?? snap.children ?? quote?.pricing?.party?.children),
     travelers: lead.travelers ?? quote?.travelers ?? quote?.pricing?.party?.travelers,
     numberOfRooms:
       lead.numberOfRooms ??
@@ -640,17 +652,31 @@ export function resolveTravelerCounts(quote) {
   const lead = resolveQuoteLead(quote);
   const pkg = resolveQuotePackage(quote);
   const party = quote?.pricing?.party || {};
-  const total = Number(lead.travelers || party.travelers) || 2;
+  // Lead adults/children are source of truth for PDF pax (not package template / stale party)
+  const kids = Math.max(
+    0,
+    Number(lead.children ?? party.children ?? pkg.kids ?? pkg.children) || 0
+  );
+  const adultsFromLeadOrParty = Number(lead.adults ?? party.adults ?? pkg.adults);
+  const travelersTotal = Number(lead.travelers ?? party.travelers);
+  const adults = Math.max(
+    1,
+    Number.isFinite(adultsFromLeadOrParty) && adultsFromLeadOrParty > 0
+      ? Math.floor(adultsFromLeadOrParty)
+      : travelersTotal > 0
+        ? Math.max(1, Math.floor(travelersTotal) - kids)
+        : 1
+  );
   const rooms = Number(
-    party.rooms ?? lead.numberOfRooms ?? pkg.numberOfRooms ?? pkg.rooms
+    lead.numberOfRooms ?? party.rooms ?? pkg.numberOfRooms ?? pkg.rooms
   );
   const mattresses = Number(
-    party.mattresses ?? lead.roomsWithMattress ?? pkg.roomsWithMattress ?? pkg.extraBeds
+    lead.roomsWithMattress ?? party.mattresses ?? pkg.roomsWithMattress ?? pkg.extraBeds
   );
   return {
-    adults: Number(party.adults ?? pkg.adults ?? lead.adults) || Math.max(1, total - (pkg.kids || 0)),
-    kids: Number(pkg.kids ?? lead.children ?? party.children) || 0,
-    rooms: Number.isFinite(rooms) && rooms > 0 ? Math.floor(rooms) : Math.max(1, Math.ceil(total / 2)),
+    adults,
+    kids,
+    rooms: Number.isFinite(rooms) && rooms > 0 ? Math.floor(rooms) : Math.max(1, Math.ceil(adults / 2)),
     extraBeds: Number.isFinite(mattresses) && mattresses >= 0 ? Math.floor(mattresses) : 0,
   };
 }

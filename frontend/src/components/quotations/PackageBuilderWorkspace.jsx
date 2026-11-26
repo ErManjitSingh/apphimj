@@ -425,6 +425,9 @@ export default function PackageBuilderWorkspace({
           draftQuote.packageSnapshot?.travelDate ||
           draftQuote.package?.travelDate ||
           '',
+        adults: lead?.adults ?? draftQuote.lead?.adults,
+        children: lead?.children ?? draftQuote.lead?.children,
+        travelers: lead?.travelers ?? draftQuote.lead?.travelers,
         numberOfRooms:
           lead?.numberOfRooms ??
           draftQuote.lead?.numberOfRooms ??
@@ -444,6 +447,13 @@ export default function PackageBuilderWorkspace({
         ...(draftQuote.packageSnapshot || draftQuote.package || {}),
         guestName,
         preparedFor: guestName,
+        travelDate:
+          lead?.travelDate ||
+          draftQuote.packageSnapshot?.travelDate ||
+          draftQuote.package?.travelDate ||
+          '',
+        adults: lead?.adults ?? draftQuote.packageSnapshot?.adults,
+        children: lead?.children ?? draftQuote.packageSnapshot?.children,
       },
     };
   }, [draftQuote, lead]);

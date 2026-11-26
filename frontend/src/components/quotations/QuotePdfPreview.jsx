@@ -356,10 +356,11 @@ const QuotePdfPreview = forwardRef(function QuotePdfPreview({ quote }, ref) {
           <div className="quote-ht-timeline">
             {pkg.itinerary.map((day, index) => {
               const dayNum = Number(day.day) || index + 1;
+              // Always derive from lead travel date (Day 1 = travel date, Day N = +N-1)
               const dayDate =
-                getDayDate(day.date, 1) ||
                 getDayDate(lead.travelDate, dayNum) ||
-                getDayDate(pkg.travelDate, dayNum);
+                getDayDate(pkg.travelDate, dayNum) ||
+                getDayDate(day.date, 1);
               const dayHotel = resolveDayHotelForItinerary(quote, dayNum);
               const stay = resolveDayStaySummary(quote, dayNum);
               const hasHotel = dayHotel?.name || day.hotel;
